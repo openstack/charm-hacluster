@@ -1,0 +1,17 @@
+name: hacluster
+summary: Corosync Cluster Engine - membership, messaging and quorum
+maintainer: Andres Rodriguez <andres.rodriguez@canonical.com>
+subordinate: true
+description: |
+ Corosync/Pacemaker
+requires:
+  juju-info:
+    interface: juju-info
+    scope: container
+provides:
+  ha:
+    interface: hacluster
+    scope: container
+peers:
+  hanode:
+    interface: hacluster
