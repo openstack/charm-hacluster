@@ -15,23 +15,13 @@ HA Cluster (pacemaker/corosync)  Charm
  * TODO: Fix Disable upstart jobs
    - sudo sh -c "echo 'manual' > /etc/init/SERVICE.override"
 
- * BIG PROBlEM:
-   - given that we can only deploy hacluster once, and its config defines
-     the corosync configuration options, then we need to change the approach
-     on how the corosync is defined. Possible solution:
-     - in the 'service/charm' that uses hacluster, it will define the corosync options
-     - Instead of network source, it can define interfaces to use and assume each ethX
-       interface is connected to the same network and autodetect the network address.
- * TODO: on juju destroy-server quantum, ha-relation-broken is executed.
-   we need to put nodes in standby or delete them.
-
- * ERROR/BUG (discuss with jamespage):
-   - On add-unit in controller environment:
-     - subordinate (in added unit) gets the relation data in ha-relation-joined
-   - On add-unit in openstack
-     - subordinate (in added unit) *DOESN'T* get the the relation data in ha-relation-joined
-       - This is fine really cause we don't really need to re-add the services.
-       - However, the problem is that upstart jobs don't get stopped.
-
   update-rc.d -f pacemaker remove
   update-rc.d pacemaker start 50 1 2 3 4 5 . stop 01 0 6 .
+
+TODO: Problem seems to be that peer-relation gets executed before the subordinate relation.
+
+In that case, peer relation would have to put nodes in standby and then the subordinate relation
+will have to put the nodes online and configure the services. Or probably not use it at all.
+
+Hanode-relation puts node in standby.
+ha-relation counts nodes in hanode-relation and if >2 then we online them and setup cluster.

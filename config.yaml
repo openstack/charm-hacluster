@@ -1,9 +1,4 @@
 options:
-  corosync_bindnetaddr:
-    type: string
-    description: |
-      Network address of the interface on which corosync will communicate
-      with the other nodes of the cluster.
   corosync_mcastaddr:
     default: 226.94.1.1
     type: string
@@ -11,13 +6,6 @@ options:
       Multicast IP address to use for exchanging messages over the network.
       If multiple clusters are on the same bindnetaddr network, this value
       can be changed.
-  corosync_mcastport:
-    default: 5405
-    type: int
-    description: |
-      Multicast Port number to use for exchanging messages. If multiple
-      clusters sit on the same Multicast IP Address, this value needs to
-      be changed.
   corosync_pcmk_ver:
     default: 1
     type: int
@@ -26,6 +14,7 @@ options:
       Corosync how to start pacemaker
   corosync_key:
     type: string
+    default: corosync-key
     description: |
       This value will become the Corosync authentication key. To generate
       a suitable value use:

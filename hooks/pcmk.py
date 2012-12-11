@@ -20,12 +20,33 @@ def commit(cmd):
     subprocess.call(cmd.split())
 
 
-#def wait_for_cluster():
-#    while (not is_running()):
-#        time.sleep(3)
-
 def is_resource_present(resource):
     (status, output) = commands.getstatusoutput("crm resource status %s" % resource)
     if status != 0:
         return False
     return True
+
+
+def standby(node=None):
+    if node is None:
+        cmd = "crm -F node standby"
+    else:
+        cmd = "crm -F node standby %s" % node
+    commit(cmd)
+
+
+def online(node=None):
+    if node is None:
+        cmd = "crm -F node online"
+    else:
+        cmd = "crm -F node online %s" % node
+    commit(cmd)
+
+
+def crm_opt_exists(opt_name):
+     (status, output) = commands.getstatusoutput("crm configure show")
+     show_re = re.compile(opt_name)
+     opt = show_re.search(output)
+     if opt:
+         return True
+     return False

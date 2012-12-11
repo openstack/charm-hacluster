@@ -13,6 +13,8 @@ import re
 import subprocess
 import socket
 import sys
+import fcntl
+import struct
 
 
 def do_hooks(hooks):
@@ -42,6 +44,12 @@ try:
 except ImportError:
     install('python-jinja2')
     import jinja2
+
+try:
+    from netaddr import *
+except:
+    install('python-netaddr')
+    from netaddr import *
 
 
 def render_template(template_name, context, template_dir=TEMPLATES_DIR):
@@ -223,3 +231,35 @@ def disable_lsb_services(*services):
 def enable_lsb_services(*services):
     for service in services:
         subprocess.call(['update-rc.d','-f',service,'defaults'])
+
+
+def get_iface_ipaddr(iface):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    return socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x8919,  # SIOCGIFADDR
+        struct.pack('256s', iface[:15])
+    )[20:24])
+
+
+def get_iface_netmask(iface):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    return socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x891b, # SIOCGIFNETMASK
+        struct.pack('256s', iface[:15])
+    )[20:24])
+
+
+def get_netmask_cidr(netmask):
+    netmask = netmask.split('.')
+    binary_str = ''
+    for octet in netmask:
+        binary_str += bin(int(octet))[2:].zfill(8)
+    return str(len(binary_str.rstrip('0')))
+
+
+def get_network_address(iface):
+    network = "%s/%s" % (get_iface_ipaddr(iface), get_netmask_cidr(get_iface_netmask(iface)))
+    ip = IPNetwork(network)
+    return str(ip.network)
