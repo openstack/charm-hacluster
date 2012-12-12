@@ -22,6 +22,7 @@ def install():
     utils.juju_log('INFO', 'Begin install hook.')
     utils.configure_source()
     utils.install('corosync', 'pacemaker', 'openstack-resource-agents', 'python-netaddr')
+    utils.enable_lsb_services('pacemaker')
     utils.juju_log('INFO', 'End install hook.')
 
 
