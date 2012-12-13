@@ -7,12 +7,9 @@
 #  Andres Rodriguez <andres.rodriguez@canonical.com>
 #
 
-import glob
-import os
-import subprocess
-import shutil
 import sys
 import time
+import os
 
 import utils
 import pcmk
@@ -21,8 +18,8 @@ import pcmk
 def install():
     utils.juju_log('INFO', 'Begin install hook.')
     utils.configure_source()
-    utils.install('corosync', 'pacemaker', 'openstack-resource-agents', 'python-netaddr')
-    utils.enable_lsb_services('pacemaker')
+    utils.install('corosync', 'pacemaker',
+                  'openstack-resource-agents', 'python-netaddr')
     utils.juju_log('INFO', 'End install hook.')
 
 
@@ -30,9 +27,11 @@ def get_corosync_conf():
     for relid in utils.relation_ids('ha'):
         for unit in utils.relation_list(relid):
             conf = {
-                'corosync_bindnetaddr': utils.get_network_address(
-                                          utils.relation_get('corosync_bindiface',
-                                          unit, relid)),
+                'corosync_bindnetaddr':
+                    utils.get_network_address(
+                              utils.relation_get('corosync_bindiface',
+                                                 unit, relid)
+                              ),
                 'corosync_mcastport': utils.relation_get('corosync_mcastport',
                                         unit, relid),
                 'corosync_mcastaddr': utils.config_get('corosync_mcastaddr'),
@@ -46,20 +45,21 @@ def get_corosync_conf():
 def emit_corosync_conf():
     # read config variables
     corosync_conf_context = get_corosync_conf()
-
     # write config file (/etc/corosync/corosync.conf
     with open('/etc/corosync/corosync.conf', 'w') as corosync_conf:
-        corosync_conf.write(utils.render_template('corosync.conf', corosync_conf_context))
+        corosync_conf.write(utils.render_template('corosync.conf',
+                                                  corosync_conf_context))
 
 
 def emit_base_conf():
     corosync_default_context = {'corosync_enabled': 'yes'}
     # write /etc/default/corosync file
     with open('/etc/default/corosync', 'w') as corosync_default:
-        corosync_default.write(utils.render_template('corosync', corosync_default_context))
+        corosync_default.write(utils.render_template('corosync',
+                                                     corosync_default_context))
 
     # write the authkey
-    corosync_key=utils.config_get('corosync_key')
+    corosync_key = utils.config_get('corosync_key')
     with open(corosync_key, 'w') as corosync_key_file:
         corosync_key_file.write(corosync_key)
 
@@ -73,81 +73,128 @@ def config_changed():
                        'No Corosync key supplied, cannot proceed')
         sys.exit(1)
 
+    if int(utils.config_get('corosync_pcmk_ver')) == 1:
+        utils.enable_lsb_services('pacemaker')
+    else:
+        utils.disable_lsb_services('pacemaker')
+
     # Create a new config file
     emit_base_conf()
+
+    # Reconfigure the cluster if required
+    configure_cluster()
 
     utils.juju_log('INFO', 'End config-changed hook.')
 
 
 def upgrade_charm():
     utils.juju_log('INFO', 'Begin upgrade-charm hook.')
-    emit_corosync_conf()
+    install()
+    config_changed()
     utils.juju_log('INFO', 'End upgrade-charm hook.')
 
 
 def start():
-    if utils.running("corosync"):
-        utils.restart("corosync")
-    else:
-        utils.start("corosync")
-
-    # Only start pacemaker after making sure
-    # corosync has been started
-    # Wait a few seconds for corosync to start.
-    time.sleep(2)
-    if utils.running("corosync"):
-        if utils.running("pacemaker"):
-            utils.restart("pacemaker")
-        else:
-            utils.start("pacemaker")
+    pass
 
 
 def stop():
-    service("corosync", "stop")
-    time.sleep(2)
-    service("pacemaker", "stop")
+    pass
 
 
-def ha_relation():
-    utils.juju_log('INFO', 'Begin ha relation joined/changed hook')
-
-    if utils.relation_get("corosync_bindiface") is None:
-        return
-    elif utils.relation_get("corosync_mcastport") is None:
-        return
-    else:
-        emit_corosync_conf()
+def restart_corosync():
+    if int(utils.config_get('corosync_pcmk_ver')) == 1:
+        if utils.running("pacemaker"):
+            utils.stop("pacemaker")
         utils.restart("corosync")
         time.sleep(2)
-        utils.restart("pacemaker")
+        utils.start("pacemaker")
+    else:
+        utils.restart("corosync")
 
+HAMARKER = '/var/lib/juju/haconfigured'
+
+
+def configure_cluster():
+    # Check that we are not already configured
+    if os.path.exists(HAMARKER):
+        utils.juju_log('INFO',
+                       'HA already configured, not reconfiguring')
+        return
     # Check that there's enough nodes in order to perform the
     # configuration of the HA cluster
     if len(get_cluster_nodes()) < 2:
+        utils.juju_log('WARNING', 'Not enough nodes in cluster, bailing')
         return
+    # Check that we are related to a principle and that
+    # it has already provided the required corosync configuration
+    if not get_corosync_conf():
+        utils.juju_log('WARNING',
+                       'Unable to configure corosync right now, bailing')
+        return
+
+    relids = utils.relation_ids('ha')
+    if len(relids) == 1:  # Should only ever be one of these
+        # Obtain relation information
+        relid = relids[0]
+        unit = utils.relation_list(relid)[0]
+        import ast
+        resources = \
+            {} if utils.relation_get("resources") is None \
+               else ast.literal_eval(utils.relation_get("resources",
+                                                        unit, relid))
+        resource_params = \
+            {} if utils.relation_get("resource_params",
+                                     unit, relid) is None \
+               else ast.literal_eval(utils.relation_get("resource_params",
+                                                        unit, relid))
+        groups = \
+            {} if utils.relation_get("groups",
+                                     unit, relid) is None \
+               else ast.literal_eval(utils.relation_get("groups",
+                                                        unit, relid))
+        orders = \
+            {} if utils.relation_get("orders",
+                                     unit, relid) is None \
+               else ast.literal_eval(utils.relation_get("orders",
+                                                        unit, relid))
+        colocations = \
+            {} if utils.relation_get("colocations",
+                                     unit, relid) is None \
+               else ast.literal_eval(utils.relation_get("colocations",
+                                                        unit, relid))
+        clones = \
+            {} if utils.relation_get("clones",
+                                     unit, relid) is None \
+               else ast.literal_eval(utils.relation_get("clones",
+                                                        unit, relid))
+        init_services = \
+            {} if utils.relation_get("init_services",
+                                     unit, relid) is None \
+               else ast.literal_eval(utils.relation_get("init_services",
+                                                        unit, relid))
     else:
-        utils.juju_log('INFO', 'hanode-relation: Waiting for PCMK to start')
-        pcmk.wait_for_pcmk()
+        utils.juju_log('WARNING',
+                       'Related to {} ha services'.format(len(relids)))
+        return
 
-    # Obtain relation information
-    import ast
-    resources = {} if utils.relation_get("resources") is None else ast.literal_eval(utils.relation_get("resources"))
-    resource_params = {} if utils.relation_get("resource_params") is None else ast.literal_eval(utils.relation_get("resource_params"))
-    groups = {} if utils.relation_get("groups") is None else ast.literal_eval(utils.relation_get("groups"))
-    orders = {} if utils.relation_get("orders") is None else ast.literal_eval(utils.relation_get("orders"))
-    colocations = {} if utils.relation_get("colocations") is None else ast.literal_eval(utils.relation_get("colocations"))
-    clones = {} if utils.relation_get("clones") is None else ast.literal_eval(utils.relation_get("clones"))
-    init_services = {} if utils.relation_get("init_services") is None else ast.literal_eval(utils.relation_get("init_services"))
+    utils.juju_log('INFO', 'Configuring and restarting corosync')
+    emit_corosync_conf()
+    restart_corosync()
 
-    # Configuring the Resource
-    utils.juju_log('INFO', 'ha-relation: Configuring Resources')
-    for res_name,res_type in resources.iteritems():
+    utils.juju_log('INFO', 'Waiting for PCMK to start')
+    pcmk.wait_for_pcmk()
+
+    utils.juju_log('INFO', 'Configuring Resources')
+    for res_name, res_type in resources.iteritems():
         # disable the service we are going to put in HA
         if res_type.split(':')[0] == "lsb":
             utils.disable_lsb_services(res_type.split(':')[1])
             if utils.running(res_type.split(':')[1]):
                 utils.stop(res_type.split(':')[1])
-        elif len(init_services) != 0 and res_name in init_services and init_services[res_name]:
+        elif (len(init_services) != 0 and
+              res_name in init_services and
+              init_services[res_name]):
             utils.disable_upstart_services(init_services[res_name])
             if utils.running(init_services[res_name]):
                 utils.stop(init_services[res_name])
@@ -157,43 +204,42 @@ def ha_relation():
             if resource_params[res_name] is None:
                 cmd = 'crm -F configure primitive %s %s' % (res_name, res_type)
             else:
-                cmd = 'crm -F configure primitive %s %s %s' % (res_name, res_type, resource_params[res_name])
+                cmd = 'crm -F configure primitive %s %s %s' % \
+                            (res_name,
+                             res_type,
+                             resource_params[res_name])
             pcmk.commit(cmd)
             utils.juju_log('INFO', '%s' % cmd)
 
-    # Configuring groups
-    utils.juju_log('INFO', 'ha-relation: Configuring Groups')
+    utils.juju_log('INFO', 'Configuring Groups')
     for grp_name, grp_params in groups.iteritems():
         if not pcmk.crm_opt_exists(grp_name):
             cmd = 'crm -F configure group %s %s' % (grp_name, grp_params)
             pcmk.commit(cmd)
             utils.juju_log('INFO', '%s' % cmd)
 
-    # Configuring ordering
-    utils.juju_log('INFO', 'ha-relation: Configuring Orders')
+    utils.juju_log('INFO', 'Configuring Orders')
     for ord_name, ord_params in orders.iteritems():
         if not pcmk.crm_opt_exists(ord_name):
             cmd = 'crm -F configure order %s %s' % (ord_name, ord_params)
             pcmk.commit(cmd)
             utils.juju_log('INFO', '%s' % cmd)
 
-    # Configuring colocations
-    utils.juju_log('INFO', 'ha-relation: Configuring Colocations')
+    utils.juju_log('INFO', 'Configuring Colocations')
     for col_name, col_params in colocations.iteritems():
         if not pcmk.crm_opt_exists(col_name):
             cmd = 'crm -F configure colocation %s %s' % (col_name, col_params)
             pcmk.commit(cmd)
             utils.juju_log('INFO', '%s' % cmd)
 
-    # Configuring clones
-    utils.juju_log('INFO', 'ha-relation: Configuring Clones')
+    utils.juju_log('INFO', 'Configuring Clones')
     for cln_name, cln_params in clones.iteritems():
         if not pcmk.crm_opt_exists(cln_name):
             cmd = 'crm -F configure clone %s %s' % (cln_name, cln_params)
             pcmk.commit(cmd)
             utils.juju_log('INFO', '%s' % cmd)
 
-    for res_name,res_type in resources.iteritems():
+    for res_name, res_type in resources.iteritems():
         # TODO: This should first check that the resources is running
         if len(init_services) != 0 and res_name in init_services:
             # If the resource is in HA already, and it is a service, restart
@@ -202,7 +248,16 @@ def ha_relation():
             cmd = 'crm resource restart %s' % res_name
             pcmk.commit(cmd)
 
-    utils.juju_log('INFO', 'End ha relation joined/changed hook')
+    utils.juju_log('INFO', 'Doing global cluster configuration')
+    cmd = "crm configure property stonith-enabled=false"
+    pcmk.commit(cmd)
+    cmd = "crm configure property no-quorum-policy=ignore"
+    pcmk.commit(cmd)
+    cmd = 'crm configure rsc_defaults $id="rsc-options" resource-stickiness="100"'
+    pcmk.commit(cmd)
+
+    with open(HAMARKER, 'w') as marker:
+        marker.write('done')
 
 
 def ha_relation_departed():
@@ -229,31 +284,16 @@ def get_cluster_nodes():
     return hosts
 
 
-def hanode_relation():
-    utils.juju_log('INFO', 'Begin hanode peer relation hook')
-    if len(get_cluster_nodes()) >= 2:
-        utils.juju_log('INFO', 'hanode-relation: Waiting for PCMK to start')
-        pcmk.wait_for_pcmk()
-
-        utils.juju_log('INFO', 'hanode-relation: Doing global configuration')
-        cmd = "crm configure property stonith-enabled=false"
-        pcmk.commit(cmd)
-        cmd = "crm configure property no-quorum-policy=ignore"
-        pcmk.commit(cmd)
-        cmd = 'crm configure rsc_defaults $id="rsc-options" resource-stickiness="100"'
-        pcmk.commit(cmd)
-
-
 utils.do_hooks({
         'install': install,
         'config-changed': config_changed,
         'start': start,
         'stop': stop,
         'upgrade-charm': upgrade_charm,
-        'ha-relation-joined': ha_relation,
-        'ha-relation-changed': ha_relation,
+        'ha-relation-joined': configure_cluster,
+        'ha-relation-changed': configure_cluster,
         'ha-relation-departed': ha_relation_departed,
-        'hanode-relation-joined': hanode_relation,
+        'hanode-relation-joined': configure_cluster,
         #'hanode-relation-departed': hanode_relation_departed, # TODO: should probably remove nodes from the cluster
         })
 
