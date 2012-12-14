@@ -138,9 +138,12 @@ def configure_cluster():
         # Obtain relation information
         relid = relids[0]
         unit = utils.relation_list(relid)[0]
+        utils.juju_log('INFO',
+                       'Using rid {} unit {}'.format(relid, unit))
         import ast
         resources = \
-            {} if utils.relation_get("resources") is None \
+            {} if utils.relation_get("resources",
+                                     unit, relid) is None \
                else ast.literal_eval(utils.relation_get("resources",
                                                         unit, relid))
         resource_params = \
@@ -185,7 +188,16 @@ def configure_cluster():
     utils.juju_log('INFO', 'Waiting for PCMK to start')
     pcmk.wait_for_pcmk()
 
+    utils.juju_log('INFO', 'Doing global cluster configuration')
+    cmd = "crm configure property stonith-enabled=false"
+    pcmk.commit(cmd)
+    cmd = "crm configure property no-quorum-policy=ignore"
+    pcmk.commit(cmd)
+    cmd = 'crm configure rsc_defaults $id="rsc-options" resource-stickiness="100"'
+    pcmk.commit(cmd)
+
     utils.juju_log('INFO', 'Configuring Resources')
+    utils.juju_log('INFO', str(resources))
     for res_name, res_type in resources.iteritems():
         # disable the service we are going to put in HA
         if res_type.split(':')[0] == "lsb":
@@ -212,6 +224,7 @@ def configure_cluster():
             utils.juju_log('INFO', '%s' % cmd)
 
     utils.juju_log('INFO', 'Configuring Groups')
+    utils.juju_log('INFO', str(groups))
     for grp_name, grp_params in groups.iteritems():
         if not pcmk.crm_opt_exists(grp_name):
             cmd = 'crm -F configure group %s %s' % (grp_name, grp_params)
@@ -219,6 +232,7 @@ def configure_cluster():
             utils.juju_log('INFO', '%s' % cmd)
 
     utils.juju_log('INFO', 'Configuring Orders')
+    utils.juju_log('INFO', str(orders))
     for ord_name, ord_params in orders.iteritems():
         if not pcmk.crm_opt_exists(ord_name):
             cmd = 'crm -F configure order %s %s' % (ord_name, ord_params)
@@ -226,6 +240,7 @@ def configure_cluster():
             utils.juju_log('INFO', '%s' % cmd)
 
     utils.juju_log('INFO', 'Configuring Colocations')
+    utils.juju_log('INFO', str(colocations))
     for col_name, col_params in colocations.iteritems():
         if not pcmk.crm_opt_exists(col_name):
             cmd = 'crm -F configure colocation %s %s' % (col_name, col_params)
@@ -233,6 +248,7 @@ def configure_cluster():
             utils.juju_log('INFO', '%s' % cmd)
 
     utils.juju_log('INFO', 'Configuring Clones')
+    utils.juju_log('INFO', str(clones))
     for cln_name, cln_params in clones.iteritems():
         if not pcmk.crm_opt_exists(cln_name):
             cmd = 'crm -F configure clone %s %s' % (cln_name, cln_params)
@@ -247,14 +263,6 @@ def configure_cluster():
             # principal charm
             cmd = 'crm resource restart %s' % res_name
             pcmk.commit(cmd)
-
-    utils.juju_log('INFO', 'Doing global cluster configuration')
-    cmd = "crm configure property stonith-enabled=false"
-    pcmk.commit(cmd)
-    cmd = "crm configure property no-quorum-policy=ignore"
-    pcmk.commit(cmd)
-    cmd = 'crm configure rsc_defaults $id="rsc-options" resource-stickiness="100"'
-    pcmk.commit(cmd)
 
     with open(HAMARKER, 'w') as marker:
         marker.write('done')
