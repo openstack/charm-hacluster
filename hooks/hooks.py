@@ -264,6 +264,10 @@ def configure_cluster():
             cmd = 'crm resource restart %s' % res_name
             pcmk.commit(cmd)
 
+    for rel_id in utils.relation_ids('ha'):
+        utils.relation_set(rid=rel_id,
+                           clustered="yes")
+
     with open(HAMARKER, 'w') as marker:
         marker.write('done')
 
