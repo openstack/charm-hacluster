@@ -7,7 +7,7 @@ options:
       If multiple clusters are on the same bindnetaddr network, this value
       can be changed.
   corosync_pcmk_ver:
-    default: 1
+    default: 0
     type: int
     description: |
       Service version for the Pacemaker service version. This will tell

@@ -7,9 +7,7 @@
 #  Paul Collins <paul.collins@canonical.com>
 #
 
-import commands
 import os
-import re
 import subprocess
 import socket
 import sys
@@ -46,10 +44,16 @@ except ImportError:
     import jinja2
 
 try:
-    from netaddr import *
-except:
+    from netaddr import IPNetwork
+except ImportError:
     install('python-netaddr')
-    from netaddr import *
+    from netaddr import IPNetwork
+
+try:
+    import dns.resolver
+except ImportError:
+    install('python-dnspython')
+    import dns.resolver
 
 
 def render_template(template_name, context, template_dir=TEMPLATES_DIR):
@@ -60,26 +64,51 @@ def render_template(template_name, context, template_dir=TEMPLATES_DIR):
     return template.render(context)
 
 
+CLOUD_ARCHIVE = \
+""" # Ubuntu Cloud Archive
+deb http://ubuntu-cloud.archive.canonical.com/ubuntu {} main
+"""
+
+CLOUD_ARCHIVE_POCKETS = {
+    'precise-folsom': 'precise-updates/folsom',
+    'precise-folsom/updates': 'precise-updates/folsom',
+    'precise-folsom/proposed': 'precise-proposed/folsom',
+    'precise-grizzly': 'precise-updates/grizzly',
+    'precise-grizzly/updates': 'precise-updates/grizzly',
+    'precise-grizzly/proposed': 'precise-proposed/grizzly'
+    }
+
+
 def configure_source():
-    source = config_get('source')
-    if (source.startswith('ppa:') or
-        source.startswith('cloud:')):
+    source = str(config_get('openstack-origin'))
+    if not source:
+        return
+    if source.startswith('ppa:'):
         cmd = [
             'add-apt-repository',
             source
             ]
         subprocess.check_call(cmd)
-    if source.startswith('http:'):
-        with open('/etc/apt/sources.list.d/hacluster.list', 'w') as apt:
-            apt.write("deb " + source + "\n")
-        key = config_get('key')
-        if key != "":
+    if source.startswith('cloud:'):
+        install('ubuntu-cloud-keyring')
+        pocket = source.split(':')[1]
+        with open('/etc/apt/sources.list.d/cloud-archive.list', 'w') as apt:
+            apt.write(CLOUD_ARCHIVE.format(CLOUD_ARCHIVE_POCKETS[pocket]))
+    if source.startswith('deb'):
+        l = len(source.split('|'))
+        if l == 2:
+            (apt_line, key) = source.split('|')
             cmd = [
                 'apt-key',
-                'import',
-                key
+                'adv', '--keyserver keyserver.ubuntu.com',
+                '--recv-keys', key
                 ]
             subprocess.check_call(cmd)
+        elif l == 1:
+            apt_line = source
+
+        with open('/etc/apt/sources.list.d/quantum.list', 'w') as apt:
+            apt.write(apt_line + "\n")
     cmd = [
         'apt-get',
         'update'
@@ -140,6 +169,7 @@ def relation_get(attribute, unit=None, rid=None):
     else:
         return value
 
+
 def relation_set(**kwargs):
     cmd = [
         'relation-set'
@@ -176,12 +206,19 @@ def get_unit_hostname():
 
 
 def get_host_ip(hostname=unit_get('private-address')):
-    cmd = [
-        'dig',
-        '+short',
-        hostname
-        ]
-    return subprocess.check_output(cmd).strip()  # IGNORE:E1103
+    try:
+        # Test to see if already an IPv4 address
+        socket.inet_aton(hostname)
+        return hostname
+    except socket.error:
+        pass
+    try:
+        answers = dns.resolver.query(hostname, 'A')
+        if answers:
+            return answers[0].address
+    except dns.resolver.NXDOMAIN:
+        pass
+    return None
 
 
 def restart(*services):
@@ -200,27 +237,29 @@ def start(*services):
 
 
 def running(service):
-    #output = subprocess.check_output(['service', service, 'status'])
-    output = commands.getoutput('service %s status' % service)
-    show_re = re.compile("start/running")
-    status = show_re.search(output)
-    if status:
-        return True
-    return False
+    try:
+        output = subprocess.check_output(['service', service, 'status'])
+    except subprocess.CalledProcessError:
+        return False
+    else:
+        if ("start/running" in output or
+            "is running" in output):
+            return True
+        else:
+            return False
+
 
 def disable_upstart_services(*services):
     for service in services:
-        #subprocess.check_call('sh -c "echo manual > /etc/init/%s.override"' % service, shell=True)
-        override = open("/etc/init/%s.override" % service, "w")
-        override.write("manual")
-        override.close()
+        with open("/etc/init/{}.override".format(service), "w") as override:
+            override.write("manual")
 
 
 def enable_upstart_services(*services):
     for service in services:
-        path = '/etc/init/%s.override' % service
+        path = '/etc/init/{}.override'.format(service)
         if os.path.exists(path):
-            subprocess.check_call(['rm', '-rf', path])
+            os.remove(path)
 
 
 def disable_lsb_services(*services):
@@ -230,7 +269,7 @@ def disable_lsb_services(*services):
 
 def enable_lsb_services(*services):
     for service in services:
-        subprocess.call(['update-rc.d','-f',service,'defaults'])
+        subprocess.check_call(['update-rc.d', '-f', service, 'defaults'])
 
 
 def get_iface_ipaddr(iface):
@@ -246,7 +285,7 @@ def get_iface_netmask(iface):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     return socket.inet_ntoa(fcntl.ioctl(
         s.fileno(),
-        0x891b, # SIOCGIFNETMASK
+        0x891b,  # SIOCGIFNETMASK
         struct.pack('256s', iface[:15])
     )[20:24])
 
@@ -260,6 +299,10 @@ def get_netmask_cidr(netmask):
 
 
 def get_network_address(iface):
-    network = "%s/%s" % (get_iface_ipaddr(iface), get_netmask_cidr(get_iface_netmask(iface)))
-    ip = IPNetwork(network)
-    return str(ip.network)
+    if iface:
+        network = "{}/{}".format(get_iface_ipaddr(iface),
+                                 get_netmask_cidr(get_iface_netmask(iface)))
+        ip = IPNetwork(network)
+        return str(ip.network)
+    else:
+        return None

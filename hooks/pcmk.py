@@ -8,6 +8,7 @@ import subprocess
 
 #def is_leader():
 
+
 def wait_for_pcmk():
     crm_up = None
     while not crm_up:
@@ -21,7 +22,8 @@ def commit(cmd):
 
 
 def is_resource_present(resource):
-    (status, output) = commands.getstatusoutput("crm resource status %s" % resource)
+    (status, output) = \
+        commands.getstatusoutput("crm resource status %s" % resource)
     if status != 0:
         return False
     return True
@@ -44,9 +46,9 @@ def online(node=None):
 
 
 def crm_opt_exists(opt_name):
-     (status, output) = commands.getstatusoutput("crm configure show")
-     show_re = re.compile(opt_name)
-     opt = show_re.search(output)
-     if opt:
-         return True
-     return False
+    (status, output) = commands.getstatusoutput("crm configure show")
+    show_re = re.compile(opt_name)
+    opt = show_re.search(output)
+    if opt:
+        return True
+    return False
