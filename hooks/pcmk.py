@@ -52,3 +52,12 @@ def crm_opt_exists(opt_name):
     if opt:
         return True
     return False
+
+
+def is_dc_leader():
+    (status, output) = commands.getstatusoutput("crm status")
+    show_re = re.compile("Current DC: %s" % utils.get_unit_hostname())
+    quorum = show_re.search(output)
+    if quorum:
+        return True
+    return False

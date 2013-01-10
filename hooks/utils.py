@@ -13,6 +13,7 @@ import socket
 import sys
 import fcntl
 import struct
+import json
 
 
 def do_hooks(hooks):
@@ -77,6 +78,41 @@ CLOUD_ARCHIVE_POCKETS = {
     'precise-grizzly/updates': 'precise-updates/grizzly',
     'precise-grizzly/proposed': 'precise-proposed/grizzly'
     }
+
+
+def execute(cmd, die=False, echo=False):
+    """ Executes a command 
+
+    if die=True, script will exit(1) if command does not return 0
+    if echo=True, output of command will be printed to stdout
+
+    returns a tuple: (stdout, stderr, return code)
+    """
+    p = subprocess.Popen(cmd.split(" "),
+                         stdout=subprocess.PIPE,
+                         stdin=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    stdout=""
+    stderr=""
+
+    def print_line(l):
+        if echo:
+            print l.strip('\n')
+            sys.stdout.flush()
+
+    for l in iter(p.stdout.readline, ''):
+        print_line(l)
+        stdout += l
+    for l in iter(p.stderr.readline, ''):
+        print_line(l)
+        stderr += l
+
+    p.communicate()
+    rc = p.returncode
+
+    if die and rc != 0:
+        error_out("ERROR: command %s return non-zero.\n" % cmd)
+    return (stdout, stderr, rc)
 
 
 def configure_source():
@@ -168,6 +204,25 @@ def relation_get(attribute, unit=None, rid=None):
         return None
     else:
         return value
+
+
+def relation_get_dict(relation_id=None, remote_unit=None):
+    """Obtain all relation data as dict by way of JSON"""
+    cmd = 'relation-get --format=json'
+    if relation_id:
+        cmd += ' -r %s' % relation_id
+    if remote_unit:
+        remote_unit_orig = os.getenv('JUJU_REMOTE_UNIT', None)
+        os.environ['JUJU_REMOTE_UNIT'] = remote_unit
+    j = execute(cmd, die=True)[0]
+    if remote_unit and remote_unit_orig:
+        os.environ['JUJU_REMOTE_UNIT'] = remote_unit_orig
+    d = json.loads(j)
+    settings = {}
+    # convert unicode to strings
+    for k, v in d.iteritems():
+        settings[str(k)] = str(v)
+    return settings
 
 
 def relation_set(**kwargs):

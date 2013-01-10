@@ -13,13 +13,15 @@ import os
 
 import utils
 import pcmk
+import drbd
 
 
 def install():
     utils.juju_log('INFO', 'Begin install hook.')
     utils.configure_source()
     utils.install('corosync', 'pacemaker',
-                  'openstack-resource-agents', 'python-netaddr')
+                  'openstack-resource-agents', 'python-netaddr',
+                  'drbd8-utils')
     utils.juju_log('INFO', 'End install hook.')
 
 
@@ -62,6 +64,38 @@ def emit_base_conf():
     corosync_key = utils.config_get('corosync_key')
     with open(corosync_key, 'w') as corosync_key_file:
         corosync_key_file.write(corosync_key)
+
+
+def get_drbd_conf():
+    cluster_hosts = {}
+    # TODO: In MAAS private-address is the *hostname*. We need to set the
+    # private address in a relation.
+    cluster_hosts[utils.get_unit_hostname()] = utils.unit_get('private-address')
+    for r_id in utils.relation_ids('hanode'):
+        for unit in utils.relation_list(r_id):
+            cluster_hosts[unit.replace('/','-')] = \
+                utils.relation_get_dict(relation_id=r_id,
+                                  remote_unit=unit)['private-address']
+
+    for relid in utils.relation_ids('ha'):
+        for unit in utils.relation_list(relid):
+            conf = {
+                'block_device': utils.relation_get('block_device',
+                                        unit, relid),
+                }
+            if None not in conf.itervalues():
+                conf['units'] = cluster_hosts
+                return conf
+    return None
+
+
+def emit_drbd_conf():
+    # read config variables
+    drbd_conf_context = get_drbd_conf()
+    # write config file
+    with open('/etc/drbd.d/export.res', 'w') as drbd_conf:
+        drbd_conf.write(utils.render_template('drbd-resource.res',
+                                              drbd_conf_context))
 
 
 def config_changed():
@@ -176,6 +210,14 @@ def configure_cluster():
                                      unit, relid) is None \
                else ast.literal_eval(utils.relation_get("init_services",
                                                         unit, relid))
+        block_storage = \
+            None if utils.relation_get("block_storage",
+                                      unit, relid) is None \
+                else utils.relation_get("block_storage", unit, relid)
+        block_device = \
+            None if utils.relation_get("block_device",
+                                      unit, relid) is None \
+                else utils.relation_get("block_device", unit, relid)
     else:
         utils.juju_log('WARNING',
                        'Related to {} ha services'.format(len(relids)))
@@ -187,6 +229,25 @@ def configure_cluster():
 
     utils.juju_log('INFO', 'Waiting for PCMK to start')
     pcmk.wait_for_pcmk()
+
+    # TODO: Configure DRBD
+    if block_storage == "drbd":
+        drbd.prepare_drbd_disk(block_device)
+        drbd.modprobe_module()
+        emit_drbd_conf()
+        # TODO: Make sure drbd is unconfigured
+        drbd.create_md()
+        drbd.bring_resource_up()
+        # TODO: is_dc_leader should be the leader of the cluster.
+        # say mysql first instance.
+        if pcmk.is_dc_leader() and drbd.is_quorum_secondary():
+            if drbd.is_state_inconsistent():
+                drbd.clear_bitmap()
+            if drbd.is_state_uptodate():
+                drbd.make_primary()
+            if drbd.is_quorum_primary():
+                drbd.format_drbd_device()
+        # TODO:   6. Move MySQL DB to DRBD share.
 
     utils.juju_log('INFO', 'Doing global cluster configuration')
     cmd = "crm configure property stonith-enabled=false"
