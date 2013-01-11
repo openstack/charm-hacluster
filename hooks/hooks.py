@@ -13,15 +13,13 @@ import os
 
 import utils
 import pcmk
-import drbd
 
 
 def install():
     utils.juju_log('INFO', 'Begin install hook.')
     utils.configure_source()
     utils.install('corosync', 'pacemaker',
-                  'openstack-resource-agents', 'python-netaddr',
-                  'drbd8-utils')
+                  'openstack-resource-agents', 'python-netaddr')
     utils.juju_log('INFO', 'End install hook.')
 
 
@@ -64,38 +62,6 @@ def emit_base_conf():
     corosync_key = utils.config_get('corosync_key')
     with open(corosync_key, 'w') as corosync_key_file:
         corosync_key_file.write(corosync_key)
-
-
-def get_drbd_conf():
-    cluster_hosts = {}
-    # TODO: In MAAS private-address is the *hostname*. We need to set the
-    # private address in a relation.
-    cluster_hosts[utils.get_unit_hostname()] = utils.unit_get('private-address')
-    for r_id in utils.relation_ids('hanode'):
-        for unit in utils.relation_list(r_id):
-            cluster_hosts[unit.replace('/','-')] = \
-                utils.relation_get_dict(relation_id=r_id,
-                                  remote_unit=unit)['private-address']
-
-    for relid in utils.relation_ids('ha'):
-        for unit in utils.relation_list(relid):
-            conf = {
-                'block_device': utils.relation_get('block_device',
-                                        unit, relid),
-                }
-            if None not in conf.itervalues():
-                conf['units'] = cluster_hosts
-                return conf
-    return None
-
-
-def emit_drbd_conf():
-    # read config variables
-    drbd_conf_context = get_drbd_conf()
-    # write config file
-    with open('/etc/drbd.d/export.res', 'w') as drbd_conf:
-        drbd_conf.write(utils.render_template('drbd-resource.res',
-                                              drbd_conf_context))
 
 
 def config_changed():
@@ -190,6 +156,11 @@ def configure_cluster():
                                      unit, relid) is None \
                else ast.literal_eval(utils.relation_get("groups",
                                                         unit, relid))
+        ms = \
+            {} if utils.relation_get("ms",
+                                     unit, relid) is None \
+               else ast.literal_eval(utils.relation_get("ms",
+                                                        unit, relid))
         orders = \
             {} if utils.relation_get("orders",
                                      unit, relid) is None \
@@ -230,25 +201,6 @@ def configure_cluster():
     utils.juju_log('INFO', 'Waiting for PCMK to start')
     pcmk.wait_for_pcmk()
 
-    # TODO: Configure DRBD
-    if block_storage == "drbd":
-        drbd.prepare_drbd_disk(block_device)
-        drbd.modprobe_module()
-        emit_drbd_conf()
-        # TODO: Make sure drbd is unconfigured
-        drbd.create_md()
-        drbd.bring_resource_up()
-        # TODO: is_dc_leader should be the leader of the cluster.
-        # say mysql first instance.
-        if pcmk.is_dc_leader() and drbd.is_quorum_secondary():
-            if drbd.is_state_inconsistent():
-                drbd.clear_bitmap()
-            if drbd.is_state_uptodate():
-                drbd.make_primary()
-            if drbd.is_quorum_primary():
-                drbd.format_drbd_device()
-        # TODO:   6. Move MySQL DB to DRBD share.
-
     utils.juju_log('INFO', 'Doing global cluster configuration')
     cmd = "crm configure property stonith-enabled=false"
     pcmk.commit(cmd)
@@ -274,7 +226,7 @@ def configure_cluster():
         # Put the services in HA, if not already done so
         #if not pcmk.is_resource_present(res_name):
         if not pcmk.crm_opt_exists(res_name):
-            if resource_params[res_name] is None:
+            if not res_name in resource_params:
                 cmd = 'crm -F configure primitive %s %s' % (res_name, res_type)
             else:
                 cmd = 'crm -F configure primitive %s %s %s' % \
@@ -289,6 +241,14 @@ def configure_cluster():
     for grp_name, grp_params in groups.iteritems():
         if not pcmk.crm_opt_exists(grp_name):
             cmd = 'crm -F configure group %s %s' % (grp_name, grp_params)
+            pcmk.commit(cmd)
+            utils.juju_log('INFO', '%s' % cmd)
+
+    utils.juju_log('INFO', 'Configuring Master/Slave (ms)')
+    utils.juju_log('INFO', str(ms))
+    for ms_name, ms_params in ms.iteritems():
+        if not pcmk.crm_opt_exists(ms_name):
+            cmd = 'crm -F configure ms %s %s' % (ms_name, ms_params)
             pcmk.commit(cmd)
             utils.juju_log('INFO', '%s' % cmd)
 
@@ -323,6 +283,10 @@ def configure_cluster():
             # the pcmk resource as the config file might have changed by the
             # principal charm
             cmd = 'crm resource restart %s' % res_name
+            pcmk.commit(cmd)
+            # Just in case, cleanup the resources to ensure they get started
+            # in case they failed for some unrelated reason.
+            cmd = 'crm resource cleanup %s' % res_name
             pcmk.commit(cmd)
 
     for rel_id in utils.relation_ids('ha'):
