@@ -156,6 +156,11 @@ def configure_cluster():
                                      unit, relid) is None \
                else ast.literal_eval(utils.relation_get("groups",
                                                         unit, relid))
+        ms = \
+            {} if utils.relation_get("ms",
+                                     unit, relid) is None \
+               else ast.literal_eval(utils.relation_get("ms",
+                                                        unit, relid))
         orders = \
             {} if utils.relation_get("orders",
                                      unit, relid) is None \
@@ -176,6 +181,14 @@ def configure_cluster():
                                      unit, relid) is None \
                else ast.literal_eval(utils.relation_get("init_services",
                                                         unit, relid))
+        block_storage = \
+            None if utils.relation_get("block_storage",
+                                      unit, relid) is None \
+                else utils.relation_get("block_storage", unit, relid)
+        block_device = \
+            None if utils.relation_get("block_device",
+                                      unit, relid) is None \
+                else utils.relation_get("block_device", unit, relid)
     else:
         utils.juju_log('WARNING',
                        'Related to {} ha services'.format(len(relids)))
@@ -213,7 +226,7 @@ def configure_cluster():
         # Put the services in HA, if not already done so
         #if not pcmk.is_resource_present(res_name):
         if not pcmk.crm_opt_exists(res_name):
-            if resource_params[res_name] is None:
+            if not res_name in resource_params:
                 cmd = 'crm -F configure primitive %s %s' % (res_name, res_type)
             else:
                 cmd = 'crm -F configure primitive %s %s %s' % \
@@ -228,6 +241,14 @@ def configure_cluster():
     for grp_name, grp_params in groups.iteritems():
         if not pcmk.crm_opt_exists(grp_name):
             cmd = 'crm -F configure group %s %s' % (grp_name, grp_params)
+            pcmk.commit(cmd)
+            utils.juju_log('INFO', '%s' % cmd)
+
+    utils.juju_log('INFO', 'Configuring Master/Slave (ms)')
+    utils.juju_log('INFO', str(ms))
+    for ms_name, ms_params in ms.iteritems():
+        if not pcmk.crm_opt_exists(ms_name):
+            cmd = 'crm -F configure ms %s %s' % (ms_name, ms_params)
             pcmk.commit(cmd)
             utils.juju_log('INFO', '%s' % cmd)
 
@@ -262,6 +283,10 @@ def configure_cluster():
             # the pcmk resource as the config file might have changed by the
             # principal charm
             cmd = 'crm resource restart %s' % res_name
+            pcmk.commit(cmd)
+            # Just in case, cleanup the resources to ensure they get started
+            # in case they failed for some unrelated reason.
+            cmd = 'crm resource cleanup %s' % res_name
             pcmk.commit(cmd)
 
     for rel_id in utils.relation_ids('ha'):
