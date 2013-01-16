@@ -18,8 +18,7 @@ import pcmk
 def install():
     utils.juju_log('INFO', 'Begin install hook.')
     utils.configure_source()
-    utils.install('corosync', 'pacemaker',
-                  'openstack-resource-agents', 'python-netaddr')
+    utils.install('corosync', 'pacemaker', 'python-netaddr')
     utils.juju_log('INFO', 'End install hook.')
 
 
@@ -211,6 +210,11 @@ def configure_cluster():
 
     utils.juju_log('INFO', 'Configuring Resources')
     utils.juju_log('INFO', str(resources))
+
+    if True in [ra.startswith('ocf:openstack')
+                for ra in resources.itervalues()]:
+        utils.install('openstack-resource-agents')
+
     for res_name, res_type in resources.iteritems():
         # disable the service we are going to put in HA
         if res_type.split(':')[0] == "lsb":
