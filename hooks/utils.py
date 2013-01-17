@@ -13,6 +13,7 @@ import socket
 import sys
 import fcntl
 import struct
+import time
 
 
 def do_hooks(hooks):
@@ -25,6 +26,19 @@ def do_hooks(hooks):
                  "This charm doesn't know how to handle '{}'.".format(hook))
 
 
+def can_install():
+    try:
+        fd = os.open("/var/lib/dpkg/lock", os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW, 0640)
+        fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError, message:
+        os.close(fd)
+        return False
+    else:
+        fcntl.lockf(fd, fcntl.LOCK_UN)
+        os.close(fd)
+        return True
+
+
 def install(*pkgs):
     cmd = [
         'apt-get',
@@ -33,6 +47,10 @@ def install(*pkgs):
           ]
     for pkg in pkgs:
         cmd.append(pkg)
+    while not can_install():
+        juju_log('INFO',
+                 "dpkg is busy, can't install %s yet, waiting..." % pkgs)
+        time.sleep(1)
     subprocess.check_call(cmd)
 
 TEMPLATES_DIR = 'templates'
