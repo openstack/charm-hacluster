@@ -18,7 +18,7 @@ import pcmk
 def install():
     utils.juju_log('INFO', 'Begin install hook.')
     utils.configure_source()
-    utils.install('corosync', 'pacemaker', 'python-netaddr')
+    utils.install('corosync', 'pacemaker', 'python-netaddr', 'ipmitool')
     utils.juju_log('INFO', 'End install hook.')
 
 
