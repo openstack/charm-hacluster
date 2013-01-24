@@ -11,9 +11,9 @@ import sys
 import time
 import os
 
+import maas
 import utils
 import pcmk
-
 
 def install():
     utils.juju_log('INFO', 'Begin install hook.')
