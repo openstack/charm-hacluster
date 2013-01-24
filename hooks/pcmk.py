@@ -79,10 +79,10 @@ def _maas_ipmi_stonith_resource(node, power_params):
     return rsc, constraint
 
 
-def maas_stonith_primitive(maas_nodes, node):
+def maas_stonith_primitive(maas_nodes, crm_node):
     power_type = power_params = None
     for node in maas_nodes:
-        if node['hostname'].startswith(node):
+        if node['hostname'].startswith(crm_node):
             power_type = node['power_type']
             power_params = node['power_parameters']
 
@@ -92,7 +92,7 @@ def maas_stonith_primitive(maas_nodes, node):
     rsc = constraint = None
     # we can extend to support other power flavors in the future?
     if power_type == 'ipmi':
-        rsc, constraint = _maas_ipmi_stonith_resource(node, power_params)
+        rsc, constraint = _maas_ipmi_stonith_resource(crm_node, power_params)
     else:
         utils.juju_log('ERROR',
                        'Unsupported STONITH power_type: %s' % power_type)
