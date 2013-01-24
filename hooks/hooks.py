@@ -339,7 +339,7 @@ def configure_stonith():
                            'Failed to determine STONITH primitive for node'\
                            ' %s' % node)
 
-        rsc_name = rsc.split(' ')[2]
+        rsc_name = rsc.split(' ')[1]
         if not pcmk.is_resource_present(rsc_name):
             utils.juju_log('INFO', 'Creating new STONITH primitive %s.' %\
                            rsc_name)
