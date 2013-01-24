@@ -32,7 +32,7 @@ options:
      parameters are properly configured in its invenvory.
   maas_url:
     type: string
-    description: MAAS API endpoint.
+    description: MAAS API endpoint (required for STONITH).
   maas_credentials:
     type: string
-    description: MAAS credentials.
+    description: MAAS credentials (required for STONITH).

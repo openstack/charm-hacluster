@@ -324,6 +324,8 @@ def configure_stonith():
     if None in [url, creds]:
         utils.juju_log('ERROR', 'maas_url and maas_credentials must be set'\
                        ' in config to enable STONITH.')
+        sys.exit(1)
+
     maas = MAAS.MAASHelper(url, creds)
     nodes = maas.list_nodes()
     if not nodes:
@@ -338,6 +340,7 @@ def configure_stonith():
             utils.juju_log('ERROR',
                            'Failed to determine STONITH primitive for node'\
                            ' %s' % node)
+            sys.exit(1)
 
         rsc_name = rsc.split(' ')[1]
         if not pcmk.is_resource_present(rsc_name):
