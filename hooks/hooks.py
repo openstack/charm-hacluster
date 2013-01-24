@@ -311,13 +311,13 @@ def configure_cluster():
                            'MAAS @ %s.' % url)
             sys.exit(1)
 
-        hosts = get_cluster_nodes()
-        for host in hosts:
-            rsc, constraint = pcmk.maas_stonith_primitive(nodes, host)
+        cluster_nodes = pcmk.list_nodes()
+        for node in cluster_nodes:
+            rsc, constraint = pcmk.maas_stonith_primitive(nodes, node)
             if not rsc:
                 utils.juju_log('ERROR',
                                'Failed to determine STONITH primitive for node'\
-                               ' %s' % host)
+                               ' %s' % node)
             cmd = 'crm -F configure %s' % rsc
             pcmk.commit(cmd)
             if constraint:

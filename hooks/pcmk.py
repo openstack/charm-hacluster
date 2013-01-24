@@ -54,26 +54,35 @@ def crm_opt_exists(opt_name):
     return False
 
 
-def _maas_ipmi_stonith_resource(host, power_params):
-    crm_node = crm_node_name(host)
+def list_nodes():
+    cmd = ['crm', 'node', 'list']
+    out = subprocess.check_output(cmd)
+    nodes = []
+    for line in out.split('\n'):
+        if line != '':
+            nodes.append(line.split(':')[0])
+    return nodes
+
+
+def _maas_ipmi_stonith_resource(node, power_params):
     rsc_name = '%s_res_stonith' % crm_node
     rsc = 'primitive %s stonith:external/ipmi' % rsc_name
-    rsc += ' params hostname=%s ipaddr=%s user=%s passwd=%s interface=lan' %\
-           (crm_node, power_params['power_address'],
+    rsc += ' params hostname=%s ipaddr=%s userid=%s passwd=%s interface=lan' %\
+           (node, power_params['power_address'],
             power_params['power_user'], power_params['power_pass'])
 
-    # ensure ipmi stonith agents are not running on the hosts that
+    # ensure ipmi stonith agents are not running on the nodes that
     # they manage.
     constraint = 'location const_loc_stonith_avoid_%s %s -inf: %s' %\
-                  (crm_node, rsc_name, crm_node)
+                  (node, rsc_name, node)
 
     return rsc, constraint
 
 
-def maas_stonith_primitive(maas_nodes, host):
+def maas_stonith_primitive(maas_nodes, node):
     power_type = power_params = None
     for node in maas_nodes:
-        if node['hostname'] == host:
+        if node['hostname'].startswith(node):
             power_type = node['power_type']
             power_params = node['power_parameters']
 
@@ -83,7 +92,7 @@ def maas_stonith_primitive(maas_nodes, host):
     rsc = constraint = None
     # we can extend to support other power flavors in the future?
     if power_type == 'ipmi':
-        rsc, constraint = _maas_ipmi_stonith_resource(host, power_params)
+        rsc, constraint = _maas_ipmi_stonith_resource(node, power_params)
     else:
         utils.juju_log('ERROR',
                        'Unsupported STONITH power_type: %s' % power_type)
