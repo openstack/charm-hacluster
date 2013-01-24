@@ -11,7 +11,7 @@ import sys
 import time
 import os
 
-import maas
+import maas as MAAS
 import utils
 import pcmk
 
@@ -304,7 +304,7 @@ def configure_cluster():
         if None in [url, creds]:
             utils.juju_log('ERROR', 'maas_url and maas_credentials must be set'\
                            ' in config to enable STONITH.')
-        maas = maas.MAASHelper(url, creds)
+        maas = MAAS.MAASHelper(url, creds)
         nodes = maas.list_nodes()
         if not nodes:
             utils.juju_log('ERROR', 'Could not obtain node inventory from '\
