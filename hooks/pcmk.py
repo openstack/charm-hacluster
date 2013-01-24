@@ -65,7 +65,7 @@ def list_nodes():
 
 
 def _maas_ipmi_stonith_resource(node, power_params):
-    rsc_name = '%s_res_stonith' % node
+    rsc_name = 'res_stonith_%s' % node
     rsc = 'primitive %s stonith:external/ipmi' % rsc_name
     rsc += ' params hostname=%s ipaddr=%s userid=%s passwd=%s interface=lan' %\
            (node, power_params['power_address'],
