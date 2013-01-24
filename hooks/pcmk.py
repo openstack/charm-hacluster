@@ -52,3 +52,44 @@ def crm_opt_exists(opt_name):
     if opt:
         return True
     return False
+
+
+def _maas_ipmi_stonith_resource(host, power_params):
+    crm_node = crm_node_name(host)
+    rsc_name = '%s_res_stonith' % crm_node
+    rsc = 'primitive %s stonith:external/ipmi' % rsc_name
+    rsc += ' params hostname=%s ipaddr=%s user=%s passwd=%s interface=lan' %\
+           (crm_node, power_params['power_address'],
+            power_params['power_user'], power_params['power_pass'])
+
+    # ensure ipmi stonith agents are not running on the hosts that
+    # they manage.
+    constraint = 'location const_loc_stonith_avoid_%s %s -inf: %s' %\
+                  (crm_node, rsc_name, crm_node)
+
+    return rsc, constraint
+
+
+def maas_stonith_primitive(maas_nodes, host):
+    power_type = power_params = None
+    for node in maas_nodes:
+        if node['hostname'] == host:
+            power_type = node['power_type']
+            power_params = node['power_parameters']
+
+    if not power_type or not power_params:
+        return False, False
+
+    rsc = constraint = None
+    # we can extend to support other power flavors in the future?
+    if power_type == 'ipmi':
+        rsc, constraint = _maas_ipmi_stonith_resource(host, power_params)
+    else:
+        utils.juju_log('ERROR',
+                       'Unsupported STONITH power_type: %s' % power_type)
+        return False, False
+
+    if not rsc or not constraint:
+        return False, False
+
+    return rsc, constraint

@@ -23,3 +23,16 @@ options:
       .
       This configuration element is mandatory and the service will fail on
       install if it is not provided.
+  stonith_enabled:
+    type: string
+    default: 'False'
+    description: |
+     Enable resource fencing (aka STONITH) for every node in the cluster.
+     This requires MAAS credentials be provided and each node's power
+     parameters are properly configured in its invenvory.
+  maas_url:
+    type: string
+    description: MAAS API endpoint.
+  maas_credentials:
+    type: string
+    description: MAAS credentials.
