@@ -324,6 +324,9 @@ def configure_cluster():
                 cmd = 'crm -F configure %s' % constraint
                 pcmk.commit(cmd)
 
+        cmd = "crm configure property stonith-enabled=true"
+        pcmk.commit(cmd)
+
     for rel_id in utils.relation_ids('ha'):
         utils.relation_set(rid=rel_id,
                            clustered="yes")
