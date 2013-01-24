@@ -312,6 +312,7 @@ def configure_stonith():
     if not os.path.exists(HAMARKER):
         utils.juju_log('INFO',
                        'HA not yet configured, skipping STONITH config.')
+        return
 
     utils.juju_log('INFO', 'Configuring STONITH for all nodes in cluster.')
     # configure stontih resources for all nodes in cluster.
