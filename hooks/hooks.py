@@ -296,6 +296,8 @@ def configure_cluster():
             cmd = 'crm resource cleanup %s' % res_name
             pcmk.commit(cmd)
 
+    configure_stonith()
+
     for rel_id in utils.relation_ids('ha'):
         utils.relation_set(rid=rel_id,
                            clustered="yes")
@@ -306,6 +308,10 @@ def configure_cluster():
 def configure_stonith():
     if utils.config_get('stonith_enabled') not in ['true', 'True']:
         return
+
+    if not os.path.exists(HAMARKER):
+        utils.juju_log('INFO',
+                       'HA not yet configured, skipping STONITH config.')
 
     utils.juju_log('INFO', 'Configuring STONITH for all nodes in cluster.')
     # configure stontih resources for all nodes in cluster.
