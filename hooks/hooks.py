@@ -59,8 +59,9 @@ def emit_base_conf():
 
     # write the authkey
     corosync_key = utils.config_get('corosync_key')
-    with open(corosync_key, 'w') as corosync_key_file:
+    with open('/etc/corosync/authkey', 'w') as corosync_key_file:
         corosync_key_file.write(corosync_key)
+    os.chmod=('/etc/corosync/authkey', 0400)
 
 
 def config_changed():
