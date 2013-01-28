@@ -11,14 +11,14 @@ import sys
 import time
 import os
 
+import maas as MAAS
 import utils
 import pcmk
-
 
 def install():
     utils.juju_log('INFO', 'Begin install hook.')
     utils.configure_source()
-    utils.install('corosync', 'pacemaker', 'python-netaddr')
+    utils.install('corosync', 'pacemaker', 'python-netaddr', 'ipmitool')
     utils.juju_log('INFO', 'End install hook.')
 
 
@@ -83,6 +83,9 @@ def config_changed():
 
     # Reconfigure the cluster if required
     configure_cluster()
+
+    # Setup fencing.
+    configure_stonith()
 
     utils.juju_log('INFO', 'End config-changed hook.')
 
@@ -294,12 +297,67 @@ def configure_cluster():
             cmd = 'crm resource cleanup %s' % res_name
             pcmk.commit(cmd)
 
+    configure_stonith()
+
     for rel_id in utils.relation_ids('ha'):
         utils.relation_set(rid=rel_id,
                            clustered="yes")
 
     with open(HAMARKER, 'w') as marker:
         marker.write('done')
+
+def configure_stonith():
+    if utils.config_get('stonith_enabled') not in ['true', 'True']:
+        return
+
+    if not os.path.exists(HAMARKER):
+        utils.juju_log('INFO',
+                       'HA not yet configured, skipping STONITH config.')
+        return
+
+    utils.juju_log('INFO', 'Configuring STONITH for all nodes in cluster.')
+    # configure stontih resources for all nodes in cluster.
+    # note: this is totally provider dependent and requires
+    # access to the MAAS API endpoint, using endpoint and credentials
+    # set in config.
+    url = utils.config_get('maas_url')
+    creds = utils.config_get('maas_credentials')
+    if None in [url, creds]:
+        utils.juju_log('ERROR', 'maas_url and maas_credentials must be set'\
+                       ' in config to enable STONITH.')
+        sys.exit(1)
+
+    maas = MAAS.MAASHelper(url, creds)
+    nodes = maas.list_nodes()
+    if not nodes:
+        utils.juju_log('ERROR', 'Could not obtain node inventory from '\
+                       'MAAS @ %s.' % url)
+        sys.exit(1)
+
+    cluster_nodes = pcmk.list_nodes()
+    for node in cluster_nodes:
+        rsc, constraint = pcmk.maas_stonith_primitive(nodes, node)
+        if not rsc:
+            utils.juju_log('ERROR',
+                           'Failed to determine STONITH primitive for node'\
+                           ' %s' % node)
+            sys.exit(1)
+
+        rsc_name = rsc.split(' ')[1]
+        if not pcmk.is_resource_present(rsc_name):
+            utils.juju_log('INFO', 'Creating new STONITH primitive %s.' %\
+                           rsc_name)
+            cmd = 'crm -F configure %s' % rsc
+            pcmk.commit(cmd)
+            if constraint:
+                cmd = 'crm -F configure %s' % constraint
+                pcmk.commit(cmd)
+        else:
+            utils.juju_log('INFO', 'STONITH primitive already exists '\
+                           'for node.')
+
+    cmd = "crm configure property stonith-enabled=true"
+    pcmk.commit(cmd)
 
 
 def ha_relation_departed():
