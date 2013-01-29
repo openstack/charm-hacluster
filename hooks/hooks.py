@@ -218,6 +218,9 @@ def configure_cluster():
     if True in [ra.startswith('ocf:openstack')
                 for ra in resources.itervalues()]:
         utils.install('openstack-resource-agents')
+    if True in [ra.startswith('ocf:ceph')
+                for ra in resources.itervalues()]:
+        utils.install('ceph-resource-agents')
 
     for res_name, res_type in resources.iteritems():
         # disable the service we are going to put in HA
