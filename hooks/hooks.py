@@ -300,14 +300,14 @@ def configure_cluster():
             cmd = 'crm resource cleanup %s' % res_name
             pcmk.commit(cmd)
 
-    configure_stonith()
-
     for rel_id in utils.relation_ids('ha'):
         utils.relation_set(rid=rel_id,
                            clustered="yes")
 
     with open(HAMARKER, 'w') as marker:
         marker.write('done')
+
+    configure_stonith()
 
 def configure_stonith():
     if utils.config_get('stonith_enabled') not in ['true', 'True']:
