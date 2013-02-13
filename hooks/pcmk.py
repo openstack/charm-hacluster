@@ -53,6 +53,13 @@ def crm_opt_exists(opt_name):
         return True
     return False
 
+def crm_res_running(opt_name):
+    (status, output) = commands.getstatusoutput("crm resource status %s" % opt_name)
+    show_re = re.compile('NOT running')
+    opt = show_re.search(output)
+    if opt:
+        return False
+    return True
 
 def list_nodes():
     cmd = ['crm', 'node', 'list']

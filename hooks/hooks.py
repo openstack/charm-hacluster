@@ -197,6 +197,13 @@ def configure_cluster():
                        'Related to {} ha services'.format(len(relids)))
         return
 
+    if True in [ra.startswith('ocf:openstack')
+                for ra in resources.itervalues()]:
+        utils.install('openstack-resource-agents')
+    if True in [ra.startswith('ocf:ceph')
+                for ra in resources.itervalues()]:
+        utils.install('ceph-resource-agents')
+
     utils.juju_log('INFO', 'Configuring and restarting corosync')
     emit_corosync_conf()
     restart_corosync()
@@ -214,13 +221,6 @@ def configure_cluster():
 
     utils.juju_log('INFO', 'Configuring Resources')
     utils.juju_log('INFO', str(resources))
-
-    if True in [ra.startswith('ocf:openstack')
-                for ra in resources.itervalues()]:
-        utils.install('openstack-resource-agents')
-    if True in [ra.startswith('ocf:ceph')
-                for ra in resources.itervalues()]:
-        utils.install('ceph-resource-agents')
 
     for res_name, res_type in resources.iteritems():
         # disable the service we are going to put in HA
@@ -288,17 +288,18 @@ def configure_cluster():
             utils.juju_log('INFO', '%s' % cmd)
 
     for res_name, res_type in resources.iteritems():
-        # TODO: This should first check that the resources is running
         if len(init_services) != 0 and res_name in init_services:
-            # If the resource is in HA already, and it is a service, restart
-            # the pcmk resource as the config file might have changed by the
-            # principal charm
-            cmd = 'crm resource restart %s' % res_name
-            pcmk.commit(cmd)
-            # Just in case, cleanup the resources to ensure they get started
-            # in case they failed for some unrelated reason.
-            cmd = 'crm resource cleanup %s' % res_name
-            pcmk.commit(cmd)
+            # Checks that the resources are running and started.
+            if not pcmk.crm_res_running(res_name):
+                # If the resource is in HA already, and it is a service, restart
+                # the pcmk resource as the config file might have changed by the
+                # principal charm
+                #cmd = 'crm resource restart %s' % res_name
+                #pcmk.commit(cmd)
+                # Just in case, cleanup the resources to ensure they get started
+                # in case they failed for some unrelated reason.
+                cmd = 'crm resource cleanup %s' % res_name
+                pcmk.commit(cmd)
 
     for rel_id in utils.relation_ids('ha'):
         utils.relation_set(rid=rel_id,
