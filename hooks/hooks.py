@@ -290,12 +290,10 @@ def configure_cluster():
     for res_name, res_type in resources.iteritems():
         if len(init_services) != 0 and res_name in init_services:
             # Checks that the resources are running and started.
-            if not pcmk.crm_res_running(res_name):
-                # If the resource is in HA already, and it is a service, restart
-                # the pcmk resource as the config file might have changed by the
-                # principal charm
-                #cmd = 'crm resource restart %s' % res_name
-                #pcmk.commit(cmd)
+            # Ensure that clones are excluded as the resource is
+            # not directly controllable
+            if (res_name not in clones.values() and
+                not pcmk.crm_res_running(res_name)):
                 # Just in case, cleanup the resources to ensure they get started
                 # in case they failed for some unrelated reason.
                 cmd = 'crm resource cleanup %s' % res_name
