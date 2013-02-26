@@ -15,6 +15,7 @@ import maas as MAAS
 import utils
 import pcmk
 
+
 def install():
     utils.juju_log('INFO', 'Begin install hook.')
     utils.configure_source()
@@ -61,7 +62,7 @@ def emit_base_conf():
     corosync_key = utils.config_get('corosync_key')
     with open('/etc/corosync/authkey', 'w') as corosync_key_file:
         corosync_key_file.write(corosync_key)
-    os.chmod=('/etc/corosync/authkey', 0400)
+    os.chmod = ('/etc/corosync/authkey', 0400)
 
 
 def config_changed():
@@ -184,14 +185,7 @@ def configure_cluster():
                                      unit, relid) is None \
                else ast.literal_eval(utils.relation_get("init_services",
                                                         unit, relid))
-        block_storage = \
-            None if utils.relation_get("block_storage",
-                                      unit, relid) is None \
-                else utils.relation_get("block_storage", unit, relid)
-        block_device = \
-            None if utils.relation_get("block_device",
-                                      unit, relid) is None \
-                else utils.relation_get("block_device", unit, relid)
+
     else:
         utils.juju_log('WARNING',
                        'Related to {} ha services'.format(len(relids)))
@@ -216,7 +210,8 @@ def configure_cluster():
     pcmk.commit(cmd)
     cmd = "crm configure property no-quorum-policy=ignore"
     pcmk.commit(cmd)
-    cmd = 'crm configure rsc_defaults $id="rsc-options" resource-stickiness="100"'
+    cmd = 'crm configure rsc_defaults $id="rsc-options"' \
+          ' resource-stickiness="100"'
     pcmk.commit(cmd)
 
     utils.juju_log('INFO', 'Configuring Resources')
@@ -290,16 +285,19 @@ def configure_cluster():
     for res_name, res_type in resources.iteritems():
         if len(init_services) != 0 and res_name in init_services:
             # Checks that the resources are running and started.
-            if not pcmk.crm_res_running(res_name):
-                # If the resource is in HA already, and it is a service, restart
-                # the pcmk resource as the config file might have changed by the
-                # principal charm
-                #cmd = 'crm resource restart %s' % res_name
-                #pcmk.commit(cmd)
-                # Just in case, cleanup the resources to ensure they get started
-                # in case they failed for some unrelated reason.
+            # Ensure that clones are excluded as the resource is
+            # not directly controllable (dealt with below)
+            if (res_name not in clones.values() and
+                not pcmk.crm_res_running(res_name)):
+                # Just in case, cleanup the resources to ensure they get
+                # started in case they failed for some unrelated reason.
                 cmd = 'crm resource cleanup %s' % res_name
                 pcmk.commit(cmd)
+
+    for cl_name in clones:
+        # Always cleanup clones
+        cmd = 'crm resource cleanup %s' % cl_name
+        pcmk.commit(cmd)
 
     for rel_id in utils.relation_ids('ha'):
         utils.relation_set(rid=rel_id,
@@ -309,6 +307,7 @@ def configure_cluster():
         marker.write('done')
 
     configure_stonith()
+
 
 def configure_stonith():
     if utils.config_get('stonith_enabled') not in ['true', 'True']:
@@ -347,7 +346,7 @@ def configure_stonith():
                            ' %s' % node)
             sys.exit(1)
 
-        rsc_name = rsc.split(' ')[1]
+        rsc_name = str(rsc).split(' ')[1]
         if not pcmk.is_resource_present(rsc_name):
             utils.juju_log('INFO', 'Creating new STONITH primitive %s.' %\
                            rsc_name)
@@ -398,7 +397,8 @@ utils.do_hooks({
         'ha-relation-changed': configure_cluster,
         'ha-relation-departed': ha_relation_departed,
         'hanode-relation-joined': configure_cluster,
-        #'hanode-relation-departed': hanode_relation_departed, # TODO: should probably remove nodes from the cluster
+        #'hanode-relation-departed': hanode_relation_departed,
+        # TODO: should probably remove nodes from the cluster
         })
 
 sys.exit(0)

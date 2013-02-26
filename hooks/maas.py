@@ -1,13 +1,13 @@
 import apt_pkg as apt
 
 import json
-import sys
 import subprocess
 
 import utils
 
 MAAS_STABLE_PPA = 'ppa:maas-maintainers/stable '
 MAAS_PROFILE_NAME = 'maas-juju-hacluster'
+
 
 class MAASHelper(object):
     def __init__(self, url, creds):
@@ -36,7 +36,6 @@ class MAASHelper(object):
         if not pkg.current_ver:
             utils.install('maas-cli')
 
-
     def login(self):
         cmd = ['maas-cli', 'login', MAAS_PROFILE_NAME, self.url, self.creds]
         try:
@@ -45,11 +44,9 @@ class MAASHelper(object):
             utils.juju_log('ERROR', 'Could not login to MAAS @ %s.' % self.url)
             return False
 
-
     def logout(self):
         cmd = ['maas-cli', 'logout', MAAS_PROFILE_NAME]
         subprocess.check_call(cmd)
-
 
     def list_nodes(self):
         self.login()

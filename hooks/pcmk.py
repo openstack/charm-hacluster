@@ -1,20 +1,14 @@
 import utils
 import commands
-import re
 import subprocess
-
-#def is_quorum():
-#import time
-
-#def is_leader():
 
 
 def wait_for_pcmk():
     crm_up = None
+    hostname = utils.get_unit_hostname()
     while not crm_up:
-        (status, output) = commands.getstatusoutput("crm node list")
-        show_re = re.compile(utils.get_unit_hostname())
-        crm_up = show_re.search(output)
+        output = commands.getstatusoutput("crm node list")[1]
+        crm_up = hostname in output
 
 
 def commit(cmd):
@@ -22,8 +16,7 @@ def commit(cmd):
 
 
 def is_resource_present(resource):
-    (status, output) = \
-        commands.getstatusoutput("crm resource status %s" % resource)
+    status = commands.getstatusoutput("crm resource status %s" % resource)[0]
     if status != 0:
         return False
     return True
@@ -46,26 +39,24 @@ def online(node=None):
 
 
 def crm_opt_exists(opt_name):
-    (status, output) = commands.getstatusoutput("crm configure show")
-    show_re = re.compile(opt_name)
-    opt = show_re.search(output)
-    if opt:
+    output = commands.getstatusoutput("crm configure show")[1]
+    if opt_name in output:
         return True
     return False
 
+
 def crm_res_running(opt_name):
-    (status, output) = commands.getstatusoutput("crm resource status %s" % opt_name)
-    show_re = re.compile('NOT running')
-    opt = show_re.search(output)
-    if opt:
+    output = commands.getstatusoutput("crm resource status %s" % opt_name)[1]
+    if opt_name in output:
         return False
     return True
+
 
 def list_nodes():
     cmd = ['crm', 'node', 'list']
     out = subprocess.check_output(cmd)
     nodes = []
-    for line in out.split('\n'):
+    for line in str(out).split('\n'):
         if line != '':
             nodes.append(line.split(':')[0])
     return nodes
