@@ -7,6 +7,7 @@
 #  Andres Rodriguez <andres.rodriguez@canonical.com>
 #
 
+import shutil
 import sys
 import time
 import os
@@ -19,6 +20,12 @@ def install():
     utils.juju_log('INFO', 'Begin install hook.')
     utils.configure_source()
     utils.install('corosync', 'pacemaker', 'python-netaddr', 'ipmitool')
+    # XXX rbd OCF only included with newer versions of ceph-resource-agents.
+    # Bundle /w charm until we figure out a better way to install it.
+    if not os.path.exists('/usr/lib/ocf/resource.d/ceph'):
+        os.makedirs('/usr/lib/ocf/resource.d/ceph')
+    if not os.path.isfile('/usr/lib/ocf/resource.d/ceph/rbd'):
+        shutil.copy('ocf/ceph/rbd', '/usr/lib/ocf/resource.d/ceph/rbd')
     utils.juju_log('INFO', 'End install hook.')
 
 
@@ -38,6 +45,9 @@ def get_corosync_conf():
                 }
             if None not in conf.itervalues():
                 return conf
+    missing = [k for k, v in config.iteritems() if v == None]
+    utils.juju_log('INFO',
+                   'Missing required principle configuration: %s' % missing)
     return None
 
 
