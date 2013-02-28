@@ -45,7 +45,7 @@ def get_corosync_conf():
                 }
             if None not in conf.itervalues():
                 return conf
-    missing = [k for k, v in config.iteritems() if v == None]
+    missing = [k for k, v in conf.iteritems() if v == None]
     utils.juju_log('INFO',
                    'Missing required principle configuration: %s' % missing)
     return None
