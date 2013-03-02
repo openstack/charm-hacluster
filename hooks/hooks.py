@@ -30,6 +30,7 @@ def install():
 
 
 def get_corosync_conf():
+    conf = {}
     for relid in utils.relation_ids('ha'):
         for unit in utils.relation_list(relid):
             conf = {
