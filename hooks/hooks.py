@@ -298,7 +298,10 @@ def configure_cluster():
             # Checks that the resources are running and started.
             # Ensure that clones are excluded as the resource is
             # not directly controllable (dealt with below)
+            # Ensure that groups are cleaned up as a whole rather
+            # than as individual resources.
             if (res_name not in clones.values() and
+                res_name not in groups.values() and
                 not pcmk.crm_res_running(res_name)):
                 # Just in case, cleanup the resources to ensure they get
                 # started in case they failed for some unrelated reason.
@@ -308,6 +311,11 @@ def configure_cluster():
     for cl_name in clones:
         # Always cleanup clones
         cmd = 'crm resource cleanup %s' % cl_name
+        pcmk.commit(cmd)
+
+    for grp_name in groups:
+        # Always cleanup groups
+        cmd = 'crm resource cleanup %s' % grp_name
         pcmk.commit(cmd)
 
     for rel_id in utils.relation_ids('ha'):
