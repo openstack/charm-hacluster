@@ -11,10 +11,12 @@ import shutil
 import sys
 import time
 import os
+from base64 import b64decode
 
 import maas as MAAS
-import utils
+import lib.utils as utils
 import pcmk
+import hacluster
 
 
 def install():
@@ -36,12 +38,12 @@ def get_corosync_conf():
         for unit in utils.relation_list(relid):
             conf = {
                 'corosync_bindnetaddr':
-                    utils.get_network_address(
+                    hacluster.get_network_address(
                               utils.relation_get('corosync_bindiface',
                                                  unit, relid)
                               ),
                 'corosync_mcastport': utils.relation_get('corosync_mcastport',
-                                        unit, relid),
+                                                         unit, relid),
                 'corosync_mcastaddr': utils.config_get('corosync_mcastaddr'),
                 'corosync_pcmk_ver': utils.config_get('corosync_pcmk_ver'),
                 }
@@ -68,27 +70,27 @@ def emit_base_conf():
     with open('/etc/default/corosync', 'w') as corosync_default:
         corosync_default.write(utils.render_template('corosync',
                                                      corosync_default_context))
-
-    # write the authkey
     corosync_key = utils.config_get('corosync_key')
-    with open('/etc/corosync/authkey', 'w') as corosync_key_file:
-        corosync_key_file.write(corosync_key)
-    os.chmod = ('/etc/corosync/authkey', 0400)
+    if corosync_key:
+        # write the authkey
+        with open('/etc/corosync/authkey', 'w') as corosync_key_file:
+            corosync_key_file.write(b64decode(corosync_key))
+        os.chmod = ('/etc/corosync/authkey', 0400)
 
 
 def config_changed():
     utils.juju_log('INFO', 'Begin config-changed hook.')
 
     corosync_key = utils.config_get('corosync_key')
-    if corosync_key == '':
+    if not corosync_key:
         utils.juju_log('CRITICAL',
                        'No Corosync key supplied, cannot proceed')
         sys.exit(1)
 
     if int(utils.config_get('corosync_pcmk_ver')) == 1:
-        utils.enable_lsb_services('pacemaker')
+        hacluster.enable_lsb_services('pacemaker')
     else:
-        utils.disable_lsb_services('pacemaker')
+        hacluster.disable_lsb_services('pacemaker')
 
     # Create a new config file
     emit_base_conf()
@@ -107,14 +109,6 @@ def upgrade_charm():
     install()
     config_changed()
     utils.juju_log('INFO', 'End upgrade-charm hook.')
-
-
-def start():
-    pass
-
-
-def stop():
-    pass
 
 
 def restart_corosync():
@@ -136,16 +130,22 @@ def configure_cluster():
         utils.juju_log('INFO',
                        'HA already configured, not reconfiguring')
         return
-    # Check that there's enough nodes in order to perform the
-    # configuration of the HA cluster
-    if len(get_cluster_nodes()) < 2:
-        utils.juju_log('WARNING', 'Not enough nodes in cluster, bailing')
-        return
     # Check that we are related to a principle and that
     # it has already provided the required corosync configuration
     if not get_corosync_conf():
         utils.juju_log('WARNING',
                        'Unable to configure corosync right now, bailing')
+        return
+    else:
+        utils.juju_log('INFO',
+                       'Ready to form cluster - informing peers')
+        utils.relation_set(ready=True,
+                           rid=utils.relation_ids('hanode')[0])
+    # Check that there's enough nodes in order to perform the
+    # configuration of the HA cluster
+    if (len(get_cluster_nodes()) <
+        int(utils.config_get('cluster_count'))):
+        utils.juju_log('WARNING', 'Not enough nodes in cluster, bailing')
         return
 
     relids = utils.relation_ids('ha')
@@ -231,13 +231,13 @@ def configure_cluster():
     for res_name, res_type in resources.iteritems():
         # disable the service we are going to put in HA
         if res_type.split(':')[0] == "lsb":
-            utils.disable_lsb_services(res_type.split(':')[1])
+            hacluster.disable_lsb_services(res_type.split(':')[1])
             if utils.running(res_type.split(':')[1]):
                 utils.stop(res_type.split(':')[1])
         elif (len(init_services) != 0 and
               res_name in init_services and
               init_services[res_name]):
-            utils.disable_upstart_services(init_services[res_name])
+            hacluster.disable_upstart_services(init_services[res_name])
             if utils.running(init_services[res_name]):
                 utils.stop(init_services[res_name])
         # Put the services in HA, if not already done so
@@ -382,42 +382,28 @@ def configure_stonith():
     pcmk.commit(cmd)
 
 
-def ha_relation_departed():
-    # TODO: Fin out which node is departing and put it in standby mode.
-    # If this happens, and a new relation is created in the same machine
-    # (which already has node), then check whether it is standby and put it
-    # in online mode. This should be done in ha_relation_joined.
-    pcmk.standby(utils.get_unit_hostname())
-
-
 def get_cluster_nodes():
     hosts = []
-    hosts.append('{}:6789'.format(utils.get_host_ip()))
-
+    hosts.append(utils.unit_get('private-address'))
     for relid in utils.relation_ids('hanode'):
         for unit in utils.relation_list(relid):
-            hosts.append(
-                '{}:6789'.format(utils.get_host_ip(
-                                    utils.relation_get('private-address',
-                                                       unit, relid)))
-                )
-
+            if utils.relation_get('ready',
+                                  rid=relid,
+                                  unit=unit):
+                hosts.append(utils.relation_get('private-address',
+                                                unit, relid))
     hosts.sort()
     return hosts
 
 
-utils.do_hooks({
-        'install': install,
-        'config-changed': config_changed,
-        'start': start,
-        'stop': stop,
-        'upgrade-charm': upgrade_charm,
-        'ha-relation-joined': configure_cluster,
-        'ha-relation-changed': configure_cluster,
-        'ha-relation-departed': ha_relation_departed,
-        'hanode-relation-joined': configure_cluster,
-        #'hanode-relation-departed': hanode_relation_departed,
-        # TODO: should probably remove nodes from the cluster
-        })
+hooks = {
+    'install': install,
+    'config-changed': config_changed,
+    'upgrade-charm': upgrade_charm,
+    'ha-relation-joined': configure_cluster,
+    'ha-relation-changed': configure_cluster,
+    'hanode-relation-joined': configure_cluster,
+    'hanode-relation-changed': configure_cluster,
+    }
 
-sys.exit(0)
+utils.do_hooks(hooks)

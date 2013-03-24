@@ -3,7 +3,7 @@ import apt_pkg as apt
 import json
 import subprocess
 
-import utils
+import lib.utils as utils
 
 MAAS_STABLE_PPA = 'ppa:maas-maintainers/stable '
 MAAS_PROFILE_NAME = 'maas-juju-hacluster'
