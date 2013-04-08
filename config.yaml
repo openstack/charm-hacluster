@@ -7,22 +7,23 @@ options:
       If multiple clusters are on the same bindnetaddr network, this value
       can be changed.
   corosync_pcmk_ver:
-    default: 0
+    default: 1
     type: int
     description: |
       Service version for the Pacemaker service version. This will tell
       Corosync how to start pacemaker
   corosync_key:
     type: string
-    default: corosync-key
+    default: "64RxJNcCkwo8EJYBsaacitUvbQp5AW4YolJi5/2urYZYp2jfLxY+3IUCOaAUJHPle4Yqfy+WBXO0I/6ASSAjj9jaiHVNaxmVhhjcmyBqy2vtPf+m+0VxVjUXlkTyYsODwobeDdO3SIkbIABGfjLTu29yqPTsfbvSYr6skRb9ne0="
     description: |
       This value will become the Corosync authentication key. To generate
       a suitable value use:
       .
-        corosync-keygen
+        sudo corosync-keygen
+        sudo cat /etc/corosync/authkey | base64 -w 0
       .
       This configuration element is mandatory and the service will fail on
-      install if it is not provided.
+      install if it is not provided.  The value must be base64 encoded.
   stonith_enabled:
     type: string
     default: 'False'
@@ -36,3 +37,7 @@ options:
   maas_credentials:
     type: string
     description: MAAS credentials (required for STONITH).
+  cluster_count:
+    type: int
+    default: 2
+    description: Number of peer units required to bootstrap cluster services.

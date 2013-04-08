@@ -11,10 +11,13 @@ import shutil
 import sys
 import time
 import os
+from base64 import b64decode
 
 import maas as MAAS
-import utils
+import lib.utils as utils
+import lib.cluster_utils as cluster
 import pcmk
+import hacluster
 
 
 def install():
@@ -36,12 +39,12 @@ def get_corosync_conf():
         for unit in utils.relation_list(relid):
             conf = {
                 'corosync_bindnetaddr':
-                    utils.get_network_address(
+                    hacluster.get_network_address(
                               utils.relation_get('corosync_bindiface',
                                                  unit, relid)
                               ),
                 'corosync_mcastport': utils.relation_get('corosync_mcastport',
-                                        unit, relid),
+                                                         unit, relid),
                 'corosync_mcastaddr': utils.config_get('corosync_mcastaddr'),
                 'corosync_pcmk_ver': utils.config_get('corosync_pcmk_ver'),
                 }
@@ -68,27 +71,27 @@ def emit_base_conf():
     with open('/etc/default/corosync', 'w') as corosync_default:
         corosync_default.write(utils.render_template('corosync',
                                                      corosync_default_context))
-
-    # write the authkey
     corosync_key = utils.config_get('corosync_key')
-    with open('/etc/corosync/authkey', 'w') as corosync_key_file:
-        corosync_key_file.write(corosync_key)
-    os.chmod = ('/etc/corosync/authkey', 0400)
+    if corosync_key:
+        # write the authkey
+        with open('/etc/corosync/authkey', 'w') as corosync_key_file:
+            corosync_key_file.write(b64decode(corosync_key))
+        os.chmod = ('/etc/corosync/authkey', 0400)
 
 
 def config_changed():
     utils.juju_log('INFO', 'Begin config-changed hook.')
 
     corosync_key = utils.config_get('corosync_key')
-    if corosync_key == '':
+    if not corosync_key:
         utils.juju_log('CRITICAL',
                        'No Corosync key supplied, cannot proceed')
         sys.exit(1)
 
     if int(utils.config_get('corosync_pcmk_ver')) == 1:
-        utils.enable_lsb_services('pacemaker')
+        hacluster.enable_lsb_services('pacemaker')
     else:
-        utils.disable_lsb_services('pacemaker')
+        hacluster.disable_lsb_services('pacemaker')
 
     # Create a new config file
     emit_base_conf()
@@ -107,14 +110,6 @@ def upgrade_charm():
     install()
     config_changed()
     utils.juju_log('INFO', 'End upgrade-charm hook.')
-
-
-def start():
-    pass
-
-
-def stop():
-    pass
 
 
 def restart_corosync():
@@ -136,16 +131,22 @@ def configure_cluster():
         utils.juju_log('INFO',
                        'HA already configured, not reconfiguring')
         return
-    # Check that there's enough nodes in order to perform the
-    # configuration of the HA cluster
-    if len(get_cluster_nodes()) < 2:
-        utils.juju_log('WARNING', 'Not enough nodes in cluster, bailing')
-        return
     # Check that we are related to a principle and that
     # it has already provided the required corosync configuration
     if not get_corosync_conf():
         utils.juju_log('WARNING',
                        'Unable to configure corosync right now, bailing')
+        return
+    else:
+        utils.juju_log('INFO',
+                       'Ready to form cluster - informing peers')
+        utils.relation_set(ready=True,
+                           rid=utils.relation_ids('hanode')[0])
+    # Check that there's enough nodes in order to perform the
+    # configuration of the HA cluster
+    if (len(get_cluster_nodes()) <
+        int(utils.config_get('cluster_count'))):
+        utils.juju_log('WARNING', 'Not enough nodes in cluster, bailing')
         return
 
     relids = utils.relation_ids('ha')
@@ -225,98 +226,101 @@ def configure_cluster():
           ' resource-stickiness="100"'
     pcmk.commit(cmd)
 
-    utils.juju_log('INFO', 'Configuring Resources')
-    utils.juju_log('INFO', str(resources))
-
-    for res_name, res_type in resources.iteritems():
-        # disable the service we are going to put in HA
-        if res_type.split(':')[0] == "lsb":
-            utils.disable_lsb_services(res_type.split(':')[1])
-            if utils.running(res_type.split(':')[1]):
-                utils.stop(res_type.split(':')[1])
-        elif (len(init_services) != 0 and
-              res_name in init_services and
-              init_services[res_name]):
-            utils.disable_upstart_services(init_services[res_name])
-            if utils.running(init_services[res_name]):
-                utils.stop(init_services[res_name])
-        # Put the services in HA, if not already done so
-        #if not pcmk.is_resource_present(res_name):
-        if not pcmk.crm_opt_exists(res_name):
-            if not res_name in resource_params:
-                cmd = 'crm -F configure primitive %s %s' % (res_name, res_type)
-            else:
-                cmd = 'crm -F configure primitive %s %s %s' % \
-                            (res_name,
-                             res_type,
-                             resource_params[res_name])
-            pcmk.commit(cmd)
-            utils.juju_log('INFO', '%s' % cmd)
-
-    utils.juju_log('INFO', 'Configuring Groups')
-    utils.juju_log('INFO', str(groups))
-    for grp_name, grp_params in groups.iteritems():
-        if not pcmk.crm_opt_exists(grp_name):
-            cmd = 'crm -F configure group %s %s' % (grp_name, grp_params)
-            pcmk.commit(cmd)
-            utils.juju_log('INFO', '%s' % cmd)
-
-    utils.juju_log('INFO', 'Configuring Master/Slave (ms)')
-    utils.juju_log('INFO', str(ms))
-    for ms_name, ms_params in ms.iteritems():
-        if not pcmk.crm_opt_exists(ms_name):
-            cmd = 'crm -F configure ms %s %s' % (ms_name, ms_params)
-            pcmk.commit(cmd)
-            utils.juju_log('INFO', '%s' % cmd)
-
-    utils.juju_log('INFO', 'Configuring Orders')
-    utils.juju_log('INFO', str(orders))
-    for ord_name, ord_params in orders.iteritems():
-        if not pcmk.crm_opt_exists(ord_name):
-            cmd = 'crm -F configure order %s %s' % (ord_name, ord_params)
-            pcmk.commit(cmd)
-            utils.juju_log('INFO', '%s' % cmd)
-
-    utils.juju_log('INFO', 'Configuring Colocations')
-    utils.juju_log('INFO', str(colocations))
-    for col_name, col_params in colocations.iteritems():
-        if not pcmk.crm_opt_exists(col_name):
-            cmd = 'crm -F configure colocation %s %s' % (col_name, col_params)
-            pcmk.commit(cmd)
-            utils.juju_log('INFO', '%s' % cmd)
-
-    utils.juju_log('INFO', 'Configuring Clones')
-    utils.juju_log('INFO', str(clones))
-    for cln_name, cln_params in clones.iteritems():
-        if not pcmk.crm_opt_exists(cln_name):
-            cmd = 'crm -F configure clone %s %s' % (cln_name, cln_params)
-            pcmk.commit(cmd)
-            utils.juju_log('INFO', '%s' % cmd)
-
-    for res_name, res_type in resources.iteritems():
-        if len(init_services) != 0 and res_name in init_services:
-            # Checks that the resources are running and started.
-            # Ensure that clones are excluded as the resource is
-            # not directly controllable (dealt with below)
-            # Ensure that groups are cleaned up as a whole rather
-            # than as individual resources.
-            if (res_name not in clones.values() and
-                res_name not in groups.values() and
-                not pcmk.crm_res_running(res_name)):
-                # Just in case, cleanup the resources to ensure they get
-                # started in case they failed for some unrelated reason.
-                cmd = 'crm resource cleanup %s' % res_name
+    # Only configure the cluster resources
+    # from the oldest peer unit.
+    if cluster.oldest_peer(cluster.peer_units()):
+        utils.juju_log('INFO', 'Configuring Resources')
+        utils.juju_log('INFO', str(resources))
+        for res_name, res_type in resources.iteritems():
+            # disable the service we are going to put in HA
+            if res_type.split(':')[0] == "lsb":
+                hacluster.disable_lsb_services(res_type.split(':')[1])
+                if utils.running(res_type.split(':')[1]):
+                    utils.stop(res_type.split(':')[1])
+            elif (len(init_services) != 0 and
+                  res_name in init_services and
+                  init_services[res_name]):
+                hacluster.disable_upstart_services(init_services[res_name])
+                if utils.running(init_services[res_name]):
+                    utils.stop(init_services[res_name])
+            # Put the services in HA, if not already done so
+            #if not pcmk.is_resource_present(res_name):
+            if not pcmk.crm_opt_exists(res_name):
+                if not res_name in resource_params:
+                    cmd = 'crm -F configure primitive %s %s' % (res_name,
+                                                                res_type)
+                else:
+                    cmd = 'crm -F configure primitive %s %s %s' % \
+                                (res_name,
+                                 res_type,
+                                 resource_params[res_name])
                 pcmk.commit(cmd)
+                utils.juju_log('INFO', '%s' % cmd)
 
-    for cl_name in clones:
-        # Always cleanup clones
-        cmd = 'crm resource cleanup %s' % cl_name
-        pcmk.commit(cmd)
+        utils.juju_log('INFO', 'Configuring Groups')
+        utils.juju_log('INFO', str(groups))
+        for grp_name, grp_params in groups.iteritems():
+            if not pcmk.crm_opt_exists(grp_name):
+                cmd = 'crm -F configure group %s %s' % (grp_name, grp_params)
+                pcmk.commit(cmd)
+                utils.juju_log('INFO', '%s' % cmd)
 
-    for grp_name in groups:
-        # Always cleanup groups
-        cmd = 'crm resource cleanup %s' % grp_name
-        pcmk.commit(cmd)
+        utils.juju_log('INFO', 'Configuring Master/Slave (ms)')
+        utils.juju_log('INFO', str(ms))
+        for ms_name, ms_params in ms.iteritems():
+            if not pcmk.crm_opt_exists(ms_name):
+                cmd = 'crm -F configure ms %s %s' % (ms_name, ms_params)
+                pcmk.commit(cmd)
+                utils.juju_log('INFO', '%s' % cmd)
+
+        utils.juju_log('INFO', 'Configuring Orders')
+        utils.juju_log('INFO', str(orders))
+        for ord_name, ord_params in orders.iteritems():
+            if not pcmk.crm_opt_exists(ord_name):
+                cmd = 'crm -F configure order %s %s' % (ord_name, ord_params)
+                pcmk.commit(cmd)
+                utils.juju_log('INFO', '%s' % cmd)
+
+        utils.juju_log('INFO', 'Configuring Colocations')
+        utils.juju_log('INFO', str(colocations))
+        for col_name, col_params in colocations.iteritems():
+            if not pcmk.crm_opt_exists(col_name):
+                cmd = 'crm -F configure colocation %s %s' % (col_name, col_params)
+                pcmk.commit(cmd)
+                utils.juju_log('INFO', '%s' % cmd)
+
+        utils.juju_log('INFO', 'Configuring Clones')
+        utils.juju_log('INFO', str(clones))
+        for cln_name, cln_params in clones.iteritems():
+            if not pcmk.crm_opt_exists(cln_name):
+                cmd = 'crm -F configure clone %s %s' % (cln_name, cln_params)
+                pcmk.commit(cmd)
+                utils.juju_log('INFO', '%s' % cmd)
+
+        for res_name, res_type in resources.iteritems():
+            if len(init_services) != 0 and res_name in init_services:
+                # Checks that the resources are running and started.
+                # Ensure that clones are excluded as the resource is
+                # not directly controllable (dealt with below)
+                # Ensure that groups are cleaned up as a whole rather
+                # than as individual resources.
+                if (res_name not in clones.values() and
+                    res_name not in groups.values() and
+                    not pcmk.crm_res_running(res_name)):
+                    # Just in case, cleanup the resources to ensure they get
+                    # started in case they failed for some unrelated reason.
+                    cmd = 'crm resource cleanup %s' % res_name
+                    pcmk.commit(cmd)
+
+        for cl_name in clones:
+            # Always cleanup clones
+            cmd = 'crm resource cleanup %s' % cl_name
+            pcmk.commit(cmd)
+
+        for grp_name in groups:
+            # Always cleanup groups
+            cmd = 'crm resource cleanup %s' % grp_name
+            pcmk.commit(cmd)
 
     for rel_id in utils.relation_ids('ha'):
         utils.relation_set(rid=rel_id,
@@ -382,42 +386,28 @@ def configure_stonith():
     pcmk.commit(cmd)
 
 
-def ha_relation_departed():
-    # TODO: Fin out which node is departing and put it in standby mode.
-    # If this happens, and a new relation is created in the same machine
-    # (which already has node), then check whether it is standby and put it
-    # in online mode. This should be done in ha_relation_joined.
-    pcmk.standby(utils.get_unit_hostname())
-
-
 def get_cluster_nodes():
     hosts = []
-    hosts.append('{}:6789'.format(utils.get_host_ip()))
-
+    hosts.append(utils.unit_get('private-address'))
     for relid in utils.relation_ids('hanode'):
         for unit in utils.relation_list(relid):
-            hosts.append(
-                '{}:6789'.format(utils.get_host_ip(
-                                    utils.relation_get('private-address',
-                                                       unit, relid)))
-                )
-
+            if utils.relation_get('ready',
+                                  rid=relid,
+                                  unit=unit):
+                hosts.append(utils.relation_get('private-address',
+                                                unit, relid))
     hosts.sort()
     return hosts
 
 
-utils.do_hooks({
-        'install': install,
-        'config-changed': config_changed,
-        'start': start,
-        'stop': stop,
-        'upgrade-charm': upgrade_charm,
-        'ha-relation-joined': configure_cluster,
-        'ha-relation-changed': configure_cluster,
-        'ha-relation-departed': ha_relation_departed,
-        'hanode-relation-joined': configure_cluster,
-        #'hanode-relation-departed': hanode_relation_departed,
-        # TODO: should probably remove nodes from the cluster
-        })
+hooks = {
+    'install': install,
+    'config-changed': config_changed,
+    'upgrade-charm': upgrade_charm,
+    'ha-relation-joined': configure_cluster,
+    'ha-relation-changed': configure_cluster,
+    'hanode-relation-joined': configure_cluster,
+    'hanode-relation-changed': configure_cluster,
+    }
 
-sys.exit(0)
+utils.do_hooks(hooks)
