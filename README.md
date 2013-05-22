@@ -16,15 +16,15 @@ hardware.
 
 To deploy the charm:
 
-  juju deploy hacluster mysql-hacluster
+    juju deploy hacluster mysql-hacluster
 
 To enable HA clustering support (for mysql for example):
 
-  juju deploy -n 2 mysql
-  juju deploy -n 3 ceph
-  juju set mysql vip="192.168.21.1"
-  juju add-relation mysql ceph
-  juju add-relation mysql mysql-hacluster
+    juju deploy -n 2 mysql
+    juju deploy -n 3 ceph
+    juju set mysql vip="192.168.21.1"
+    juju add-relation mysql ceph
+    juju add-relation mysql mysql-hacluster
 
 The principle charm must have explicit support for the hacluster interface
 in order for clustering to occur - otherwise nothing actually get configured.
@@ -34,10 +34,12 @@ in order for clustering to occur - otherwise nothing actually get configured.
 The hacluster interface supports a number of different cluster configuration
 options.
 
-## Mandatory
+## Mandatory Relation Data
 
-   corosync\_bindiface: The network interface to use for cluster messaging.
-   corosync\_mcastport: The multicast port to use for cluster messaging.
+All principle charms must provide basic corosync configuration:
+
+    corosync\_bindiface: The network interface to use for cluster messaging.
+    corosync\_mcastport: The multicast port to use for cluster messaging.
 
 ## Resource Configuration
 
