@@ -297,7 +297,7 @@ def configure_cluster():
         for cln_name, cln_params in clones.iteritems():
             if not pcmk.crm_opt_exists(cln_name):
                 cmd = 'crm -w -F configure clone %s %s' % (cln_name,
-                                                        cln_params)
+                                                           cln_params)
                 pcmk.commit(cmd)
                 utils.juju_log('INFO', '%s' % cmd)
 
