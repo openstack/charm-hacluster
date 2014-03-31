@@ -88,10 +88,7 @@ def config_changed():
                        'No Corosync key supplied, cannot proceed')
         sys.exit(1)
 
-    if int(utils.config_get('corosync_pcmk_ver')) == 1:
-        hacluster.enable_lsb_services('pacemaker')
-    else:
-        hacluster.disable_lsb_services('pacemaker')
+    hacluster.enable_lsb_services('pacemaker')
 
     # Create a new config file
     emit_base_conf()
