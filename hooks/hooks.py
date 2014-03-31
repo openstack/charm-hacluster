@@ -113,14 +113,11 @@ def upgrade_charm():
 
 
 def restart_corosync():
-    if int(utils.config_get('corosync_pcmk_ver')) == 1:
-        if utils.running("pacemaker"):
-            utils.stop("pacemaker")
-        utils.restart("corosync")
-        time.sleep(2)
-        utils.start("pacemaker")
-    else:
-        utils.restart("corosync")
+    if utils.running("pacemaker"):
+        utils.stop("pacemaker")
+    utils.restart("corosync")
+    time.sleep(5)
+    utils.start("pacemaker")
 
 HAMARKER = '/var/lib/juju/haconfigured'
 

@@ -6,12 +6,6 @@ options:
       Multicast IP address to use for exchanging messages over the network.
       If multiple clusters are on the same bindnetaddr network, this value
       can be changed.
-  corosync_pcmk_ver:
-    default: 0
-    type: int
-    description: |
-      Service version for the Pacemaker service version. This will tell
-      Corosync how to start pacemaker
   corosync_key:
     type: string
     default: "64RxJNcCkwo8EJYBsaacitUvbQp5AW4YolJi5/2urYZYp2jfLxY+3IUCOaAUJHPle4Yqfy+WBXO0I/6ASSAjj9jaiHVNaxmVhhjcmyBqy2vtPf+m+0VxVjUXlkTyYsODwobeDdO3SIkbIABGfjLTu29yqPTsfbvSYr6skRb9ne0="
