@@ -46,7 +46,6 @@ def get_corosync_conf():
                 'corosync_mcastport': utils.relation_get('corosync_mcastport',
                                                          unit, relid),
                 'corosync_mcastaddr': utils.config_get('corosync_mcastaddr'),
-                'corosync_pcmk_ver': utils.config_get('corosync_pcmk_ver'),
                 }
             if None not in conf.itervalues():
                 return conf
