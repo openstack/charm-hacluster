@@ -229,15 +229,16 @@ def configure_cluster():
     # Configure Ping service
     monitor_host = utils.config_get('monitor_host')
     if monitor_host:
-        monitor_interval = utils.config_get('monitor_interval')
-        cmd = 'crm -w -F configure primitive Ping' \
-              ' ocf:pacemaker:ping params host_list="%s"' \
-              ' multiplier="100" op monitor interval="%s"' %\
-              (monitor_host, monitor_interval)
-        cmd2 = 'crm -w -F configure clone PingClone Ping' \
-               ' meta interleave="true"'
-        pcmk.commit(cmd)
-        pcmk.commit(cmd2)
+        if not pcmk.crm_opt_exists('ping'):
+            monitor_interval = utils.config_get('monitor_interval')
+            cmd = 'crm -w -F configure primitive ping' \
+                  ' ocf:pacemaker:ping params host_list="%s"' \
+                  ' multiplier="100" op monitor interval="%s"' %\
+                  (monitor_host, monitor_interval)
+            cmd2 = 'crm -w -F configure clone cl_ping ping' \
+                   ' meta interleave="true"'
+            pcmk.commit(cmd)
+            pcmk.commit(cmd2)
 
     # Only configure the cluster resources
     # from the oldest peer unit.
