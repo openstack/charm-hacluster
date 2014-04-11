@@ -72,6 +72,7 @@ def get_netmask_cidr(netmask):
 
 def get_network_address(iface):
     if iface:
+        iface = str(iface)
         network = "{}/{}".format(get_iface_ipaddr(iface),
                                  get_netmask_cidr(get_iface_netmask(iface)))
         ip = IPNetwork(network)

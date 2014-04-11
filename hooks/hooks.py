@@ -64,15 +64,16 @@ def get_corosync_conf():
     for relid in relation_ids('ha'):
         for unit in related_units(relid):
             conf = {
-                'corosync_bindnetaddr': relation_get('corosync_bindiface',
-                                                     unit, relid),
+                'corosync_bindnetaddr':
+                hacluster.get_network_address(
+                    relation_get('corosync_bindiface',
+                                 unit, relid)
+                ),
                 'corosync_mcastport': relation_get('corosync_mcastport',
                                                    unit, relid),
                 'corosync_mcastaddr': config('corosync_mcastaddr'),
             }
             if None not in conf.itervalues():
-                conf['corosync_bindnetaddr'] = \
-                    hacluster.get_network_address(conf['corosync_bindnetaddr'])
                 return conf
     missing = [k for k, v in conf.iteritems() if v is None]
     log('Missing required principle configuration: %s' % missing)
