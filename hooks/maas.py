@@ -3,7 +3,8 @@ import apt_pkg as apt
 import json
 import subprocess
 
-import lib.utils as utils
+from charmhelpers.fetch import apt_install
+from charmhelpers.core.hookenv import log, ERROR
 
 MAAS_STABLE_PPA = 'ppa:maas-maintainers/stable '
 MAAS_PROFILE_NAME = 'maas-juju-hacluster'
@@ -35,14 +36,14 @@ class MAASHelper(object):
             return
 
         if not pkg.current_ver:
-            utils.install('maas-cli')
+            apt_install('maas-cli', fatal=True)
 
     def login(self):
         cmd = ['maas-cli', 'login', MAAS_PROFILE_NAME, self.url, self.creds]
         try:
             subprocess.check_call(cmd)
         except subprocess.CalledProcessError:
-            utils.juju_log('ERROR', 'Could not login to MAAS @ %s.' % self.url)
+            log('Could not login to MAAS @ %s.' % self.url, ERROR)
             return False
 
     def logout(self):
@@ -56,7 +57,7 @@ class MAASHelper(object):
             cmd = ['maas-cli', MAAS_PROFILE_NAME, 'nodes', 'list']
             out = subprocess.check_output(cmd)
         except subprocess.CalledProcessError:
-            utils.juju_log('ERROR', 'Could not get node inventory from MAAS.')
+            log('Could not get node inventory from MAAS.', ERROR)
             return False
         self.logout()
         return json.loads(out)

@@ -1,23 +1,30 @@
 #
 # Copyright 2012 Canonical Ltd.
 #
-# This file is sourced from lp:openstack-charm-helpers
-#
 # Authors:
 #  James Page <james.page@ubuntu.com>
 #  Adam Gandelman <adamg@ubuntu.com>
 #
 
-from lib.utils import (
-    juju_log,
-    relation_ids,
-    relation_list,
-    relation_get,
-    get_unit_hostname,
-    config_get
-)
 import subprocess
 import os
+
+from socket import gethostname as get_unit_hostname
+
+from charmhelpers.core.hookenv import (
+    log,
+    relation_ids,
+    related_units as relation_list,
+    relation_get,
+    config as config_get,
+    INFO,
+    ERROR,
+    unit_get,
+)
+
+
+class HAIncompleteConfig(Exception):
+    pass
 
 
 def is_clustered():
@@ -67,12 +74,12 @@ def oldest_peer(peers):
 def eligible_leader(resource):
     if is_clustered():
         if not is_leader(resource):
-            juju_log('INFO', 'Deferring action to CRM leader.')
+            log('Deferring action to CRM leader.', level=INFO)
             return False
     else:
         peers = peer_units()
         if peers and not oldest_peer(peers):
-            juju_log('INFO', 'Deferring action to oldest service unit.')
+            log('Deferring action to oldest service unit.', level=INFO)
             return False
     return True
 
@@ -90,10 +97,14 @@ def https():
         return True
     for r_id in relation_ids('identity-service'):
         for unit in relation_list(r_id):
-            if (relation_get('https_keystone', rid=r_id, unit=unit) and
-                relation_get('ssl_cert', rid=r_id, unit=unit) and
-                relation_get('ssl_key', rid=r_id, unit=unit) and
-                    relation_get('ca_cert', rid=r_id, unit=unit)):
+            rel_state = [
+                relation_get('https_keystone', rid=r_id, unit=unit),
+                relation_get('ssl_cert', rid=r_id, unit=unit),
+                relation_get('ssl_key', rid=r_id, unit=unit),
+                relation_get('ca_cert', rid=r_id, unit=unit),
+            ]
+            # NOTE: works around (LP: #1203241)
+            if (None not in rel_state) and ('' not in rel_state):
                 return True
     return False
 
@@ -115,16 +126,58 @@ def determine_api_port(public_port):
     return public_port - (i * 10)
 
 
-def determine_haproxy_port(public_port):
+def determine_apache_port(public_port):
     '''
-    Description: Determine correct proxy listening port based on public IP +
-    existence of HTTPS reverse proxy.
+    Description: Determine correct apache listening port based on public IP +
+    state of the cluster.
 
     public_port: int: standard public port for given service
 
     returns: int: the correct listening port for the HAProxy service
     '''
     i = 0
-    if https():
+    if len(peer_units()) > 0 or is_clustered():
         i += 1
     return public_port - (i * 10)
+
+
+def get_hacluster_config():
+    '''
+    Obtains all relevant configuration from charm configuration required
+    for initiating a relation to hacluster:
+
+        ha-bindiface, ha-mcastport, vip, vip_iface, vip_cidr
+
+    returns: dict: A dict containing settings keyed by setting name.
+    raises: HAIncompleteConfig if settings are missing.
+    '''
+    settings = ['ha-bindiface', 'ha-mcastport', 'vip', 'vip_iface', 'vip_cidr']
+    conf = {}
+    for setting in settings:
+        conf[setting] = config_get(setting)
+    missing = []
+    [missing.append(s) for s, v in conf.iteritems() if v is None]
+    if missing:
+        log('Insufficient config data to configure hacluster.', level=ERROR)
+        raise HAIncompleteConfig
+    return conf
+
+
+def canonical_url(configs, vip_setting='vip'):
+    '''
+    Returns the correct HTTP URL to this host given the state of HTTPS
+    configuration and hacluster.
+
+    :configs    : OSTemplateRenderer: A config tempating object to inspect for
+                                      a complete https context.
+    :vip_setting:                str: Setting in charm config that specifies
+                                      VIP address.
+    '''
+    scheme = 'http'
+    if 'https' in configs.complete_contexts():
+        scheme = 'https'
+    if is_clustered():
+        addr = config_get(vip_setting)
+    else:
+        addr = unit_get('private-address')
+    return '%s://%s' % (scheme, addr)

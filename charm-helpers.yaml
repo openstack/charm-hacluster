@@ -1,0 +1,8 @@
+branch: lp:charm-helpers
+destination: hooks/charmhelpers
+include:
+    - core
+    - fetch
+    - contrib.storage.linux
+    - contrib.hahelpers
+    - contrib.storage

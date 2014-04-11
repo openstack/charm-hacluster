@@ -1,11 +1,14 @@
-import lib.utils as utils
+#import lib.utils as utils
 import commands
 import subprocess
+import socket
+
+from charmhelpers.core.hookenv import log, ERROR
 
 
 def wait_for_pcmk():
     crm_up = None
-    hostname = utils.get_unit_hostname()
+    hostname = socket.gethostname()
     while not crm_up:
         output = commands.getstatusoutput("crm node list")[1]
         crm_up = hostname in output
@@ -92,8 +95,7 @@ def maas_stonith_primitive(maas_nodes, crm_node):
     if power_type == 'ipmi':
         rsc, constraint = _maas_ipmi_stonith_resource(crm_node, power_params)
     else:
-        utils.juju_log('ERROR',
-                       'Unsupported STONITH power_type: %s' % power_type)
+        log('Unsupported STONITH power_type: %s' % power_type, ERROR)
         return False, False
 
     if not rsc or not constraint:

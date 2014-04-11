@@ -12,13 +12,12 @@ import subprocess
 import socket
 import fcntl
 import struct
-import lib.utils as utils
-
+from charmhelpers.fetch import apt_install
 
 try:
     from netaddr import IPNetwork
 except ImportError:
-    utils.install('python-netaddr')
+    apt_install('python-netaddr', fatal=True)
     from netaddr import IPNetwork
 
 
