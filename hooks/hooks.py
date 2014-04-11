@@ -39,18 +39,18 @@ def get_corosync_conf():
         for unit in utils.relation_list(relid):
             conf = {
                 'corosync_bindnetaddr':
-                    hacluster.get_network_address(
-                              utils.relation_get('corosync_bindiface',
-                                                 unit, relid)
-                              ),
+                hacluster.get_network_address(
+                    utils.relation_get('corosync_bindiface',
+                                       unit, relid)
+                ),
                 'corosync_mcastport': utils.relation_get('corosync_mcastport',
                                                          unit, relid),
                 'corosync_mcastaddr': utils.config_get('corosync_mcastaddr'),
                 'corosync_pcmk_ver': utils.config_get('corosync_pcmk_ver'),
-                }
+            }
             if None not in conf.itervalues():
                 return conf
-    missing = [k for k, v in conf.iteritems() if v == None]
+    missing = [k for k, v in conf.iteritems() if v is None]
     utils.juju_log('INFO',
                    'Missing required principle configuration: %s' % missing)
     return None
@@ -76,7 +76,7 @@ def emit_base_conf():
         # write the authkey
         with open('/etc/corosync/authkey', 'w') as corosync_key_file:
             corosync_key_file.write(b64decode(corosync_key))
-        os.chmod = ('/etc/corosync/authkey', 0400)
+        os.chmod = ('/etc/corosync/authkey', 0o400)
 
 
 def config_changed():
@@ -145,7 +145,7 @@ def configure_cluster():
     # Check that there's enough nodes in order to perform the
     # configuration of the HA cluster
     if (len(get_cluster_nodes()) <
-        int(utils.config_get('cluster_count'))):
+            int(utils.config_get('cluster_count'))):
         utils.juju_log('WARNING', 'Not enough nodes in cluster, bailing')
         return
 
@@ -160,43 +160,43 @@ def configure_cluster():
         resources = \
             {} if utils.relation_get("resources",
                                      unit, relid) is None \
-               else ast.literal_eval(utils.relation_get("resources",
-                                                        unit, relid))
+            else ast.literal_eval(utils.relation_get("resources",
+                                                     unit, relid))
         resource_params = \
             {} if utils.relation_get("resource_params",
                                      unit, relid) is None \
-               else ast.literal_eval(utils.relation_get("resource_params",
-                                                        unit, relid))
+            else ast.literal_eval(utils.relation_get("resource_params",
+                                                     unit, relid))
         groups = \
             {} if utils.relation_get("groups",
                                      unit, relid) is None \
-               else ast.literal_eval(utils.relation_get("groups",
-                                                        unit, relid))
+            else ast.literal_eval(utils.relation_get("groups",
+                                                     unit, relid))
         ms = \
             {} if utils.relation_get("ms",
                                      unit, relid) is None \
-               else ast.literal_eval(utils.relation_get("ms",
-                                                        unit, relid))
+            else ast.literal_eval(utils.relation_get("ms",
+                                                     unit, relid))
         orders = \
             {} if utils.relation_get("orders",
                                      unit, relid) is None \
-               else ast.literal_eval(utils.relation_get("orders",
-                                                        unit, relid))
+            else ast.literal_eval(utils.relation_get("orders",
+                                                     unit, relid))
         colocations = \
             {} if utils.relation_get("colocations",
                                      unit, relid) is None \
-               else ast.literal_eval(utils.relation_get("colocations",
-                                                        unit, relid))
+            else ast.literal_eval(utils.relation_get("colocations",
+                                                     unit, relid))
         clones = \
             {} if utils.relation_get("clones",
                                      unit, relid) is None \
-               else ast.literal_eval(utils.relation_get("clones",
-                                                        unit, relid))
+            else ast.literal_eval(utils.relation_get("clones",
+                                                     unit, relid))
         init_services = \
             {} if utils.relation_get("init_services",
                                      unit, relid) is None \
-               else ast.literal_eval(utils.relation_get("init_services",
-                                                        unit, relid))
+            else ast.literal_eval(utils.relation_get("init_services",
+                                                     unit, relid))
 
     else:
         utils.juju_log('WARNING',
@@ -257,16 +257,16 @@ def configure_cluster():
                 if utils.running(init_services[res_name]):
                     utils.stop(init_services[res_name])
             # Put the services in HA, if not already done so
-            #if not pcmk.is_resource_present(res_name):
+            # if not pcmk.is_resource_present(res_name):
             if not pcmk.crm_opt_exists(res_name):
                 if not res_name in resource_params:
                     cmd = 'crm -w -F configure primitive %s %s' % (res_name,
                                                                    res_type)
                 else:
                     cmd = 'crm -w -F configure primitive %s %s %s' % \
-                                (res_name,
-                                 res_type,
-                                 resource_params[res_name])
+                        (res_name,
+                         res_type,
+                         resource_params[res_name])
                 pcmk.commit(cmd)
                 utils.juju_log('INFO', '%s' % cmd)
                 if monitor_host:
@@ -327,7 +327,7 @@ def configure_cluster():
                 # than as individual resources.
                 if (res_name not in clones.values() and
                     res_name not in groups.values() and
-                    not pcmk.crm_res_running(res_name)):
+                        not pcmk.crm_res_running(res_name)):
                     # Just in case, cleanup the resources to ensure they get
                     # started in case they failed for some unrelated reason.
                     cmd = 'crm resource cleanup %s' % res_name
@@ -370,14 +370,14 @@ def configure_stonith():
     url = utils.config_get('maas_url')
     creds = utils.config_get('maas_credentials')
     if None in [url, creds]:
-        utils.juju_log('ERROR', 'maas_url and maas_credentials must be set'\
+        utils.juju_log('ERROR', 'maas_url and maas_credentials must be set'
                        ' in config to enable STONITH.')
         sys.exit(1)
 
     maas = MAAS.MAASHelper(url, creds)
     nodes = maas.list_nodes()
     if not nodes:
-        utils.juju_log('ERROR', 'Could not obtain node inventory from '\
+        utils.juju_log('ERROR', 'Could not obtain node inventory from '
                        'MAAS @ %s.' % url)
         sys.exit(1)
 
@@ -386,13 +386,13 @@ def configure_stonith():
         rsc, constraint = pcmk.maas_stonith_primitive(nodes, node)
         if not rsc:
             utils.juju_log('ERROR',
-                           'Failed to determine STONITH primitive for node'\
+                           'Failed to determine STONITH primitive for node'
                            ' %s' % node)
             sys.exit(1)
 
         rsc_name = str(rsc).split(' ')[1]
         if not pcmk.is_resource_present(rsc_name):
-            utils.juju_log('INFO', 'Creating new STONITH primitive %s.' %\
+            utils.juju_log('INFO', 'Creating new STONITH primitive %s.' %
                            rsc_name)
             cmd = 'crm -F configure %s' % rsc
             pcmk.commit(cmd)
@@ -400,7 +400,7 @@ def configure_stonith():
                 cmd = 'crm -F configure %s' % constraint
                 pcmk.commit(cmd)
         else:
-            utils.juju_log('INFO', 'STONITH primitive already exists '\
+            utils.juju_log('INFO', 'STONITH primitive already exists '
                            'for node.')
 
     cmd = "crm configure property stonith-enabled=true"
@@ -429,6 +429,6 @@ hooks = {
     'ha-relation-changed': configure_cluster,
     'hanode-relation-joined': configure_cluster,
     'hanode-relation-changed': configure_cluster,
-    }
+}
 
 utils.do_hooks(hooks)

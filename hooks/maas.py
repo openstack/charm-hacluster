@@ -10,6 +10,7 @@ MAAS_PROFILE_NAME = 'maas-juju-hacluster'
 
 
 class MAASHelper(object):
+
     def __init__(self, url, creds):
         self.url = url
         self.creds = creds
