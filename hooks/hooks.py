@@ -230,11 +230,11 @@ def configure_cluster():
     monitor_host = utils.config_get('monitor_host')
     if monitor_host:
         monitor_interval = utils.config_get('monitor_interval')
-        cmd = 'crm -F configure primitive Ping' \
+        cmd = 'crm -w -F configure primitive Ping' \
               ' ocf:pacemaker:ping params host_list="%s"' \
               ' multiplier="100" op monitor interval="%s"' %\
               (monitor_host, monitor_interval)
-        cmd2 = 'crm -F configure clone PingClone Ping' \
+        cmd2 = 'crm -w -F configure clone PingClone Ping' \
                ' meta interleave="true"'
         pcmk.commit(cmd)
         pcmk.commit(cmd2)
@@ -260,10 +260,10 @@ def configure_cluster():
             #if not pcmk.is_resource_present(res_name):
             if not pcmk.crm_opt_exists(res_name):
                 if not res_name in resource_params:
-                    cmd = 'crm -F configure primitive %s %s' % (res_name,
-                                                                res_type)
+                    cmd = 'crm -w -F configure primitive %s %s' % (res_name,
+                                                                   res_type)
                 else:
-                    cmd = 'crm -F configure primitive %s %s %s' % \
+                    cmd = 'crm -w -F configure primitive %s %s %s' % \
                                 (res_name,
                                  res_type,
                                  resource_params[res_name])
@@ -278,7 +278,8 @@ def configure_cluster():
         utils.juju_log('INFO', str(groups))
         for grp_name, grp_params in groups.iteritems():
             if not pcmk.crm_opt_exists(grp_name):
-                cmd = 'crm -F configure group %s %s' % (grp_name, grp_params)
+                cmd = 'crm -w -F configure group %s %s' % (grp_name,
+                                                           grp_params)
                 pcmk.commit(cmd)
                 utils.juju_log('INFO', '%s' % cmd)
 
@@ -286,7 +287,7 @@ def configure_cluster():
         utils.juju_log('INFO', str(ms))
         for ms_name, ms_params in ms.iteritems():
             if not pcmk.crm_opt_exists(ms_name):
-                cmd = 'crm -F configure ms %s %s' % (ms_name, ms_params)
+                cmd = 'crm -w -F configure ms %s %s' % (ms_name, ms_params)
                 pcmk.commit(cmd)
                 utils.juju_log('INFO', '%s' % cmd)
 
@@ -294,7 +295,8 @@ def configure_cluster():
         utils.juju_log('INFO', str(orders))
         for ord_name, ord_params in orders.iteritems():
             if not pcmk.crm_opt_exists(ord_name):
-                cmd = 'crm -F configure order %s %s' % (ord_name, ord_params)
+                cmd = 'crm -w -F configure order %s %s' % (ord_name,
+                                                           ord_params)
                 pcmk.commit(cmd)
                 utils.juju_log('INFO', '%s' % cmd)
 
@@ -302,7 +304,8 @@ def configure_cluster():
         utils.juju_log('INFO', str(colocations))
         for col_name, col_params in colocations.iteritems():
             if not pcmk.crm_opt_exists(col_name):
-                cmd = 'crm -F configure colocation %s %s' % (col_name, col_params)
+                cmd = 'crm -w -F configure colocation %s %s' % (col_name,
+                                                                col_params)
                 pcmk.commit(cmd)
                 utils.juju_log('INFO', '%s' % cmd)
 
@@ -310,7 +313,8 @@ def configure_cluster():
         utils.juju_log('INFO', str(clones))
         for cln_name, cln_params in clones.iteritems():
             if not pcmk.crm_opt_exists(cln_name):
-                cmd = 'crm -F configure clone %s %s' % (cln_name, cln_params)
+                cmd = 'crm -w -F configure clone %s %s' % (cln_name,
+                                                           cln_params)
                 pcmk.commit(cmd)
                 utils.juju_log('INFO', '%s' % cmd)
 
