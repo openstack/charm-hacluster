@@ -226,6 +226,19 @@ def configure_cluster():
           ' resource-stickiness="100"'
     pcmk.commit(cmd)
 
+    # Configure Ping service
+    monitor_host = utils.config_get('monitor_host')
+    if monitor_host:
+        monitor_interval = utils.config_get('monitor_interval')
+        cmd = 'crm -F configure primitive Ping' \
+              ' ocf:pacemaker:ping params host_list="%s"' \
+              ' multiplier="100" op monitor interval="%s"' %\
+              (monitor_host, monitor_interval)
+        cmd2 = 'crm -F configure clone PingClone Ping' \
+               ' meta interleave="true"'
+        pcmk.commit(cmd)
+        pcmk.commit(cmd2)
+
     # Only configure the cluster resources
     # from the oldest peer unit.
     if cluster.oldest_peer(cluster.peer_units()):
@@ -256,6 +269,10 @@ def configure_cluster():
                                  resource_params[res_name])
                 pcmk.commit(cmd)
                 utils.juju_log('INFO', '%s' % cmd)
+                if monitor_host:
+                    cmd = 'crm -F configure location Ping-%s %s rule' \
+                          ' -inf: pingd lte 0' % (res_name, res_name)
+                    pcmk.commit(cmd)
 
         utils.juju_log('INFO', 'Configuring Groups')
         utils.juju_log('INFO', str(groups))
