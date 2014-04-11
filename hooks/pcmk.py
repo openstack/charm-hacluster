@@ -72,7 +72,7 @@ def _maas_ipmi_stonith_resource(node, power_params):
     # ensure ipmi stonith agents are not running on the nodes that
     # they manage.
     constraint = 'location const_loc_stonith_avoid_%s %s -inf: %s' %\
-                  (node, rsc_name, node)
+        (node, rsc_name, node)
 
     return rsc, constraint
 

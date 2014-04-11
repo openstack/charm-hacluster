@@ -35,3 +35,16 @@ options:
     type: int
     default: 2
     description: Number of peer units required to bootstrap cluster services.
+  monitor_host:
+    type: string
+    description: |
+     One or more IPs, separated by space, that will be used as a saftey check
+     for avoiding split brain situations. Nodes in the cluster will ping these
+     IPs periodicaly. Node that can not ping monitor_host will not run shared
+     resources (VIP, shared disk...).
+  monitor_interval:
+    type: string
+    default: 5s
+    description: |
+     Time period between checks of resource health. It consists of a number
+     and a time factor, e.g. 5s = 5 seconds. 2m = 2 minutes.

@@ -15,7 +15,7 @@ from lib.utils import (
     relation_get,
     get_unit_hostname,
     config_get
-    )
+)
 import subprocess
 import os
 
@@ -35,7 +35,7 @@ def is_leader(resource):
     cmd = [
         "crm", "resource",
         "show", resource
-        ]
+    ]
     try:
         status = subprocess.check_output(cmd)
     except subprocess.CalledProcessError:
@@ -93,7 +93,7 @@ def https():
             if (relation_get('https_keystone', rid=r_id, unit=unit) and
                 relation_get('ssl_cert', rid=r_id, unit=unit) and
                 relation_get('ssl_key', rid=r_id, unit=unit) and
-                relation_get('ca_cert', rid=r_id, unit=unit)):
+                    relation_get('ca_cert', rid=r_id, unit=unit)):
                 return True
     return False
 
