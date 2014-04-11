@@ -49,7 +49,8 @@ hooks = Hooks()
 
 @hooks.hook()
 def install():
-    apt_install('corosync', 'pacemaker', 'python-netaddr', 'ipmitool')
+    apt_install(['corosync', 'pacemaker', 'python-netaddr', 'ipmitool'],
+                fatal=True)
     # XXX rbd OCF only included with newer versions of ceph-resource-agents.
     # Bundle /w charm until we figure out a better way to install it.
     if not os.path.exists('/usr/lib/ocf/resource.d/ceph'):
@@ -436,7 +437,7 @@ TEMPLATES_DIR = 'templates'
 try:
     import jinja2
 except ImportError:
-    install('python-jinja2')
+    apt_install('python-jinja2', fatal=True)
     import jinja2
 
 
