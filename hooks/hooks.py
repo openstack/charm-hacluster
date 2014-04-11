@@ -64,16 +64,15 @@ def get_corosync_conf():
     for relid in relation_ids('ha'):
         for unit in related_units(relid):
             conf = {
-                'corosync_bindnetaddr':
-                hacluster.get_network_address(
-                    relation_get('corosync_bindiface',
-                                 unit, relid)
-                ),
+                'corosync_bindnetaddr': relation_get('corosync_bindiface',
+                                                     unit, relid),
                 'corosync_mcastport': relation_get('corosync_mcastport',
                                                    unit, relid),
                 'corosync_mcastaddr': config('corosync_mcastaddr'),
             }
             if None not in conf.itervalues():
+                conf['corosync_bindnetaddr'] = \
+                    hacluster.get_network_address(conf['corosync_bindnetaddr'])
                 return conf
     missing = [k for k, v in conf.iteritems() if v is None]
     log('Missing required principle configuration: %s' % missing)
@@ -155,8 +154,8 @@ def configure_cluster():
         return
     else:
         log('Ready to form cluster - informing peers')
-        relation_set(ready=True,
-                     rid=relation_ids('hanode')[0])
+        relation_set(relation_id=relation_ids('hanode')[0],
+                     ready=True)
     # Check that there's enough nodes in order to perform the
     # configuration of the HA cluster
     if (len(get_cluster_nodes()) <
@@ -382,7 +381,7 @@ def configure_stonith():
     # set in config.
     url = config('maas_url')
     creds = config('maas_credentials')
-    if all([url, creds]):
+    if None in [url, creds]:
         log('maas_url and maas_credentials must be set'
             ' in config to enable STONITH.')
         sys.exit(1)
