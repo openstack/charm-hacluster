@@ -358,7 +358,7 @@ def configure_cluster():
             pcmk.commit(cmd)
 
     for rel_id in relation_ids('ha'):
-        relation_set(rid=rel_id,
+        relation_set(relation_id=rel_id,
                      clustered="yes")
 
     with open(HAMARKER, 'w') as marker:
