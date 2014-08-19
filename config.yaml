@@ -48,3 +48,8 @@ options:
     description: |
      Time period between checks of resource health. It consists of a number
      and a time factor, e.g. 5s = 5 seconds. 2m = 2 minutes.
+  prefer-ipv6:
+    default: false
+    type: boolean
+    description: "Enable IPv6"
+

@@ -16,6 +16,7 @@ from base64 import b64decode
 import maas as MAAS
 import pcmk
 import hacluster
+import random
 
 from charmhelpers.core.hookenv import (
     log,
@@ -61,18 +62,35 @@ def install():
 
 def get_corosync_conf():
     conf = {}
+    if config('prefer-ipv6'):
+        ip_version = 'ipv6'
+        bindnetaddr = hacluster.get_ipv6_addr
+    else:
+        ip_version = 'ipv4'
+        bindnetaddr = hacluster.get_network_address
+
     for relid in relation_ids('ha'):
         for unit in related_units(relid):
+            bindiface = relation_get('corosync_bindiface',
+                                     unit, relid)
+            if bindiface is None:
+                log('No corosync_bindiface is set yet.')
+                continue
+
             conf = {
                 'corosync_bindnetaddr':
-                hacluster.get_network_address(
-                    relation_get('corosync_bindiface',
-                                 unit, relid)
-                ),
+                bindnetaddr(bindiface),
                 'corosync_mcastport': relation_get('corosync_mcastport',
                                                    unit, relid),
                 'corosync_mcastaddr': config('corosync_mcastaddr'),
+                'ip_version': ip_version,
             }
+
+            # nodeid = uuid.uuid4().int & (1<<64)-1
+            # Note(xianghui): Need to find better way to avoid conflicts.
+            if config('prefer-ipv6'):
+                conf['nodeid'] = random.randint(1, 100)
+
             if None not in conf.itervalues():
                 return conf
     missing = [k for k, v in conf.iteritems() if v is None]
