@@ -34,7 +34,13 @@ options:
   cluster_count:
     type: int
     default: 2
-    description: Number of peer units required to bootstrap cluster services.
+    description: |
+      Number of peer units required to bootstrap cluster services.
+      .
+      If less that 3 is specified, the cluster will be configured to
+      ignore any quorum problems; with 3 or more units, quorum will be
+      enforced and services will be stopped in the event of a loss
+      of quorum.
   monitor_host:
     type: string
     description: |

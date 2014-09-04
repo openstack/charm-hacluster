@@ -144,10 +144,6 @@ HAMARKER = '/var/lib/juju/haconfigured'
             'hanode-relation-joined',
             'hanode-relation-changed')
 def configure_cluster():
-    # Check that we are not already configured
-    if os.path.exists(HAMARKER):
-        log('HA already configured, not reconfiguring')
-        return
     # Check that we are related to a principle and that
     # it has already provided the required corosync configuration
     if not get_corosync_conf():
@@ -233,8 +229,17 @@ def configure_cluster():
     log('Doing global cluster configuration')
     cmd = "crm configure property stonith-enabled=false"
     pcmk.commit(cmd)
-    cmd = "crm configure property no-quorum-policy=ignore"
+
+    if int(config('cluster_count')) >= 3:
+        # NOTE(jamespage) if 3 or more nodes, then quorum can be
+        # managed effectively, so stop if quorum lost
+        cmd = "crm configure property no-quorum-policy=stop"
+    else:
+        # NOTE(jamespage) if less that 3 nodes, quorum not possible
+        # so ignore
+        cmd = "crm configure property no-quorum-policy=ignore"
     pcmk.commit(cmd)
+
     cmd = 'crm configure rsc_defaults $id="rsc-options"' \
           ' resource-stickiness="100"'
     pcmk.commit(cmd)
@@ -360,9 +365,6 @@ def configure_cluster():
     for rel_id in relation_ids('ha'):
         relation_set(relation_id=rel_id,
                      clustered="yes")
-
-    with open(HAMARKER, 'w') as marker:
-        marker.write('done')
 
     configure_stonith()
 
