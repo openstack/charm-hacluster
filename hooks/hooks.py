@@ -126,7 +126,6 @@ def config_changed():
 @hooks.hook()
 def upgrade_charm():
     install()
-    config_changed()
 
 
 def restart_corosync():
@@ -172,6 +171,13 @@ def configure_cluster():
                                unit, relid) is None \
             else ast.literal_eval(relation_get("resources",
                                                unit, relid))
+
+        delete_resources = \
+            [] if relation_get("delete_resources",
+                               unit, relid) is None \
+            else ast.literal_eval(relation_get("delete_resources",
+                                               unit, relid))
+
         resource_params = \
             {} if relation_get("resource_params",
                                unit, relid) is None \
@@ -265,6 +271,14 @@ def configure_cluster():
     # Only configure the cluster resources
     # from the oldest peer unit.
     if oldest_peer(peer_units()):
+        log('Deleting Resources')
+        log(str(delete_resources))
+        for res_name in delete_resources:
+            if pcmk.crm_opt_exists(res_name):
+                if pcmk.crm_res_running(res_name):
+                    pcmk.commit('crm -w -F resource stop %s' % res_name)
+                pcmk.commit('crm -w -F configure delete %s' % res_name)
+
         log('Configuring Resources')
         log(str(resources))
         for res_name, res_type in resources.iteritems():
