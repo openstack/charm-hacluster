@@ -16,6 +16,7 @@ from base64 import b64decode
 import maas as MAAS
 import pcmk
 import hacluster
+import socket
 
 from charmhelpers.core.hookenv import (
     log,
@@ -37,6 +38,7 @@ from charmhelpers.core.host import (
 
 from charmhelpers.fetch import (
     apt_install,
+    apt_purge
 )
 
 from charmhelpers.contrib.hahelpers.cluster import (
@@ -472,6 +474,13 @@ def render_template(template_name, context, template_dir=TEMPLATES_DIR):
     )
     template = templates.get_template(template_name)
     return template.render(context)
+
+
+@hooks.hook()
+def stop():
+    cmd = 'crm -w -F node delete %s' % socket.gethostname()
+    pcmk.commit(cmd)
+    apt_purge(['corosync', 'pacemaker'], fatal=True)
 
 
 if __name__ == '__main__':
