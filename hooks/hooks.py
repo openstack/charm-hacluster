@@ -257,6 +257,10 @@ def configure_cluster():
                    ' meta interleave="true"'
             pcmk.commit(cmd)
             pcmk.commit(cmd2)
+    if not monitor_host:
+        if pcmk.crm_opt_exists('ping'):
+            pcmk.commit('crm -w -F resource stop ping')
+            pcmk.commit('crm -w -F configure delete ping')
 
     # Only configure the cluster resources
     # from the oldest peer unit.
