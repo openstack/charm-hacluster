@@ -149,9 +149,14 @@ def configure_cluster():
         log('Unable to configure corosync right now, bailing')
         return
     else:
-        log('Ready to form cluster - informing peers')
-        relation_set(relation_id=relation_ids('hanode')[0],
-                     ready=True)
+        if relation_ids('hanode'):
+            log('Ready to form cluster - informing peers')
+            relation_set(relation_id=relation_ids('hanode')[0],
+                         ready=True)
+        else:
+            log('Ready to form cluster, but not related to peers just yet')
+            return
+
     # Check that there's enough nodes in order to perform the
     # configuration of the HA cluster
     if (len(get_cluster_nodes()) <
