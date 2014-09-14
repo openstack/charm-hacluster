@@ -86,10 +86,9 @@ def get_corosync_conf():
                 'ip_version': ip_version,
             }
 
-            # nodeid = uuid.uuid4().int & (1<<64)-1
-            # Note(xianghui): Need to find better way to avoid conflicts.
             if config('prefer-ipv6'):
-                conf['nodeid'] = random.randint(1, 100)
+                local_unit_no = int(os.getenv('JUJU_UNIT_NAME').split('/')[1])
+                conf['nodeid'] = local_unit_no
 
             if None not in conf.itervalues():
                 return conf
