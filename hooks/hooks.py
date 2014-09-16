@@ -16,7 +16,6 @@ from base64 import b64decode
 import maas as MAAS
 import pcmk
 import hacluster
-import random
 
 from charmhelpers.core.hookenv import (
     log,
@@ -26,7 +25,8 @@ from charmhelpers.core.hookenv import (
     relation_set,
     unit_get,
     config,
-    Hooks, UnregisteredHookError
+    Hooks, UnregisteredHookError,
+    local_unit,
 )
 
 from charmhelpers.core.host import (
@@ -87,8 +87,9 @@ def get_corosync_conf():
             }
 
             if config('prefer-ipv6'):
-                local_unit_no = int(os.getenv('JUJU_UNIT_NAME').split('/')[1])
-                conf['nodeid'] = local_unit_no
+                local_unit_no = int(local_unit().split('/')[1])
+                # nodeid can't be 0
+                conf['nodeid'] = local_unit_no + 1
 
             if None not in conf.itervalues():
                 return conf
