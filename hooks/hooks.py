@@ -34,6 +34,7 @@ from charmhelpers.core.host import (
     service_start,
     service_restart,
     service_running,
+    lsb_release
 )
 
 from charmhelpers.fetch import (
@@ -50,6 +51,9 @@ hooks = Hooks()
 
 @hooks.hook()
 def install():
+    if config('prefer-ipv6'):
+        setup_ipv6()
+
     apt_install(['corosync', 'pacemaker', 'python-netaddr', 'ipmitool'],
                 fatal=True)
     # XXX rbd OCF only included with newer versions of ceph-resource-agents.
@@ -123,6 +127,9 @@ def emit_base_conf():
 
 @hooks.hook()
 def config_changed():
+    if config('prefer-ipv6'):
+        setup_ipv6()
+
     corosync_key = config('corosync_key')
     if not corosync_key:
         log('CRITICAL',
@@ -465,6 +472,13 @@ def render_template(template_name, context, template_dir=TEMPLATES_DIR):
     )
     template = templates.get_template(template_name)
     return template.render(context)
+
+
+def setup_ipv6():
+    ubuntu_rel = float(lsb_release()['DISTRIB_RELEASE'])
+    if ubuntu_rel < 14.04:
+        raise Exception("IPv6 is not supported for Ubuntu "
+                        "versions less than Trusty 14.04")
 
 
 if __name__ == '__main__':
