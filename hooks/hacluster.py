@@ -12,7 +12,9 @@ import subprocess
 import socket
 import fcntl
 import struct
+
 from charmhelpers.fetch import apt_install
+from charmhelpers.contrib.network import ip
 
 try:
     from netaddr import IPNetwork
@@ -81,33 +83,10 @@ def get_network_address(iface):
         return None
 
 
-def get_ipv6_addr(iface="eth0"):
-    try:
-        try:
-            import netifaces
-        except ImportError:
-            apt_install('python-netifaces')
-            import netifaces
-
-        iface = str(iface)
-        iface_addrs = netifaces.ifaddresses(iface)
-        if netifaces.AF_INET6 not in iface_addrs:
-            raise Exception("Interface '%s' doesn't have an ipv6 address."
-                            % iface)
-
-        addresses = netifaces.ifaddresses(iface)[netifaces.AF_INET6]
-        ipv6_address = [a for a in addresses
-                        if not a['addr'].startswith('fe80')][0]
-        if not ipv6_address:
-            raise Exception("Interface '%s' doesn't have global ipv6 address."
-                            % iface)
-
-        ipv6_addr = ipv6_address['addr']
-        ipv6_netmask = ipv6_address['netmask']
-
-        network = "{}/{}".format(ipv6_addr, ipv6_netmask)
-        ip = IPNetwork(network)
-        return str(ip.network)
-
-    except ValueError:
-        raise Exception("Invalid interface '%s'" % iface)
+def get_ipv6_addr():
+    ipv6_address = ip.get_ipv6_addr()[0]
+    ipv6_addr = ipv6_address['addr']
+    ipv6_netmask = ipv6_address['netmask']
+    network = "{}/{}".format(ipv6_addr, ipv6_netmask)
+    addr = IPNetwork(network)
+    return str(addr.network)
