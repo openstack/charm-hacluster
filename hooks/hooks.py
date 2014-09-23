@@ -34,6 +34,8 @@ from charmhelpers.core.host import (
     service_start,
     service_restart,
     service_running,
+    write_file,
+    mkdir
 )
 
 from charmhelpers.fetch import (
@@ -53,10 +55,10 @@ hooks = Hooks()
 def install():
     apt_install(['corosync', 'pacemaker', 'python-netaddr', 'ipmitool'],
                 fatal=True)
-    # XXX rbd OCF only included with newer versions of ceph-resource-agents.
-    # Bundle /w charm until we figure out a better way to install it.
-    if not os.path.exists('/usr/lib/ocf/resource.d/ceph'):
-        os.makedirs('/usr/lib/ocf/resource.d/ceph')
+    # NOTE(adam_g) rbd OCF only included with newer versions of
+    # ceph-resource-agents. Bundle /w charm until we figure out a
+    # better way to install it.
+    mkdir('/usr/lib/ocf/resource.d/ceph')
     if not os.path.isfile('/usr/lib/ocf/resource.d/ceph/rbd'):
         shutil.copy('ocf/ceph/rbd', '/usr/lib/ocf/resource.d/ceph/rbd')
 
@@ -68,11 +70,13 @@ def get_corosync_conf():
             conf = {
                 'corosync_bindnetaddr':
                 hacluster.get_network_address(
+                    config('corosync_bindiface') or
                     relation_get('corosync_bindiface',
                                  unit, relid)
                 ),
-                'corosync_mcastport': relation_get('corosync_mcastport',
-                                                   unit, relid),
+                'corosync_mcastport': (config('corosync_mcastport') or
+                                       relation_get('corosync_mcastport',
+                                                   unit, relid)),
                 'corosync_mcastaddr': config('corosync_mcastaddr'),
             }
             if None not in conf.itervalues():
@@ -83,26 +87,30 @@ def get_corosync_conf():
 
 
 def emit_corosync_conf():
-    # read config variables
     corosync_conf_context = get_corosync_conf()
-    # write config file (/etc/corosync/corosync.conf
-    with open('/etc/corosync/corosync.conf', 'w') as corosync_conf:
-        corosync_conf.write(render_template('corosync.conf',
-                                            corosync_conf_context))
+    if corosync_conf_context:
+        write_file(path='/etc/corosync/corosync.conf',
+                   content=render_template('corosync.conf',
+                                           corosync_conf_context))
+        return True
+    else:
+        return False
 
 
 def emit_base_conf():
     corosync_default_context = {'corosync_enabled': 'yes'}
-    # write /etc/default/corosync file
-    with open('/etc/default/corosync', 'w') as corosync_default:
-        corosync_default.write(render_template('corosync',
-                                               corosync_default_context))
+    write_file(path='/etc/default/corosync',
+               content=render_template('corosync',
+                                       corosync_default_context))
+
     corosync_key = config('corosync_key')
     if corosync_key:
-        # write the authkey
-        with open('/etc/corosync/authkey', 'w') as corosync_key_file:
-            corosync_key_file.write(b64decode(corosync_key))
-        os.chmod = ('/etc/corosync/authkey', 0o400)
+        write_file(path='/etc/corosync/authkey',
+                   content=b64decode(corosync_key),
+                   perms=0o400)
+        return True
+    else:
+        return False
 
 
 @hooks.hook()
@@ -115,14 +123,11 @@ def config_changed():
 
     hacluster.enable_lsb_services('pacemaker')
 
-    # Create a new config file
-    emit_base_conf()
-
-    # Reconfigure the cluster if required
-    configure_cluster()
-
-    # Setup fencing.
-    configure_stonith()
+    if configure_corosync():
+        pcmk.wait_for_pcmk()
+        configure_cluster_global()
+        configure_monitor_host()
+        configure_stonith()
 
 
 @hooks.hook()
@@ -137,14 +142,63 @@ def restart_corosync():
     time.sleep(5)
     service_start("pacemaker")
 
-HAMARKER = '/var/lib/juju/haconfigured'
+
+def configure_corosync():
+    # TODO: conditional restarts
+    log('Configuring and restarting corosync')
+    if emit_base_conf() and emit_corosync_conf():
+        restart_corosync()
+        return True
+    else:
+        return False
+
+
+def configure_monitor_host():
+    '''Configure extra monitor host for better network failure detection'''
+    monitor_host = config('monitor_host')
+    if monitor_host:
+        if not pcmk.crm_opt_exists('ping'):
+            log('Implementing monitor host configuration')
+            monitor_interval = config('monitor_interval')
+            cmd = 'crm -w -F configure primitive ping' \
+                  ' ocf:pacemaker:ping params host_list="%s"' \
+                  ' multiplier="100" op monitor interval="%s"' %\
+                  (monitor_host, monitor_interval)
+            cmd2 = 'crm -w -F configure clone cl_ping ping' \
+                   ' meta interleave="true"'
+            pcmk.commit(cmd)
+            pcmk.commit(cmd2)
+    else:
+        if pcmk.crm_opt_exists('ping'):
+            log('Disabling monitor host configuration')
+            pcmk.commit('crm -w -F resource stop ping')
+            pcmk.commit('crm -w -F configure delete ping')
+
+
+def configure_cluster_global():
+    '''Configure global cluster options'''
+    log('Doing global cluster configuration')
+    if int(config('cluster_count')) >= 3:
+        # NOTE(jamespage) if 3 or more nodes, then quorum can be
+        # managed effectively, so stop if quorum lost
+        cmd = "crm configure property no-quorum-policy=stop"
+    else:
+        # NOTE(jamespage) if less that 3 nodes, quorum not possible
+        # so ignore
+        cmd = "crm configure property no-quorum-policy=ignore"
+    pcmk.commit(cmd)
+
+    cmd = 'crm configure rsc_defaults $id="rsc-options"' \
+          ' resource-stickiness="100"'
+    pcmk.commit(cmd)
+
 
 
 @hooks.hook('ha-relation-joined',
             'ha-relation-changed',
             'hanode-relation-joined',
             'hanode-relation-changed')
-def configure_cluster():
+def configure_principle_cluster_resources():
     # Check that we are related to a principle and that
     # it has already provided the required corosync configuration
     if not get_corosync_conf():
@@ -232,48 +286,12 @@ def configure_cluster():
                 for ra in resources.itervalues()]:
         apt_install('ceph-resource-agents')
 
-    log('Configuring and restarting corosync')
-    emit_corosync_conf()
-    restart_corosync()
-
-    log('Waiting for PCMK to start')
+    # NOTE: this should be removed in 15.04 cycle as corosync
+    # configuration should be set directly on subordinate
+    configure_corosync()
     pcmk.wait_for_pcmk()
-
-    log('Doing global cluster configuration')
-    cmd = "crm configure property stonith-enabled=false"
-    pcmk.commit(cmd)
-
-    if int(config('cluster_count')) >= 3:
-        # NOTE(jamespage) if 3 or more nodes, then quorum can be
-        # managed effectively, so stop if quorum lost
-        cmd = "crm configure property no-quorum-policy=stop"
-    else:
-        # NOTE(jamespage) if less that 3 nodes, quorum not possible
-        # so ignore
-        cmd = "crm configure property no-quorum-policy=ignore"
-    pcmk.commit(cmd)
-
-    cmd = 'crm configure rsc_defaults $id="rsc-options"' \
-          ' resource-stickiness="100"'
-    pcmk.commit(cmd)
-
-    # Configure Ping service
-    monitor_host = config('monitor_host')
-    if monitor_host:
-        if not pcmk.crm_opt_exists('ping'):
-            monitor_interval = config('monitor_interval')
-            cmd = 'crm -w -F configure primitive ping' \
-                  ' ocf:pacemaker:ping params host_list="%s"' \
-                  ' multiplier="100" op monitor interval="%s"' %\
-                  (monitor_host, monitor_interval)
-            cmd2 = 'crm -w -F configure clone cl_ping ping' \
-                   ' meta interleave="true"'
-            pcmk.commit(cmd)
-            pcmk.commit(cmd2)
-    if not monitor_host:
-        if pcmk.crm_opt_exists('ping'):
-            pcmk.commit('crm -w -F resource stop ping')
-            pcmk.commit('crm -w -F configure delete ping')
+    configure_cluster_global()
+    configure_monitor_host()
 
     # Only configure the cluster resources
     # from the oldest peer unit.
@@ -313,7 +331,7 @@ def configure_cluster():
                          resource_params[res_name])
                 pcmk.commit(cmd)
                 log('%s' % cmd)
-                if monitor_host:
+                if config('monitor_host'):
                     cmd = 'crm -F configure location Ping-%s %s rule' \
                           ' -inf: pingd lte 0' % (res_name, res_name)
                     pcmk.commit(cmd)
@@ -395,11 +413,10 @@ def configure_cluster():
 
 
 def configure_stonith():
-    if config('stonith_enabled') not in ['true', 'True']:
-        return
-
-    if not os.path.exists(HAMARKER):
-        log('HA not yet configured, skipping STONITH config.')
+    if config('stonith_enabled') not in ['true', 'True', True]:
+        log('Disabling stonith')
+        cmd = "crm configure property stonith-enabled=false"
+        pcmk.commit(cmd)
         return
 
     log('Configuring STONITH for all nodes in cluster.')

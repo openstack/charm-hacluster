@@ -6,6 +6,18 @@ options:
       Multicast IP address to use for exchanging messages over the network.
       If multiple clusters are on the same bindnetaddr network, this value
       can be changed.
+  corosync_bindiface:
+    type: string
+    default:
+    description: |
+      Default network interface on which HA cluster will bind to communication
+      with the other members of the HA Cluster.
+  corosync_mcastport:
+    type: int
+    default:
+    description: |
+      Default multicast port number that will be used to communicate between
+      HA Cluster nodes.
   corosync_key:
     type: string
     default: "64RxJNcCkwo8EJYBsaacitUvbQp5AW4YolJi5/2urYZYp2jfLxY+3IUCOaAUJHPle4Yqfy+WBXO0I/6ASSAjj9jaiHVNaxmVhhjcmyBqy2vtPf+m+0VxVjUXlkTyYsODwobeDdO3SIkbIABGfjLTu29yqPTsfbvSYr6skRb9ne0="
@@ -27,9 +39,11 @@ options:
      parameters are properly configured in its invenvory.
   maas_url:
     type: string
+    default:
     description: MAAS API endpoint (required for STONITH).
   maas_credentials:
     type: string
+    default:
     description: MAAS credentials (required for STONITH).
   cluster_count:
     type: int
@@ -43,6 +57,7 @@ options:
       of quorum.
   monitor_host:
     type: string
+    default:
     description: |
      One or more IPs, separated by space, that will be used as a saftey check
      for avoiding split brain situations. Nodes in the cluster will ping these
