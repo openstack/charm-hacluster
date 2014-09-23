@@ -187,7 +187,7 @@ def configure_monitor_host():
     if monitor_host:
         if not pcmk.crm_opt_exists('ping'):
             log('Implementing monitor host'
-                ' configuration (monitor host: %s)' % monitor_host)
+                ' configuration (host: %s)' % monitor_host)
             monitor_interval = config('monitor_interval')
             cmd = 'crm -w -F configure primitive ping' \
                 ' ocf:pacemaker:ping params host_list="%s"' \
@@ -199,7 +199,7 @@ def configure_monitor_host():
             pcmk.commit(cmd)
         else:
             log('Reconfiguring monitor host'
-                ' configuration (monitor host: %s)' % monitor_host)
+                ' configuration (host: %s)' % monitor_host)
             cmd = 'crm -w -F resource param ping set host_list="%s"' %\
                 monitor_host
     else:
