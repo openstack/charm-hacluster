@@ -250,7 +250,11 @@ def configure_principle_cluster_resources():
     if len(relids) == 1:  # Should only ever be one of these
         # Obtain relation information
         relid = relids[0]
-        unit = related_units(relid)[0]
+        units = related_units(relid)
+        if len(units) < 1:
+            log('No principle unit found, bailing')
+            return
+        unit = units[0]
         log('Using rid {} unit {}'.format(relid, unit))
         import ast
         resources = \
