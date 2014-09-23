@@ -211,7 +211,7 @@ def configure_monitor_host():
 
 def configure_cluster_global():
     '''Configure global cluster options'''
-    log('Doing global cluster configuration')
+    log('Applying global cluster configuration')
     if int(config('cluster_count')) >= 3:
         # NOTE(jamespage) if 3 or more nodes, then quorum can be
         # managed effectively, so stop if quorum lost
@@ -331,6 +331,7 @@ def configure_principle_cluster_resources():
     pcmk.wait_for_pcmk()
     configure_cluster_global()
     configure_monitor_host()
+    configure_stonith()
 
     # Only configure the cluster resources
     # from the oldest peer unit.
@@ -447,8 +448,6 @@ def configure_principle_cluster_resources():
     for rel_id in relation_ids('ha'):
         relation_set(relation_id=rel_id,
                      clustered="yes")
-
-    configure_stonith()
 
 
 def configure_stonith():
