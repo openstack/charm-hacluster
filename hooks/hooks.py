@@ -35,7 +35,8 @@ from charmhelpers.core.host import (
     service_restart,
     service_running,
     write_file,
-    mkdir
+    mkdir,
+    file_hash
 )
 
 from charmhelpers.fetch import (
@@ -149,14 +150,33 @@ def restart_corosync():
     service_start("pacemaker")
 
 
+COROSYNC_CONF_FILES = [
+    '/etc/default/corosync',
+    '/etc/corosync/authkey',
+    '/etc/corosync/corosync.conf'
+]
+
+
+def restart_corosync_on_change():
+    '''Simple decorator to restart corosync if any of its config changes'''
+    def wrap(f):
+        def wrapped_f(*args):
+            checksums = {}
+            for path in COROSYNC_CONF_FILES:
+                checksums[path] = file_hash(path)
+            f(*args)
+            for path in COROSYNC_CONF_FILES:
+                if checksums[path] != file_hash(path):
+                    restart_corosync()
+                    break
+        return wrapped_f
+    return wrap
+
+
+@restart_corosync_on_change()
 def configure_corosync():
-    # TODO: conditional restarts
-    log('Configuring and restarting corosync')
-    if emit_base_conf() and emit_corosync_conf():
-        restart_corosync()
-        return True
-    else:
-        return False
+    log('Configuring and (maybe) restarting corosync')
+    return emit_base_conf() and emit_corosync_conf()
 
 
 def configure_monitor_host():
