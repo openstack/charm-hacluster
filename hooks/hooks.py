@@ -181,19 +181,19 @@ def configure_corosync():
 
 def configure_monitor_host():
     '''Configure extra monitor host for better network failure detection'''
+    log('Checking monitor host configuration')
     monitor_host = config('monitor_host')
     if monitor_host:
-        if not pcmk.crm_opt_exists('ping'):
-            log('Implementing monitor host configuration')
-            monitor_interval = config('monitor_interval')
-            cmd = 'crm -w -F configure primitive ping' \
-                  ' ocf:pacemaker:ping params host_list="%s"' \
-                  ' multiplier="100" op monitor interval="%s"' %\
-                  (monitor_host, monitor_interval)
-            cmd2 = 'crm -w -F configure clone cl_ping ping' \
-                   ' meta interleave="true"'
-            pcmk.commit(cmd)
-            pcmk.commit(cmd2)
+        log('Implementing monitor host configuration')
+        monitor_interval = config('monitor_interval')
+        cmd = 'crm -w -F configure primitive ping' \
+            ' ocf:pacemaker:ping params host_list="%s"' \
+            ' multiplier="100" op monitor interval="%s"' %\
+            (monitor_host, monitor_interval)
+        pcmk.commit(cmd)
+        cmd = 'crm -w -F configure clone cl_ping ping' \
+            ' meta interleave="true"'
+        pcmk.commit(cmd)
     else:
         if pcmk.crm_opt_exists('ping'):
             log('Disabling monitor host configuration')
