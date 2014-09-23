@@ -164,11 +164,12 @@ def restart_corosync_on_change():
             checksums = {}
             for path in COROSYNC_CONF_FILES:
                 checksums[path] = file_hash(path)
-            f(*args)
+            return_data = f(*args)
             for path in COROSYNC_CONF_FILES:
                 if checksums[path] != file_hash(path):
                     restart_corosync()
                     break
+            return return_data
         return wrapped_f
     return wrap
 
