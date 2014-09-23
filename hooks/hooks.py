@@ -185,16 +185,21 @@ def configure_monitor_host():
     log('Checking monitor host configuration')
     monitor_host = config('monitor_host')
     if monitor_host:
-        log('Implementing monitor host configuration')
-        monitor_interval = config('monitor_interval')
-        cmd = 'crm -w -F configure primitive ping' \
-            ' ocf:pacemaker:ping params host_list="%s"' \
-            ' multiplier="100" op monitor interval="%s"' %\
-            (monitor_host, monitor_interval)
-        pcmk.commit(cmd)
-        cmd = 'crm -w -F configure clone cl_ping ping' \
-            ' meta interleave="true"'
-        pcmk.commit(cmd)
+        if not pcmk.crm_opt_exists('ping'):
+            log('Implementing monitor host configuration')
+            monitor_interval = config('monitor_interval')
+            cmd = 'crm -w -F configure primitive ping' \
+                ' ocf:pacemaker:ping params host_list="%s"' \
+                ' multiplier="100" op monitor interval="%s"' %\
+                (monitor_host, monitor_interval)
+            pcmk.commit(cmd)
+            cmd = 'crm -w -F configure clone cl_ping ping' \
+                ' meta interleave="true"'
+            pcmk.commit(cmd)
+        else:
+            log('Reconfiguring monitor host configuration')
+            cmd = 'crm -w -F resource param ping set host_list="%s"' %\
+                monitor_host
     else:
         if pcmk.crm_opt_exists('ping'):
             log('Disabling monitor host configuration')
@@ -208,17 +213,18 @@ def configure_cluster_global():
     if int(config('cluster_count')) >= 3:
         # NOTE(jamespage) if 3 or more nodes, then quorum can be
         # managed effectively, so stop if quorum lost
+        log('Configuring no-quorum-policy to stop')
         cmd = "crm configure property no-quorum-policy=stop"
     else:
         # NOTE(jamespage) if less that 3 nodes, quorum not possible
         # so ignore
+        log('Configuring no-quorum-policy to ignore')
         cmd = "crm configure property no-quorum-policy=ignore"
     pcmk.commit(cmd)
 
     cmd = 'crm configure rsc_defaults $id="rsc-options"' \
           ' resource-stickiness="100"'
     pcmk.commit(cmd)
-
 
 
 @hooks.hook('ha-relation-joined',
