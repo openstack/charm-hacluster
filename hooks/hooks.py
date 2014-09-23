@@ -7,6 +7,7 @@
 #  Andres Rodriguez <andres.rodriguez@canonical.com>
 #
 
+import ast
 import shutil
 import sys
 import time
@@ -229,6 +230,15 @@ def configure_cluster_global():
     pcmk.commit(cmd)
 
 
+def parse_data(relid, unit, key):
+    '''Simple helper to ast parse relation data'''
+    data = relation_get(key, unit, relid)
+    if data:
+        return ast.literal_eval(data)
+    else:
+        return {}
+
+
 @hooks.hook('ha-relation-joined',
             'ha-relation-changed',
             'hanode-relation-joined',
@@ -237,7 +247,7 @@ def configure_principle_cluster_resources():
     # Check that we are related to a principle and that
     # it has already provided the required corosync configuration
     if not get_corosync_conf():
-        log('Unable to configure corosync right now, bailing')
+        log('Unable to configure corosync right now, deferring configuration')
         return
     else:
         if relation_ids('hanode'):
@@ -252,7 +262,7 @@ def configure_principle_cluster_resources():
     # configuration of the HA cluster
     if (len(get_cluster_nodes()) <
             int(config('cluster_count'))):
-        log('Not enough nodes in cluster, bailing')
+        log('Not enough nodes in cluster, deferring configuration')
         return
 
     relids = relation_ids('ha')
@@ -261,59 +271,20 @@ def configure_principle_cluster_resources():
         relid = relids[0]
         units = related_units(relid)
         if len(units) < 1:
-            log('No principle unit found, bailing')
+            log('No principle unit found, deferring configuration')
             return
         unit = units[0]
-        log('Using rid {} unit {}'.format(relid, unit))
-        import ast
-        resources = \
-            {} if relation_get("resources",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("resources",
-                                               unit, relid))
-
-        delete_resources = \
-            [] if relation_get("delete_resources",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("delete_resources",
-                                               unit, relid))
-
-        resource_params = \
-            {} if relation_get("resource_params",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("resource_params",
-                                               unit, relid))
-        groups = \
-            {} if relation_get("groups",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("groups",
-                                               unit, relid))
-        ms = \
-            {} if relation_get("ms",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("ms",
-                                               unit, relid))
-        orders = \
-            {} if relation_get("orders",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("orders",
-                                               unit, relid))
-        colocations = \
-            {} if relation_get("colocations",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("colocations",
-                                               unit, relid))
-        clones = \
-            {} if relation_get("clones",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("clones",
-                                               unit, relid))
-        init_services = \
-            {} if relation_get("init_services",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("init_services",
-                                               unit, relid))
-
+        log('Parsing cluster configuration'
+            ' using rid: {}, unit: {}'.format(relid, unit))
+        resources = parse_data(relid, unit, 'resources')
+        delete_resources = parse_data(relid, unit, 'delete_resources')
+        resource_params = parse_data(relid, unit, 'resource_params')
+        groups = parse_data(relid, unit, 'groups')
+        ms = parse_data(relid, unit, 'ms')
+        orders = parse_data(relid, unit, 'orders')
+        colocations = parse_data(relid, unit, 'colocations')
+        clones = parse_data(relid, unit, 'clones')
+        init_services = parse_data(relid, unit, 'init_services')
     else:
         log('Related to {} ha services'.format(len(relids)))
         return
@@ -340,6 +311,7 @@ def configure_principle_cluster_resources():
         log(str(delete_resources))
         for res_name in delete_resources:
             if pcmk.crm_opt_exists(res_name):
+                log('Stopping and deleting resource %s' % res_name)
                 if pcmk.crm_res_running(res_name):
                     pcmk.commit('crm -w -F resource stop %s' % res_name)
                 pcmk.commit('crm -w -F configure delete %s' % res_name)
