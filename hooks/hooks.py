@@ -452,53 +452,52 @@ def configure_principle_cluster_resources():
 
 def configure_stonith():
     if config('stonith_enabled') not in ['true', 'True', True]:
-        log('Disabling stonith')
+        log('Disabling STONITH')
         cmd = "crm configure property stonith-enabled=false"
         pcmk.commit(cmd)
-        return
-
-    log('Configuring STONITH for all nodes in cluster.')
-    # configure stontih resources for all nodes in cluster.
-    # note: this is totally provider dependent and requires
-    # access to the MAAS API endpoint, using endpoint and credentials
-    # set in config.
-    url = config('maas_url')
-    creds = config('maas_credentials')
-    if None in [url, creds]:
-        log('maas_url and maas_credentials must be set'
-            ' in config to enable STONITH.')
-        sys.exit(1)
-
-    maas = MAAS.MAASHelper(url, creds)
-    nodes = maas.list_nodes()
-    if not nodes:
-        log('Could not obtain node inventory from '
-            'MAAS @ %s.' % url)
-        sys.exit(1)
-
-    cluster_nodes = pcmk.list_nodes()
-    for node in cluster_nodes:
-        rsc, constraint = pcmk.maas_stonith_primitive(nodes, node)
-        if not rsc:
-            log('Failed to determine STONITH primitive for node'
-                ' %s' % node)
+    else:
+        log('Enabling STONITH for all nodes in cluster.')
+        # configure stontih resources for all nodes in cluster.
+        # note: this is totally provider dependent and requires
+        # access to the MAAS API endpoint, using endpoint and credentials
+        # set in config.
+        url = config('maas_url')
+        creds = config('maas_credentials')
+        if None in [url, creds]:
+            log('maas_url and maas_credentials must be set'
+                ' in config to enable STONITH.')
             sys.exit(1)
 
-        rsc_name = str(rsc).split(' ')[1]
-        if not pcmk.is_resource_present(rsc_name):
-            log('Creating new STONITH primitive %s.' %
-                rsc_name)
-            cmd = 'crm -F configure %s' % rsc
-            pcmk.commit(cmd)
-            if constraint:
-                cmd = 'crm -F configure %s' % constraint
-                pcmk.commit(cmd)
-        else:
-            log('STONITH primitive already exists '
-                'for node.')
+        maas = MAAS.MAASHelper(url, creds)
+        nodes = maas.list_nodes()
+        if not nodes:
+            log('Could not obtain node inventory from '
+                'MAAS @ %s.' % url)
+            sys.exit(1)
 
-    cmd = "crm configure property stonith-enabled=true"
-    pcmk.commit(cmd)
+        cluster_nodes = pcmk.list_nodes()
+        for node in cluster_nodes:
+            rsc, constraint = pcmk.maas_stonith_primitive(nodes, node)
+            if not rsc:
+                log('Failed to determine STONITH primitive for node'
+                    ' %s' % node)
+                sys.exit(1)
+
+            rsc_name = str(rsc).split(' ')[1]
+            if not pcmk.is_resource_present(rsc_name):
+                log('Creating new STONITH primitive %s.' %
+                    rsc_name)
+                cmd = 'crm -F configure %s' % rsc
+                pcmk.commit(cmd)
+                if constraint:
+                    cmd = 'crm -F configure %s' % constraint
+                    pcmk.commit(cmd)
+            else:
+                log('STONITH primitive already exists '
+                    'for node.')
+
+        cmd = "crm configure property stonith-enabled=true"
+        pcmk.commit(cmd)
 
 
 def get_cluster_nodes():
