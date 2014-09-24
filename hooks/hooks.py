@@ -52,11 +52,22 @@ from charmhelpers.contrib.hahelpers.cluster import (
 
 hooks = Hooks()
 
+COROSYNC_CONF = '/etc/corosync/corosync.conf'
+COROSYNC_DEFAULT = '/etc/default/corosync'
+COROSYNC_AUTHKEY = '/etc/corosync/authkey'
+
+COROSYNC_CONF_FILES = [
+    COROSYNC_DEFAULT,
+    COROSYNC_AUTHKEY,
+    COROSYNC_CONF
+]
+
+PACKAGES = ['corosync', 'pacemaker', 'python-netaddr', 'ipmitool']
+
 
 @hooks.hook()
 def install():
-    apt_install(['corosync', 'pacemaker', 'python-netaddr', 'ipmitool'],
-                fatal=True)
+    apt_install(PACKAGES, fatal=True)
     # NOTE(adam_g) rbd OCF only included with newer versions of
     # ceph-resource-agents. Bundle /w charm until we figure out a
     # better way to install it.
@@ -69,7 +80,7 @@ def get_corosync_conf():
     # NOTE(jamespage) use local charm configuration over any provided by
     # principle charm
     conf = {
-        'corosync_bindnetaddr': \
+        'corosync_bindnetaddr':
             hacluster.get_network_address(config('corosync_bindiface')),
         'corosync_mcastport': config('corosync_mcastport'),
         'corosync_mcastaddr': config('corosync_mcastaddr'),
@@ -79,10 +90,11 @@ def get_corosync_conf():
     for relid in relation_ids('ha'):
         for unit in related_units(relid):
             conf = {
-                'corosync_bindnetaddr': \
-                    hacluster.get_network_address(relation_get('corosync_bindiface',
-                                                               unit, relid)
-                ),
+                'corosync_bindnetaddr':
+                    hacluster.get_network_address(
+                        relation_get('corosync_bindiface',
+                                     unit, relid)
+                    ),
                 'corosync_mcastport': relation_get('corosync_mcastport',
                                                    unit, relid),
                 'corosync_mcastaddr': config('corosync_mcastaddr'),
@@ -97,7 +109,7 @@ def get_corosync_conf():
 def emit_corosync_conf():
     corosync_conf_context = get_corosync_conf()
     if corosync_conf_context:
-        write_file(path='/etc/corosync/corosync.conf',
+        write_file(path=COROSYNC_CONF,
                    content=render_template('corosync.conf',
                                            corosync_conf_context))
         return True
@@ -107,13 +119,13 @@ def emit_corosync_conf():
 
 def emit_base_conf():
     corosync_default_context = {'corosync_enabled': 'yes'}
-    write_file(path='/etc/default/corosync',
+    write_file(path=COROSYNC_DEFAULT,
                content=render_template('corosync',
                                        corosync_default_context))
 
     corosync_key = config('corosync_key')
     if corosync_key:
-        write_file(path='/etc/corosync/authkey',
+        write_file(path=COROSYNC_AUTHKEY,
                    content=b64decode(corosync_key),
                    perms=0o400)
         return True
@@ -149,13 +161,6 @@ def restart_corosync():
     service_restart("corosync")
     time.sleep(5)
     service_start("pacemaker")
-
-
-COROSYNC_CONF_FILES = [
-    '/etc/default/corosync',
-    '/etc/corosync/authkey',
-    '/etc/corosync/corosync.conf'
-]
 
 
 def restart_corosync_on_change():
@@ -337,7 +342,7 @@ def configure_principle_cluster_resources():
             # Put the services in HA, if not already done so
             # if not pcmk.is_resource_present(res_name):
             if not pcmk.crm_opt_exists(res_name):
-                if not res_name in resource_params:
+                if res_name not in resource_params:
                     cmd = 'crm -w -F configure primitive %s %s' % (res_name,
                                                                    res_type)
                 else:
