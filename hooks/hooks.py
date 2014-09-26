@@ -52,7 +52,7 @@ hooks = Hooks()
 @hooks.hook()
 def install():
     if config('prefer-ipv6'):
-        setup_ipv6()
+        assert_charm_supports_ipv6()
 
     apt_install(['corosync', 'pacemaker', 'python-netaddr', 'ipmitool'],
                 fatal=True)
@@ -128,7 +128,7 @@ def emit_base_conf():
 @hooks.hook()
 def config_changed():
     if config('prefer-ipv6'):
-        setup_ipv6()
+        assert_charm_supports_ipv6()
 
     corosync_key = config('corosync_key')
     if not corosync_key:
@@ -474,10 +474,10 @@ def render_template(template_name, context, template_dir=TEMPLATES_DIR):
     return template.render(context)
 
 
-def setup_ipv6():
-    ubuntu_rel = float(lsb_release()['DISTRIB_RELEASE'])
-    if ubuntu_rel < 14.04:
-        raise Exception("IPv6 is not supported for Ubuntu "
+def assert_charm_supports_ipv6():
+    """Check whether we are able to support charms ipv6."""
+    if lsb_release()['DISTRIB_CODENAME'].lower() < "trusty":
+        raise Exception("IPv6 is not supported in the charms for Ubuntu "
                         "versions less than Trusty 14.04")
 
 
