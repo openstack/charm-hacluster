@@ -92,8 +92,9 @@ def get_corosync_conf():
 
             if config('prefer-ipv6'):
                 local_unit_no = int(local_unit().split('/')[1])
-                # nodeid can't be 0
+                # nodeid should not be 0
                 conf['nodeid'] = local_unit_no + 1
+                conf['netmtu'] = config('netmtu')
 
             if None not in conf.itervalues():
                 return conf
