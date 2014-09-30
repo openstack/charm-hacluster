@@ -90,6 +90,10 @@ def get_network_address(iface):
 
 
 def get_ipv6_network_address(iface):
+    # Behave in same way as ipv4 get_network_address() above if iface is None.
+    if not iface:
+        return None
+
     try:
         ipv6_addr = utils.get_ipv6_addr(iface=iface)[0]
         all_addrs = netifaces.ifaddresses(iface)

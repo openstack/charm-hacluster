@@ -75,8 +75,7 @@ def get_corosync_conf():
             bindiface = relation_get('corosync_bindiface',
                                      unit, relid)
             conf = {
-                'corosync_bindnetaddr':
-                bindnetaddr(bindiface),
+                'corosync_bindnetaddr': bindnetaddr(bindiface),
                 'corosync_mcastport': relation_get('corosync_mcastport',
                                                    unit, relid),
                 'corosync_mcastaddr': config('corosync_mcastaddr'),
