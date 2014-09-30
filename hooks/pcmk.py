@@ -1,4 +1,3 @@
-#import lib.utils as utils
 import commands
 import subprocess
 import socket

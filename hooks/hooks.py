@@ -68,7 +68,7 @@ def get_corosync_conf():
     conf = {}
     if config('prefer-ipv6'):
         ip_version = 'ipv6'
-        bindnetaddr = hacluster.get_ipv6_addr
+        bindnetaddr = hacluster.get_ipv6_network_address
     else:
         ip_version = 'ipv4'
         bindnetaddr = hacluster.get_network_address
@@ -299,7 +299,7 @@ def configure_cluster():
             # Put the services in HA, if not already done so
             # if not pcmk.is_resource_present(res_name):
             if not pcmk.crm_opt_exists(res_name):
-                if not res_name in resource_params:
+                if res_name not in resource_params:
                     cmd = 'crm -w -F configure primitive %s %s' % (res_name,
                                                                    res_type)
                 else:

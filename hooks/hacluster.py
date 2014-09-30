@@ -17,6 +17,12 @@ from charmhelpers.fetch import apt_install
 from charmhelpers.contrib.network import ip as utils
 
 try:
+    import netifaces
+except ImportError:
+    apt_install('python-netifaces')
+    import netifaces
+
+try:
     from netaddr import IPNetwork
 except ImportError:
     apt_install('python-netaddr', fatal=True)
@@ -83,25 +89,17 @@ def get_network_address(iface):
         return None
 
 
-def get_ipv6_addr(iface="eth0"):
+def get_ipv6_network_address(iface):
     try:
-        try:
-            import netifaces
-        except ImportError:
-            apt_install('python-netifaces')
-            import netifaces
+        ipv6_addr = utils.get_ipv6_addr(iface=iface)[0]
+        all_addrs = netifaces.ifaddresses(iface)
 
-        ipv6_address = utils.get_ipv6_addr(iface)[0]
-        ifa_addrs = netifaces.ifaddresses(iface)
-
-        for ifaddr in ifa_addrs[netifaces.AF_INET6]:
-            if ipv6_address == ifaddr['addr']:
-                network = "{}/{}".format(ifaddr['addr'],
-                                         ifaddr['netmask'])
-                ip = IPNetwork(network)
-                return str(ip.network)
+        for addr in all_addrs[netifaces.AF_INET6]:
+            if ipv6_addr == addr['addr']:
+                network = "{}/{}".format(addr['addr'], addr['netmask'])
+                return str(IPNetwork(network).network)
 
     except ValueError:
         raise Exception("Invalid interface '%s'" % iface)
 
-    raise Exception("No valid network found in interface '%s'" % iface)
+    raise Exception("No valid network found for interface '%s'" % iface)
