@@ -51,9 +51,6 @@ hooks = Hooks()
 
 @hooks.hook()
 def install():
-    if config('prefer-ipv6'):
-        assert_charm_supports_ipv6()
-
     apt_install(['corosync', 'pacemaker', 'python-netaddr', 'ipmitool'],
                 fatal=True)
     # XXX rbd OCF only included with newer versions of ceph-resource-agents.
@@ -77,10 +74,6 @@ def get_corosync_conf():
         for unit in related_units(relid):
             bindiface = relation_get('corosync_bindiface',
                                      unit, relid)
-            if bindiface is None:
-                log('No corosync_bindiface is set yet.')
-                continue
-
             conf = {
                 'corosync_bindnetaddr':
                 bindnetaddr(bindiface),
