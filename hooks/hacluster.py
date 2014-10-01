@@ -12,7 +12,15 @@ import subprocess
 import socket
 import fcntl
 import struct
+
 from charmhelpers.fetch import apt_install
+from charmhelpers.contrib.network import ip as utils
+
+try:
+    import netifaces
+except ImportError:
+    apt_install('python-netifaces')
+    import netifaces
 
 try:
     from netaddr import IPNetwork
@@ -79,3 +87,23 @@ def get_network_address(iface):
         return str(ip.network)
     else:
         return None
+
+
+def get_ipv6_network_address(iface):
+    # Behave in same way as ipv4 get_network_address() above if iface is None.
+    if not iface:
+        return None
+
+    try:
+        ipv6_addr = utils.get_ipv6_addr(iface=iface)[0]
+        all_addrs = netifaces.ifaddresses(iface)
+
+        for addr in all_addrs[netifaces.AF_INET6]:
+            if ipv6_addr == addr['addr']:
+                network = "{}/{}".format(addr['addr'], addr['netmask'])
+                return str(IPNetwork(network).network)
+
+    except ValueError:
+        raise Exception("Invalid interface '%s'" % iface)
+
+    raise Exception("No valid network found for interface '%s'" % iface)

@@ -25,7 +25,7 @@ cache = {}
 def cached(func):
     """Cache return values for multiple executions of func + args
 
-    For example:
+    For example::
 
         @cached
         def unit_get(attribute):
@@ -155,6 +155,121 @@ def hook_name():
     return os.path.basename(sys.argv[0])
 
 
+class Config(dict):
+    """A dictionary representation of the charm's config.yaml, with some
+    extra features:
+
+    - See which values in the dictionary have changed since the previous hook.
+    - For values that have changed, see what the previous value was.
+    - Store arbitrary data for use in a later hook.
+
+    NOTE: Do not instantiate this object directly - instead call
+    ``hookenv.config()``, which will return an instance of :class:`Config`.
+
+    Example usage::
+
+        >>> # inside a hook
+        >>> from charmhelpers.core import hookenv
+        >>> config = hookenv.config()
+        >>> config['foo']
+        'bar'
+        >>> # store a new key/value for later use
+        >>> config['mykey'] = 'myval'
+
+
+        >>> # user runs `juju set mycharm foo=baz`
+        >>> # now we're inside subsequent config-changed hook
+        >>> config = hookenv.config()
+        >>> config['foo']
+        'baz'
+        >>> # test to see if this val has changed since last hook
+        >>> config.changed('foo')
+        True
+        >>> # what was the previous value?
+        >>> config.previous('foo')
+        'bar'
+        >>> # keys/values that we add are preserved across hooks
+        >>> config['mykey']
+        'myval'
+
+    """
+    CONFIG_FILE_NAME = '.juju-persistent-config'
+
+    def __init__(self, *args, **kw):
+        super(Config, self).__init__(*args, **kw)
+        self.implicit_save = True
+        self._prev_dict = None
+        self.path = os.path.join(charm_dir(), Config.CONFIG_FILE_NAME)
+        if os.path.exists(self.path):
+            self.load_previous()
+
+    def __getitem__(self, key):
+        """For regular dict lookups, check the current juju config first,
+        then the previous (saved) copy. This ensures that user-saved values
+        will be returned by a dict lookup.
+
+        """
+        try:
+            return dict.__getitem__(self, key)
+        except KeyError:
+            return (self._prev_dict or {})[key]
+
+    def load_previous(self, path=None):
+        """Load previous copy of config from disk.
+
+        In normal usage you don't need to call this method directly - it
+        is called automatically at object initialization.
+
+        :param path:
+
+            File path from which to load the previous config. If `None`,
+            config is loaded from the default location. If `path` is
+            specified, subsequent `save()` calls will write to the same
+            path.
+
+        """
+        self.path = path or self.path
+        with open(self.path) as f:
+            self._prev_dict = json.load(f)
+
+    def changed(self, key):
+        """Return True if the current value for this key is different from
+        the previous value.
+
+        """
+        if self._prev_dict is None:
+            return True
+        return self.previous(key) != self.get(key)
+
+    def previous(self, key):
+        """Return previous value for this key, or None if there
+        is no previous value.
+
+        """
+        if self._prev_dict:
+            return self._prev_dict.get(key)
+        return None
+
+    def save(self):
+        """Save this config to disk.
+
+        If the charm is using the :mod:`Services Framework <services.base>`
+        or :meth:'@hook <Hooks.hook>' decorator, this
+        is called automatically at the end of successful hook execution.
+        Otherwise, it should be called directly by user code.
+
+        To disable automatic saves, set ``implicit_save=False`` on this
+        instance.
+
+        """
+        if self._prev_dict:
+            for k, v in self._prev_dict.iteritems():
+                if k not in self:
+                    self[k] = v
+        with open(self.path, 'w') as f:
+            json.dump(self, f)
+
+
 @cached
 def config(scope=None):
     """Juju charm configuration"""
@@ -163,7 +278,10 @@ def config(scope=None):
         config_cmd_line.append(scope)
     config_cmd_line.append('--format=json')
     try:
-        return json.loads(subprocess.check_output(config_cmd_line))
+        config_data = json.loads(subprocess.check_output(config_cmd_line))
+        if scope is not None:
+            return config_data
+        return Config(config_data)
     except ValueError:
         return None
 
@@ -188,8 +306,9 @@ def relation_get(attribute=None, unit=None, rid=None):
         raise
 
 
-def relation_set(relation_id=None, relation_settings={}, **kwargs):
+def relation_set(relation_id=None, relation_settings=None, **kwargs):
     """Set relation information for the current unit"""
+    relation_settings = relation_settings if relation_settings else {}
     relation_cmd_line = ['relation-set']
     if relation_id is not None:
         relation_cmd_line.extend(('-r', relation_id))
@@ -348,27 +467,29 @@ class UnregisteredHookError(Exception):
 class Hooks(object):
     """A convenient handler for hook functions.
 
-    Example:
+    Example::
+
         hooks = Hooks()
 
         # register a hook, taking its name from the function name
         @hooks.hook()
         def install():
-            ...
+            pass  # your code here
 
         # register a hook, providing a custom hook name
         @hooks.hook("config-changed")
         def config_changed():
-            ...
+            pass  # your code here
 
         if __name__ == "__main__":
             # execute a hook based on the name the program is called by
             hooks.execute(sys.argv)
     """
 
-    def __init__(self):
+    def __init__(self, config_save=True):
         super(Hooks, self).__init__()
         self._hooks = {}
+        self._config_save = config_save
 
     def register(self, name, function):
         """Register a hook"""
@@ -379,6 +500,10 @@ class Hooks(object):
         hook_name = os.path.basename(args[0])
         if hook_name in self._hooks:
             self._hooks[hook_name]()
+            if self._config_save:
+                cfg = config()
+                if cfg.implicit_save:
+                    cfg.save()
         else:
             raise UnregisteredHookError(hook_name)
 

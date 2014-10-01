@@ -27,7 +27,8 @@ from charmhelpers.core.hookenv import (
     relation_set,
     unit_get,
     config,
-    Hooks, UnregisteredHookError
+    Hooks, UnregisteredHookError,
+    local_unit,
 )
 
 from charmhelpers.core.host import (
@@ -37,7 +38,8 @@ from charmhelpers.core.host import (
     service_running,
     write_file,
     mkdir,
-    file_hash
+    file_hash,
+    lsb_release
 )
 
 from charmhelpers.fetch import (
@@ -77,28 +79,44 @@ def install():
 
 
 def get_corosync_conf():
+    if config('prefer-ipv6'):
+        ip_version = 'ipv6'
+        bindnetaddr = hacluster.get_ipv6_network_address
+    else:
+        ip_version = 'ipv4'
+        bindnetaddr = hacluster.get_network_address
+
     # NOTE(jamespage) use local charm configuration over any provided by
     # principle charm
     conf = {
         'corosync_bindnetaddr':
-            hacluster.get_network_address(config('corosync_bindiface')),
+	        bindnetaddr(config('corosync_bindiface')),
         'corosync_mcastport': config('corosync_mcastport'),
         'corosync_mcastaddr': config('corosync_mcastaddr'),
+        'ip_version': ip_version,
     }
     if None not in conf.itervalues():
         return conf
+
+    conf = {}
     for relid in relation_ids('ha'):
         for unit in related_units(relid):
-            conf = {
-                'corosync_bindnetaddr':
-                    hacluster.get_network_address(
-                        relation_get('corosync_bindiface',
+            bindiface = relation_get('corosync_bindiface',
                                      unit, relid)
-                    ),
+            conf = {
+                'corosync_bindnetaddr': bindnetaddr(bindiface),
                 'corosync_mcastport': relation_get('corosync_mcastport',
                                                    unit, relid),
                 'corosync_mcastaddr': config('corosync_mcastaddr'),
+                'ip_version': ip_version,
             }
+
+            if config('prefer-ipv6'):
+                local_unit_no = int(local_unit().split('/')[1])
+                # nodeid should not be 0
+                conf['nodeid'] = local_unit_no + 1
+                conf['netmtu'] = config('netmtu')
+
             if None not in conf.itervalues():
                 return conf
     missing = [k for k, v in conf.iteritems() if v is None]
@@ -135,6 +153,9 @@ def emit_base_conf():
 
 @hooks.hook()
 def config_changed():
+    if config('prefer-ipv6'):
+        assert_charm_supports_ipv6()
+
     corosync_key = config('corosync_key')
     if not corosync_key:
         log('CRITICAL',
@@ -516,6 +537,13 @@ def stop():
     cmd = 'crm -w -F node delete %s' % socket.gethostname()
     pcmk.commit(cmd)
     apt_purge(['corosync', 'pacemaker'], fatal=True)
+
+
+def assert_charm_supports_ipv6():
+    """Check whether we are able to support charms ipv6."""
+    if lsb_release()['DISTRIB_CODENAME'].lower() < "trusty":
+        raise Exception("IPv6 is not supported in the charms for Ubuntu "
+                        "versions less than Trusty 14.04")
 
 
 if __name__ == '__main__':
