@@ -25,7 +25,8 @@ from charmhelpers.core.hookenv import (
     relation_set,
     unit_get,
     config,
-    Hooks, UnregisteredHookError
+    Hooks, UnregisteredHookError,
+    local_unit,
 )
 
 from charmhelpers.core.host import (
@@ -33,6 +34,7 @@ from charmhelpers.core.host import (
     service_start,
     service_restart,
     service_running,
+    lsb_release
 )
 
 from charmhelpers.fetch import (
@@ -61,18 +63,31 @@ def install():
 
 def get_corosync_conf():
     conf = {}
+    if config('prefer-ipv6'):
+        ip_version = 'ipv6'
+        bindnetaddr = hacluster.get_ipv6_network_address
+    else:
+        ip_version = 'ipv4'
+        bindnetaddr = hacluster.get_network_address
+
     for relid in relation_ids('ha'):
         for unit in related_units(relid):
+            bindiface = relation_get('corosync_bindiface',
+                                     unit, relid)
             conf = {
-                'corosync_bindnetaddr':
-                hacluster.get_network_address(
-                    relation_get('corosync_bindiface',
-                                 unit, relid)
-                ),
+                'corosync_bindnetaddr': bindnetaddr(bindiface),
                 'corosync_mcastport': relation_get('corosync_mcastport',
                                                    unit, relid),
                 'corosync_mcastaddr': config('corosync_mcastaddr'),
+                'ip_version': ip_version,
             }
+
+            if config('prefer-ipv6'):
+                local_unit_no = int(local_unit().split('/')[1])
+                # nodeid should not be 0
+                conf['nodeid'] = local_unit_no + 1
+                conf['netmtu'] = config('netmtu')
+
             if None not in conf.itervalues():
                 return conf
     missing = [k for k, v in conf.iteritems() if v is None]
@@ -105,6 +120,9 @@ def emit_base_conf():
 
 @hooks.hook()
 def config_changed():
+    if config('prefer-ipv6'):
+        assert_charm_supports_ipv6()
+
     corosync_key = config('corosync_key')
     if not corosync_key:
         log('CRITICAL',
@@ -273,7 +291,7 @@ def configure_cluster():
             # Put the services in HA, if not already done so
             # if not pcmk.is_resource_present(res_name):
             if not pcmk.crm_opt_exists(res_name):
-                if not res_name in resource_params:
+                if res_name not in resource_params:
                     cmd = 'crm -w -F configure primitive %s %s' % (res_name,
                                                                    res_type)
                 else:
@@ -447,6 +465,13 @@ def render_template(template_name, context, template_dir=TEMPLATES_DIR):
     )
     template = templates.get_template(template_name)
     return template.render(context)
+
+
+def assert_charm_supports_ipv6():
+    """Check whether we are able to support charms ipv6."""
+    if lsb_release()['DISTRIB_CODENAME'].lower() < "trusty":
+        raise Exception("IPv6 is not supported in the charms for Ubuntu "
+                        "versions less than Trusty 14.04")
 
 
 if __name__ == '__main__':
