@@ -34,12 +34,16 @@ in order for clustering to occur - otherwise nothing actually get configured.
 The hacluster interface supports a number of different cluster configuration
 options.
 
-## Mandatory Relation Data
+## Mandatory Relation Data (deprecated)
 
-All principle charms must provide basic corosync configuration:
+Principle charms should provide basic corosync configuration:
 
     corosync\_bindiface: The network interface to use for cluster messaging.
     corosync\_mcastport: The multicast port to use for cluster messaging.
+
+however, these can also be provided via configuration on the hacluster charm
+itself.  If configuration is provided directly to the hacluster charm, this
+will be preferred over these relation options from the principle charm.
 
 ## Resource Configuration
 
