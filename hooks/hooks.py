@@ -7,6 +7,7 @@
 #  Andres Rodriguez <andres.rodriguez@canonical.com>
 #
 
+import ast
 import shutil
 import sys
 import time
@@ -16,6 +17,7 @@ from base64 import b64decode
 import maas as MAAS
 import pcmk
 import hacluster
+import socket
 
 from charmhelpers.core.hookenv import (
     log,
@@ -34,11 +36,15 @@ from charmhelpers.core.host import (
     service_start,
     service_restart,
     service_running,
+    write_file,
+    mkdir,
+    file_hash,
     lsb_release
 )
 
 from charmhelpers.fetch import (
     apt_install,
+    apt_purge
 )
 
 from charmhelpers.contrib.hahelpers.cluster import (
@@ -48,21 +54,31 @@ from charmhelpers.contrib.hahelpers.cluster import (
 
 hooks = Hooks()
 
+COROSYNC_CONF = '/etc/corosync/corosync.conf'
+COROSYNC_DEFAULT = '/etc/default/corosync'
+COROSYNC_AUTHKEY = '/etc/corosync/authkey'
+
+COROSYNC_CONF_FILES = [
+    COROSYNC_DEFAULT,
+    COROSYNC_AUTHKEY,
+    COROSYNC_CONF
+]
+
+PACKAGES = ['corosync', 'pacemaker', 'python-netaddr', 'ipmitool']
+
 
 @hooks.hook()
 def install():
-    apt_install(['corosync', 'pacemaker', 'python-netaddr', 'ipmitool'],
-                fatal=True)
-    # XXX rbd OCF only included with newer versions of ceph-resource-agents.
-    # Bundle /w charm until we figure out a better way to install it.
-    if not os.path.exists('/usr/lib/ocf/resource.d/ceph'):
-        os.makedirs('/usr/lib/ocf/resource.d/ceph')
+    apt_install(PACKAGES, fatal=True)
+    # NOTE(adam_g) rbd OCF only included with newer versions of
+    # ceph-resource-agents. Bundle /w charm until we figure out a
+    # better way to install it.
+    mkdir('/usr/lib/ocf/resource.d/ceph')
     if not os.path.isfile('/usr/lib/ocf/resource.d/ceph/rbd'):
         shutil.copy('ocf/ceph/rbd', '/usr/lib/ocf/resource.d/ceph/rbd')
 
 
 def get_corosync_conf():
-    conf = {}
     if config('prefer-ipv6'):
         ip_version = 'ipv6'
         bindnetaddr = hacluster.get_ipv6_network_address
@@ -70,6 +86,19 @@ def get_corosync_conf():
         ip_version = 'ipv4'
         bindnetaddr = hacluster.get_network_address
 
+    # NOTE(jamespage) use local charm configuration over any provided by
+    # principle charm
+    conf = {
+        'corosync_bindnetaddr':
+        bindnetaddr(config('corosync_bindiface')),
+        'corosync_mcastport': config('corosync_mcastport'),
+        'corosync_mcastaddr': config('corosync_mcastaddr'),
+        'ip_version': ip_version,
+    }
+    if None not in conf.itervalues():
+        return conf
+
+    conf = {}
     for relid in relation_ids('ha'):
         for unit in related_units(relid):
             bindiface = relation_get('corosync_bindiface',
@@ -91,31 +120,35 @@ def get_corosync_conf():
             if None not in conf.itervalues():
                 return conf
     missing = [k for k, v in conf.iteritems() if v is None]
-    log('Missing required principle configuration: %s' % missing)
+    log('Missing required configuration: %s' % missing)
     return None
 
 
 def emit_corosync_conf():
-    # read config variables
     corosync_conf_context = get_corosync_conf()
-    # write config file (/etc/corosync/corosync.conf
-    with open('/etc/corosync/corosync.conf', 'w') as corosync_conf:
-        corosync_conf.write(render_template('corosync.conf',
-                                            corosync_conf_context))
+    if corosync_conf_context:
+        write_file(path=COROSYNC_CONF,
+                   content=render_template('corosync.conf',
+                                           corosync_conf_context))
+        return True
+    else:
+        return False
 
 
 def emit_base_conf():
     corosync_default_context = {'corosync_enabled': 'yes'}
-    # write /etc/default/corosync file
-    with open('/etc/default/corosync', 'w') as corosync_default:
-        corosync_default.write(render_template('corosync',
-                                               corosync_default_context))
+    write_file(path=COROSYNC_DEFAULT,
+               content=render_template('corosync',
+                                       corosync_default_context))
+
     corosync_key = config('corosync_key')
     if corosync_key:
-        # write the authkey
-        with open('/etc/corosync/authkey', 'w') as corosync_key_file:
-            corosync_key_file.write(b64decode(corosync_key))
-        os.chmod = ('/etc/corosync/authkey', 0o400)
+        write_file(path=COROSYNC_AUTHKEY,
+                   content=b64decode(corosync_key),
+                   perms=0o400)
+        return True
+    else:
+        return False
 
 
 @hooks.hook()
@@ -131,20 +164,16 @@ def config_changed():
 
     hacluster.enable_lsb_services('pacemaker')
 
-    # Create a new config file
-    emit_base_conf()
-
-    # Reconfigure the cluster if required
-    configure_cluster()
-
-    # Setup fencing.
-    configure_stonith()
+    if configure_corosync():
+        pcmk.wait_for_pcmk()
+        configure_cluster_global()
+        configure_monitor_host()
+        configure_stonith()
 
 
 @hooks.hook()
 def upgrade_charm():
     install()
-    config_changed()
 
 
 def restart_corosync():
@@ -154,82 +183,138 @@ def restart_corosync():
     time.sleep(5)
     service_start("pacemaker")
 
-HAMARKER = '/var/lib/juju/haconfigured'
+
+def restart_corosync_on_change():
+    '''Simple decorator to restart corosync if any of its config changes'''
+    def wrap(f):
+        def wrapped_f(*args):
+            checksums = {}
+            for path in COROSYNC_CONF_FILES:
+                checksums[path] = file_hash(path)
+            return_data = f(*args)
+            # NOTE: this assumes that this call is always done around
+            # configure_corosync, which returns true if configuration
+            # files where actually generated
+            if return_data:
+                for path in COROSYNC_CONF_FILES:
+                    if checksums[path] != file_hash(path):
+                        restart_corosync()
+                        break
+            return return_data
+        return wrapped_f
+    return wrap
+
+
+@restart_corosync_on_change()
+def configure_corosync():
+    log('Configuring and (maybe) restarting corosync')
+    return emit_base_conf() and emit_corosync_conf()
+
+
+def configure_monitor_host():
+    '''Configure extra monitor host for better network failure detection'''
+    log('Checking monitor host configuration')
+    monitor_host = config('monitor_host')
+    if monitor_host:
+        if not pcmk.crm_opt_exists('ping'):
+            log('Implementing monitor host'
+                ' configuration (host: %s)' % monitor_host)
+            monitor_interval = config('monitor_interval')
+            cmd = 'crm -w -F configure primitive ping' \
+                ' ocf:pacemaker:ping params host_list="%s"' \
+                ' multiplier="100" op monitor interval="%s"' %\
+                (monitor_host, monitor_interval)
+            pcmk.commit(cmd)
+            cmd = 'crm -w -F configure clone cl_ping ping' \
+                ' meta interleave="true"'
+            pcmk.commit(cmd)
+        else:
+            log('Reconfiguring monitor host'
+                ' configuration (host: %s)' % monitor_host)
+            cmd = 'crm -w -F resource param ping set host_list="%s"' %\
+                monitor_host
+    else:
+        if pcmk.crm_opt_exists('ping'):
+            log('Disabling monitor host configuration')
+            pcmk.commit('crm -w -F resource stop ping')
+            pcmk.commit('crm -w -F configure delete ping')
+
+
+def configure_cluster_global():
+    '''Configure global cluster options'''
+    log('Applying global cluster configuration')
+    if int(config('cluster_count')) >= 3:
+        # NOTE(jamespage) if 3 or more nodes, then quorum can be
+        # managed effectively, so stop if quorum lost
+        log('Configuring no-quorum-policy to stop')
+        cmd = "crm configure property no-quorum-policy=stop"
+    else:
+        # NOTE(jamespage) if less that 3 nodes, quorum not possible
+        # so ignore
+        log('Configuring no-quorum-policy to ignore')
+        cmd = "crm configure property no-quorum-policy=ignore"
+    pcmk.commit(cmd)
+
+    cmd = 'crm configure rsc_defaults $id="rsc-options"' \
+          ' resource-stickiness="100"'
+    pcmk.commit(cmd)
+
+
+def parse_data(relid, unit, key):
+    '''Simple helper to ast parse relation data'''
+    data = relation_get(key, unit, relid)
+    if data:
+        return ast.literal_eval(data)
+    else:
+        return {}
 
 
 @hooks.hook('ha-relation-joined',
             'ha-relation-changed',
             'hanode-relation-joined',
             'hanode-relation-changed')
-def configure_cluster():
-    # Check that we are not already configured
-    if os.path.exists(HAMARKER):
-        log('HA already configured, not reconfiguring')
-        return
+def configure_principle_cluster_resources():
     # Check that we are related to a principle and that
     # it has already provided the required corosync configuration
     if not get_corosync_conf():
-        log('Unable to configure corosync right now, bailing')
+        log('Unable to configure corosync right now, deferring configuration')
         return
     else:
-        log('Ready to form cluster - informing peers')
-        relation_set(relation_id=relation_ids('hanode')[0],
-                     ready=True)
+        if relation_ids('hanode'):
+            log('Ready to form cluster - informing peers')
+            relation_set(relation_id=relation_ids('hanode')[0],
+                         ready=True)
+        else:
+            log('Ready to form cluster, but not related to peers just yet')
+            return
+
     # Check that there's enough nodes in order to perform the
     # configuration of the HA cluster
     if (len(get_cluster_nodes()) <
             int(config('cluster_count'))):
-        log('Not enough nodes in cluster, bailing')
+        log('Not enough nodes in cluster, deferring configuration')
         return
 
     relids = relation_ids('ha')
     if len(relids) == 1:  # Should only ever be one of these
         # Obtain relation information
         relid = relids[0]
-        unit = related_units(relid)[0]
-        log('Using rid {} unit {}'.format(relid, unit))
-        import ast
-        resources = \
-            {} if relation_get("resources",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("resources",
-                                               unit, relid))
-        resource_params = \
-            {} if relation_get("resource_params",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("resource_params",
-                                               unit, relid))
-        groups = \
-            {} if relation_get("groups",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("groups",
-                                               unit, relid))
-        ms = \
-            {} if relation_get("ms",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("ms",
-                                               unit, relid))
-        orders = \
-            {} if relation_get("orders",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("orders",
-                                               unit, relid))
-        colocations = \
-            {} if relation_get("colocations",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("colocations",
-                                               unit, relid))
-        clones = \
-            {} if relation_get("clones",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("clones",
-                                               unit, relid))
-        init_services = \
-            {} if relation_get("init_services",
-                               unit, relid) is None \
-            else ast.literal_eval(relation_get("init_services",
-                                               unit, relid))
-
+        units = related_units(relid)
+        if len(units) < 1:
+            log('No principle unit found, deferring configuration')
+            return
+        unit = units[0]
+        log('Parsing cluster configuration'
+            ' using rid: {}, unit: {}'.format(relid, unit))
+        resources = parse_data(relid, unit, 'resources')
+        delete_resources = parse_data(relid, unit, 'delete_resources')
+        resource_params = parse_data(relid, unit, 'resource_params')
+        groups = parse_data(relid, unit, 'groups')
+        ms = parse_data(relid, unit, 'ms')
+        orders = parse_data(relid, unit, 'orders')
+        colocations = parse_data(relid, unit, 'colocations')
+        clones = parse_data(relid, unit, 'clones')
+        init_services = parse_data(relid, unit, 'init_services')
     else:
         log('Related to {} ha services'.format(len(relids)))
         return
@@ -241,39 +326,26 @@ def configure_cluster():
                 for ra in resources.itervalues()]:
         apt_install('ceph-resource-agents')
 
-    log('Configuring and restarting corosync')
-    emit_corosync_conf()
-    restart_corosync()
-
-    log('Waiting for PCMK to start')
+    # NOTE: this should be removed in 15.04 cycle as corosync
+    # configuration should be set directly on subordinate
+    configure_corosync()
     pcmk.wait_for_pcmk()
-
-    log('Doing global cluster configuration')
-    cmd = "crm configure property stonith-enabled=false"
-    pcmk.commit(cmd)
-    cmd = "crm configure property no-quorum-policy=ignore"
-    pcmk.commit(cmd)
-    cmd = 'crm configure rsc_defaults $id="rsc-options"' \
-          ' resource-stickiness="100"'
-    pcmk.commit(cmd)
-
-    # Configure Ping service
-    monitor_host = config('monitor_host')
-    if monitor_host:
-        if not pcmk.crm_opt_exists('ping'):
-            monitor_interval = config('monitor_interval')
-            cmd = 'crm -w -F configure primitive ping' \
-                  ' ocf:pacemaker:ping params host_list="%s"' \
-                  ' multiplier="100" op monitor interval="%s"' %\
-                  (monitor_host, monitor_interval)
-            cmd2 = 'crm -w -F configure clone cl_ping ping' \
-                   ' meta interleave="true"'
-            pcmk.commit(cmd)
-            pcmk.commit(cmd2)
+    configure_cluster_global()
+    configure_monitor_host()
+    configure_stonith()
 
     # Only configure the cluster resources
     # from the oldest peer unit.
     if oldest_peer(peer_units()):
+        log('Deleting Resources')
+        log(str(delete_resources))
+        for res_name in delete_resources:
+            if pcmk.crm_opt_exists(res_name):
+                log('Stopping and deleting resource %s' % res_name)
+                if pcmk.crm_res_running(res_name):
+                    pcmk.commit('crm -w -F resource stop %s' % res_name)
+                pcmk.commit('crm -w -F configure delete %s' % res_name)
+
         log('Configuring Resources')
         log(str(resources))
         for res_name, res_type in resources.iteritems():
@@ -301,7 +373,7 @@ def configure_cluster():
                          resource_params[res_name])
                 pcmk.commit(cmd)
                 log('%s' % cmd)
-                if monitor_host:
+                if config('monitor_host'):
                     cmd = 'crm -F configure location Ping-%s %s rule' \
                           ' -inf: pingd lte 0' % (res_name, res_name)
                     pcmk.commit(cmd)
@@ -379,62 +451,55 @@ def configure_cluster():
         relation_set(relation_id=rel_id,
                      clustered="yes")
 
-    with open(HAMARKER, 'w') as marker:
-        marker.write('done')
-
-    configure_stonith()
-
 
 def configure_stonith():
-    if config('stonith_enabled') not in ['true', 'True']:
-        return
-
-    if not os.path.exists(HAMARKER):
-        log('HA not yet configured, skipping STONITH config.')
-        return
-
-    log('Configuring STONITH for all nodes in cluster.')
-    # configure stontih resources for all nodes in cluster.
-    # note: this is totally provider dependent and requires
-    # access to the MAAS API endpoint, using endpoint and credentials
-    # set in config.
-    url = config('maas_url')
-    creds = config('maas_credentials')
-    if None in [url, creds]:
-        log('maas_url and maas_credentials must be set'
-            ' in config to enable STONITH.')
-        sys.exit(1)
-
-    maas = MAAS.MAASHelper(url, creds)
-    nodes = maas.list_nodes()
-    if not nodes:
-        log('Could not obtain node inventory from '
-            'MAAS @ %s.' % url)
-        sys.exit(1)
-
-    cluster_nodes = pcmk.list_nodes()
-    for node in cluster_nodes:
-        rsc, constraint = pcmk.maas_stonith_primitive(nodes, node)
-        if not rsc:
-            log('Failed to determine STONITH primitive for node'
-                ' %s' % node)
+    if config('stonith_enabled') not in ['true', 'True', True]:
+        log('Disabling STONITH')
+        cmd = "crm configure property stonith-enabled=false"
+        pcmk.commit(cmd)
+    else:
+        log('Enabling STONITH for all nodes in cluster.')
+        # configure stontih resources for all nodes in cluster.
+        # note: this is totally provider dependent and requires
+        # access to the MAAS API endpoint, using endpoint and credentials
+        # set in config.
+        url = config('maas_url')
+        creds = config('maas_credentials')
+        if None in [url, creds]:
+            log('maas_url and maas_credentials must be set'
+                ' in config to enable STONITH.')
             sys.exit(1)
 
-        rsc_name = str(rsc).split(' ')[1]
-        if not pcmk.is_resource_present(rsc_name):
-            log('Creating new STONITH primitive %s.' %
-                rsc_name)
-            cmd = 'crm -F configure %s' % rsc
-            pcmk.commit(cmd)
-            if constraint:
-                cmd = 'crm -F configure %s' % constraint
-                pcmk.commit(cmd)
-        else:
-            log('STONITH primitive already exists '
-                'for node.')
+        maas = MAAS.MAASHelper(url, creds)
+        nodes = maas.list_nodes()
+        if not nodes:
+            log('Could not obtain node inventory from '
+                'MAAS @ %s.' % url)
+            sys.exit(1)
 
-    cmd = "crm configure property stonith-enabled=true"
-    pcmk.commit(cmd)
+        cluster_nodes = pcmk.list_nodes()
+        for node in cluster_nodes:
+            rsc, constraint = pcmk.maas_stonith_primitive(nodes, node)
+            if not rsc:
+                log('Failed to determine STONITH primitive for node'
+                    ' %s' % node)
+                sys.exit(1)
+
+            rsc_name = str(rsc).split(' ')[1]
+            if not pcmk.is_resource_present(rsc_name):
+                log('Creating new STONITH primitive %s.' %
+                    rsc_name)
+                cmd = 'crm -F configure %s' % rsc
+                pcmk.commit(cmd)
+                if constraint:
+                    cmd = 'crm -F configure %s' % constraint
+                    pcmk.commit(cmd)
+            else:
+                log('STONITH primitive already exists '
+                    'for node.')
+
+        cmd = "crm configure property stonith-enabled=true"
+        pcmk.commit(cmd)
 
 
 def get_cluster_nodes():
@@ -465,6 +530,13 @@ def render_template(template_name, context, template_dir=TEMPLATES_DIR):
     )
     template = templates.get_template(template_name)
     return template.render(context)
+
+
+@hooks.hook()
+def stop():
+    cmd = 'crm -w -F node delete %s' % socket.gethostname()
+    pcmk.commit(cmd)
+    apt_purge(['corosync', 'pacemaker'], fatal=True)
 
 
 def assert_charm_supports_ipv6():
