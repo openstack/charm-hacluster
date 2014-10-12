@@ -29,6 +29,7 @@ from charmhelpers.core.hookenv import (
     config,
     Hooks, UnregisteredHookError,
     local_unit,
+    unit_private_ip,
 )
 
 from charmhelpers.core.host import (
@@ -48,6 +49,7 @@ from charmhelpers.fetch import (
 )
 
 from charmhelpers.contrib.hahelpers.cluster import (
+    peer_ips,
     peer_units,
     oldest_peer
 )
@@ -78,6 +80,18 @@ def install():
         shutil.copy('ocf/ceph/rbd', '/usr/lib/ocf/resource.d/ceph/rbd')
 
 
+def get_ha_nodes():
+    ha_units = peer_ips(peer_relation='hanode')
+    ha_units[local_unit()] = unit_private_ip()
+    ha_nodes = {}
+    # Corosync nodeid 0 is reserved so increase all the nodeids to avoid it
+    off_set = 1000
+    for unit in ha_units:
+        unit_no = off_set + int(unit.split('/')[1])
+        ha_nodes[unit_no] = ha_units[unit]
+    return ha_nodes
+
+
 def get_corosync_conf():
     if config('prefer-ipv6'):
         ip_version = 'ipv6'
@@ -85,7 +99,6 @@ def get_corosync_conf():
     else:
         ip_version = 'ipv4'
         bindnetaddr = hacluster.get_network_address
-
     # NOTE(jamespage) use local charm configuration over any provided by
     # principle charm
     conf = {
@@ -94,6 +107,8 @@ def get_corosync_conf():
         'corosync_mcastport': config('corosync_mcastport'),
         'corosync_mcastaddr': config('corosync_mcastaddr'),
         'ip_version': ip_version,
+        'ha_nodes': get_ha_nodes(),
+        'transport': config('corosync_transport'),
     }
     if None not in conf.itervalues():
         return conf
@@ -109,6 +124,8 @@ def get_corosync_conf():
                                                    unit, relid),
                 'corosync_mcastaddr': config('corosync_mcastaddr'),
                 'ip_version': ip_version,
+                'ha_nodes': get_ha_nodes(),
+                'transport': config('corosync_transport'),
             }
 
             if config('prefer-ipv6'):
@@ -161,7 +178,12 @@ def config_changed():
         log('CRITICAL',
             'No Corosync key supplied, cannot proceed')
         sys.exit(1)
-
+    supported_transports = ['udp', 'udpu']
+    if config('corosync_transport') not in supported_transports:
+        raise ValueError('The corosync_transport type %s is not supported.'
+                         'Supported types are: %s' %
+                         (config('corosync_transport'),
+                          str(supported_transports)))
     hacluster.enable_lsb_services('pacemaker')
 
     if configure_corosync():

@@ -85,3 +85,8 @@ options:
       order for this charm to function correctly, the privacy extension must be
       disabled and a non-temporary address must be configured/available on
       your network interface.
+  corosync_transport:
+    type: string
+    default: "udp"
+    description: |
+      Two supported modes are udp (multicast) or udpu (unicast)
