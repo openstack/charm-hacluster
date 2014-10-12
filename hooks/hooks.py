@@ -54,6 +54,8 @@ from charmhelpers.contrib.hahelpers.cluster import (
     oldest_peer
 )
 
+from charmhelpers.contrib.openstack.utils import get_host_ip
+
 hooks = Hooks()
 
 COROSYNC_CONF = '/etc/corosync/corosync.conf'
@@ -80,15 +82,19 @@ def install():
         shutil.copy('ocf/ceph/rbd', '/usr/lib/ocf/resource.d/ceph/rbd')
 
 
+def get_corosync_id(unit_name):
+    # Corosync nodeid 0 is reserved so increase all the nodeids to avoid it
+    off_set = 1000
+    return off_set + int(unit_name.split('/')[1])
+
+
 def get_ha_nodes():
     ha_units = peer_ips(peer_relation='hanode')
     ha_units[local_unit()] = unit_private_ip()
     ha_nodes = {}
-    # Corosync nodeid 0 is reserved so increase all the nodeids to avoid it
-    off_set = 1000
     for unit in ha_units:
-        unit_no = off_set + int(unit.split('/')[1])
-        ha_nodes[unit_no] = ha_units[unit]
+        corosync_id = get_corosync_id(unit)
+        ha_nodes[corosync_id] = get_host_ip(ha_units[unit])
     return ha_nodes
 
 
@@ -129,9 +135,7 @@ def get_corosync_conf():
             }
 
             if config('prefer-ipv6'):
-                local_unit_no = int(local_unit().split('/')[1])
-                # nodeid should not be 0
-                conf['nodeid'] = local_unit_no + 1
+                conf['nodeid'] = get_corosync_id(local_unit())
                 conf['netmtu'] = config('netmtu')
 
             if None not in conf.itervalues():
