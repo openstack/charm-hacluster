@@ -1,0 +1,15 @@
+hacluster-mysql:
+  series: trusty
+  services:
+    hacluster:
+      charm: hacluster
+      num_units: 0
+     mysql:
+      charm: cs:trusty/mysql
+      num_units: 2
+      options:
+        "dataset-size": 128M
+        vip: 192.168.21.1
+  relations:
+    - - "mysql:ha"
+      - "hacluster:ha"
