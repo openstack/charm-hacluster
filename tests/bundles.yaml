@@ -4,7 +4,7 @@ hacluster-mysql:
     hacluster:
       charm: hacluster
       num_units: 0
-     mysql:
+    mysql:
       charm: cs:trusty/mysql
       num_units: 2
       options:
