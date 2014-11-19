@@ -68,6 +68,7 @@ COROSYNC_CONF_FILES = [
 ]
 
 PACKAGES = ['corosync', 'pacemaker', 'python-netaddr', 'ipmitool']
+SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
 
 
 @hooks.hook()
@@ -79,6 +80,20 @@ def install():
     mkdir('/usr/lib/ocf/resource.d/ceph')
     if not os.path.isfile('/usr/lib/ocf/resource.d/ceph/rbd'):
         shutil.copy('ocf/ceph/rbd', '/usr/lib/ocf/resource.d/ceph/rbd')
+
+
+def get_transport():
+    if config('corosync_transport') == 'multicast':
+        return 'udp'
+    elif config('corosync_transport') == 'unicast':
+        return 'udpu'
+    elif config('corosync_transport') in ['udp', 'udpu']:
+        return config('corosync_transport')
+    else:
+        raise ValueError('The corosync_transport type %s is not supported.'
+                         'Supported types are: %s' %
+                         (config('corosync_transport'),
+                          str(SUPPORTED_TRANSPORTS)))
 
 
 def get_corosync_id(unit_name):
@@ -113,7 +128,7 @@ def get_corosync_conf():
         'corosync_mcastaddr': config('corosync_mcastaddr'),
         'ip_version': ip_version,
         'ha_nodes': get_ha_nodes(),
-        'transport': config('corosync_transport'),
+        'transport': get_transport(),
     }
     if None not in conf.itervalues():
         return conf
@@ -130,7 +145,7 @@ def get_corosync_conf():
                 'corosync_mcastaddr': config('corosync_mcastaddr'),
                 'ip_version': ip_version,
                 'ha_nodes': get_ha_nodes(),
-                'transport': config('corosync_transport'),
+                'transport': get_transport(),
             }
 
             if config('prefer-ipv6'):
@@ -181,12 +196,6 @@ def config_changed():
         log('CRITICAL',
             'No Corosync key supplied, cannot proceed')
         sys.exit(1)
-    supported_transports = ['udp', 'udpu']
-    if config('corosync_transport') not in supported_transports:
-        raise ValueError('The corosync_transport type %s is not supported.'
-                         'Supported types are: %s' %
-                         (config('corosync_transport'),
-                          str(supported_transports)))
     hacluster.enable_lsb_services('pacemaker')
 
     if configure_corosync():

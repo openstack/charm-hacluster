@@ -87,6 +87,6 @@ options:
       your network interface.
   corosync_transport:
     type: string
-    default: "udp"
+    default: "multicast"
     description: |
-      Two supported modes are udp (multicast) or udpu (unicast)
+      Two supported modes are multicast (udp) or unicast (udpu)
