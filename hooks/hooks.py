@@ -10,7 +10,6 @@
 import ast
 import shutil
 import sys
-import time
 import os
 from base64 import b64decode
 
@@ -82,19 +81,17 @@ def install():
     if not os.path.isfile('/usr/lib/ocf/resource.d/ceph/rbd'):
         shutil.copy('ocf/ceph/rbd', '/usr/lib/ocf/resource.d/ceph/rbd')
 
+_deprecated_transport_values = {"multicast": "udp", "unicast": "udpu"}
+
 
 def get_transport():
-    if config('corosync_transport') == 'multicast':
-        return 'udp'
-    elif config('corosync_transport') == 'unicast':
-        return 'udpu'
-    elif config('corosync_transport') in ['udp', 'udpu']:
-        return config('corosync_transport')
-    else:
+    oo = config('corosync_transport')
+    val = _deprecated_transport_values.get(oo, oo)
+    if val not in ['udp', 'udpu']:
         raise ValueError('The corosync_transport type %s is not supported.'
                          'Supported types are: %s' %
-                         (config('corosync_transport'),
-                          str(SUPPORTED_TRANSPORTS)))
+                         (oo, str(SUPPORTED_TRANSPORTS)))
+    return val
 
 
 def get_corosync_id(unit_name):
