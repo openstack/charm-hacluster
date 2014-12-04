@@ -33,8 +33,9 @@ from charmhelpers.core.hookenv import (
 )
 
 from charmhelpers.core.host import (
-    service_stop,
     service_start,
+    service_stop,
+    service_restart,
     service_running,
     write_file,
     mkdir,
@@ -213,11 +214,7 @@ def upgrade_charm():
 def restart_corosync():
     if service_running("pacemaker"):
         service_stop("pacemaker")
-    service_stop("corosync")
-    # Corosync can become wedged if restarted too quickly. Need to
-    # replace sleep with some science
-    time.sleep(5)
-    service_start("corosync")
+    service_restart("corosync")
     service_start("pacemaker")
 
 
