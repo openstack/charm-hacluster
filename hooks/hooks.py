@@ -10,7 +10,6 @@
 import ast
 import shutil
 import sys
-import time
 import os
 from base64 import b64decode
 
@@ -29,11 +28,12 @@ from charmhelpers.core.hookenv import (
     config,
     Hooks, UnregisteredHookError,
     local_unit,
+    unit_private_ip,
 )
 
 from charmhelpers.core.host import (
-    service_stop,
     service_start,
+    service_stop,
     service_restart,
     service_running,
     write_file,
@@ -48,9 +48,12 @@ from charmhelpers.fetch import (
 )
 
 from charmhelpers.contrib.hahelpers.cluster import (
+    peer_ips,
     peer_units,
     oldest_peer
 )
+
+from charmhelpers.contrib.openstack.utils import get_host_ip
 
 hooks = Hooks()
 
@@ -65,6 +68,7 @@ COROSYNC_CONF_FILES = [
 ]
 
 PACKAGES = ['corosync', 'pacemaker', 'python-netaddr', 'ipmitool']
+SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
 
 
 @hooks.hook()
@@ -77,6 +81,34 @@ def install():
     if not os.path.isfile('/usr/lib/ocf/resource.d/ceph/rbd'):
         shutil.copy('ocf/ceph/rbd', '/usr/lib/ocf/resource.d/ceph/rbd')
 
+_deprecated_transport_values = {"multicast": "udp", "unicast": "udpu"}
+
+
+def get_transport():
+    transport = config('corosync_transport')
+    val = _deprecated_transport_values.get(transport, transport)
+    if val not in ['udp', 'udpu']:
+        msg = ("Unsupported corosync_transport type '%s' - supported "
+               "types are: %s" % (transport, ', '.join(SUPPORTED_TRANSPORTS)))
+        raise ValueError(msg)
+    return val
+
+
+def get_corosync_id(unit_name):
+    # Corosync nodeid 0 is reserved so increase all the nodeids to avoid it
+    off_set = 1000
+    return off_set + int(unit_name.split('/')[1])
+
+
+def get_ha_nodes():
+    ha_units = peer_ips(peer_relation='hanode')
+    ha_units[local_unit()] = unit_private_ip()
+    ha_nodes = {}
+    for unit in ha_units:
+        corosync_id = get_corosync_id(unit)
+        ha_nodes[corosync_id] = get_host_ip(ha_units[unit])
+    return ha_nodes
+
 
 def get_corosync_conf():
     if config('prefer-ipv6'):
@@ -85,7 +117,6 @@ def get_corosync_conf():
     else:
         ip_version = 'ipv4'
         bindnetaddr = hacluster.get_network_address
-
     # NOTE(jamespage) use local charm configuration over any provided by
     # principle charm
     conf = {
@@ -94,6 +125,8 @@ def get_corosync_conf():
         'corosync_mcastport': config('corosync_mcastport'),
         'corosync_mcastaddr': config('corosync_mcastaddr'),
         'ip_version': ip_version,
+        'ha_nodes': get_ha_nodes(),
+        'transport': get_transport(),
     }
     if None not in conf.itervalues():
         return conf
@@ -109,12 +142,12 @@ def get_corosync_conf():
                                                    unit, relid),
                 'corosync_mcastaddr': config('corosync_mcastaddr'),
                 'ip_version': ip_version,
+                'ha_nodes': get_ha_nodes(),
+                'transport': get_transport(),
             }
 
             if config('prefer-ipv6'):
-                local_unit_no = int(local_unit().split('/')[1])
-                # nodeid should not be 0
-                conf['nodeid'] = local_unit_no + 1
+                conf['nodeid'] = get_corosync_id(local_unit())
                 conf['netmtu'] = config('netmtu')
 
             if None not in conf.itervalues():
@@ -161,7 +194,6 @@ def config_changed():
         log('CRITICAL',
             'No Corosync key supplied, cannot proceed')
         sys.exit(1)
-
     hacluster.enable_lsb_services('pacemaker')
 
     if configure_corosync():
@@ -180,7 +212,6 @@ def restart_corosync():
     if service_running("pacemaker"):
         service_stop("pacemaker")
     service_restart("corosync")
-    time.sleep(5)
     service_start("pacemaker")
 
 
