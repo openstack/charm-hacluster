@@ -2,10 +2,10 @@
 PYTHON := /usr/bin/env python
 
 lint:
-	@flake8 --exclude hooks/charmhelpers hooks
+	@flake8 --exclude hooks/charmhelpers hooks unit_tests
 	@charm proof
 
-test:
+unit_test:
 	@echo Starting tests...
 	@$(PYTHON) /usr/bin/nosetests --nologcapture --with-coverage  unit_tests
 
