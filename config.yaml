@@ -90,3 +90,7 @@ options:
     default: "multicast"
     description: |
       Two supported modes are multicast (udp) or unicast (udpu)
+  debug:
+    default: False
+    type: boolean
+    description: Enable debug logging

@@ -127,6 +127,7 @@ def get_corosync_conf():
         'ip_version': ip_version,
         'ha_nodes': get_ha_nodes(),
         'transport': get_transport(),
+        'debug': config('debug'),
     }
     if None not in conf.itervalues():
         return conf
@@ -144,6 +145,7 @@ def get_corosync_conf():
                 'ip_version': ip_version,
                 'ha_nodes': get_ha_nodes(),
                 'transport': get_transport(),
+                'debug': config('debug'),
             }
 
             if config('prefer-ipv6'):
