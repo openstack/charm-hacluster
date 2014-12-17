@@ -44,7 +44,8 @@ from charmhelpers.core.host import (
 
 from charmhelpers.fetch import (
     apt_install,
-    apt_purge
+    apt_purge,
+    filter_installed_packages,
 )
 
 from charmhelpers.contrib.hahelpers.cluster import (
@@ -73,7 +74,9 @@ SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
 
 @hooks.hook()
 def install():
-    apt_install(PACKAGES, fatal=True)
+    # NOTE(dosaboy): we currently disallow upgrades due to bug #1382842. This
+    # should be removed once the pacemaker package is fixed.
+    apt_install(filter_installed_packages(PACKAGES), fatal=True)
     # NOTE(adam_g) rbd OCF only included with newer versions of
     # ceph-resource-agents. Bundle /w charm until we figure out a
     # better way to install it.
