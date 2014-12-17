@@ -74,6 +74,8 @@ SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
 
 @hooks.hook()
 def install():
+    # NOTE(dosaboy): we currently disallow upgrades due to bug #1382842. This
+    # should be removed once the pacemaker package is fixed.
     apt_install(filter_installed_packages(PACKAGES), fatal=True)
     # NOTE(adam_g) rbd OCF only included with newer versions of
     # ceph-resource-agents. Bundle /w charm until we figure out a
