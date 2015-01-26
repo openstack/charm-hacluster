@@ -1,3 +1,19 @@
+# Copyright 2014-2015 Canonical Limited.
+#
+# This file is part of charm-helpers.
+#
+# charm-helpers is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3 as
+# published by the Free Software Foundation.
+#
+# charm-helpers is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+
 import os
 import yaml
 from charmhelpers.core import hookenv
@@ -196,7 +212,7 @@ class StoredContext(dict):
         if not os.path.isabs(file_name):
             file_name = os.path.join(hookenv.charm_dir(), file_name)
         with open(file_name, 'w') as file_stream:
-            os.fchmod(file_stream.fileno(), 0600)
+            os.fchmod(file_stream.fileno(), 0o600)
             yaml.dump(config_data, file_stream)
 
     def read_context(self, file_name):
@@ -211,15 +227,19 @@ class StoredContext(dict):
 
 class TemplateCallback(ManagerCallback):
     """
-    Callback class that will render a Jinja2 template, for use as a ready action.
+    Callback class that will render a Jinja2 template, for use as a ready
+    action.
 
-    :param str source: The template source file, relative to `$CHARM_DIR/templates`
+    :param str source: The template source file, relative to
+    `$CHARM_DIR/templates`
+
     :param str target: The target to write the rendered template to
     :param str owner: The owner of the rendered file
     :param str group: The group of the rendered file
     :param int perms: The permissions of the rendered file
     """
-    def __init__(self, source, target, owner='root', group='root', perms=0444):
+    def __init__(self, source, target,
+                 owner='root', group='root', perms=0o444):
         self.source = source
         self.target = target
         self.owner = owner

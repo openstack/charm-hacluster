@@ -1,3 +1,19 @@
+# Copyright 2014-2015 Canonical Limited.
+#
+# This file is part of charm-helpers.
+#
+# charm-helpers is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3 as
+# published by the Free Software Foundation.
+#
+# charm-helpers is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+
 from subprocess import (
     CalledProcessError,
     check_call,
@@ -61,6 +77,7 @@ def list_lvm_volume_group(block_device):
     vg = None
     pvd = check_output(['pvdisplay', block_device]).splitlines()
     for l in pvd:
+        l = l.decode('UTF-8')
         if l.strip().startswith('VG Name'):
             vg = ' '.join(l.strip().split()[2:])
     return vg

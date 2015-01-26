@@ -8,3 +8,4 @@ include:
     - contrib.storage
     - contrib.network.ip
     - contrib.openstack.utils
+    - contrib.python.packages

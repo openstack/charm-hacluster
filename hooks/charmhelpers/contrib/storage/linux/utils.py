@@ -1,3 +1,19 @@
+# Copyright 2014-2015 Canonical Limited.
+#
+# This file is part of charm-helpers.
+#
+# charm-helpers is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3 as
+# published by the Free Software Foundation.
+#
+# charm-helpers is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+
 import os
 import re
 from stat import S_ISBLK
@@ -30,7 +46,8 @@ def zap_disk(block_device):
     # sometimes sgdisk exits non-zero; this is OK, dd will clean up
     call(['sgdisk', '--zap-all', '--mbrtogpt',
           '--clear', block_device])
-    dev_end = check_output(['blockdev', '--getsz', block_device])
+    dev_end = check_output(['blockdev', '--getsz',
+                            block_device]).decode('UTF-8')
     gpt_end = int(dev_end.split()[0]) - 100
     check_call(['dd', 'if=/dev/zero', 'of=%s' % (block_device),
                 'bs=1M', 'count=1'])
@@ -47,7 +64,7 @@ def is_device_mounted(device):
         it doesn't.
     '''
     is_partition = bool(re.search(r".*[0-9]+\b", device))
-    out = check_output(['mount'])
+    out = check_output(['mount']).decode('UTF-8')
     if is_partition:
         return bool(re.search(device + r"\b", out))
     return bool(re.search(device + r"[0-9]+\b", out))

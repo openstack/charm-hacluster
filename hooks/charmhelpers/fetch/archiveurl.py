@@ -1,8 +1,39 @@
+# Copyright 2014-2015 Canonical Limited.
+#
+# This file is part of charm-helpers.
+#
+# charm-helpers is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License version 3 as
+# published by the Free Software Foundation.
+#
+# charm-helpers is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+
 import os
-import urllib2
-from urllib import urlretrieve
-import urlparse
 import hashlib
+import re
+
+import six
+if six.PY3:
+    from urllib.request import (
+        build_opener, install_opener, urlopen, urlretrieve,
+        HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler,
+    )
+    from urllib.parse import urlparse, urlunparse, parse_qs
+    from urllib.error import URLError
+else:
+    from urllib import urlretrieve
+    from urllib2 import (
+        build_opener, install_opener, urlopen,
+        HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler,
+        URLError
+    )
+    from urlparse import urlparse, urlunparse, parse_qs
 
 from charmhelpers.fetch import (
     BaseFetchHandler,
@@ -13,6 +44,24 @@ from charmhelpers.payload.archive import (
     extract,
 )
 from charmhelpers.core.host import mkdir, check_hash
+
+
+def splituser(host):
+    '''urllib.splituser(), but six's support of this seems broken'''
+    _userprog = re.compile('^(.*)@(.*)$')
+    match = _userprog.match(host)
+    if match:
+        return match.group(1, 2)
+    return None, host
+
+
+def splitpasswd(user):
+    '''urllib.splitpasswd(), but six's support of this is missing'''
+    _passwdprog = re.compile('^([^:]*):(.*)$', re.S)
+    match = _passwdprog.match(user)
+    if match:
+        return match.group(1, 2)
+    return user, None
 
 
 class ArchiveUrlFetchHandler(BaseFetchHandler):
@@ -42,20 +91,20 @@ class ArchiveUrlFetchHandler(BaseFetchHandler):
         """
         # propogate all exceptions
         # URLError, OSError, etc
-        proto, netloc, path, params, query, fragment = urlparse.urlparse(source)
+        proto, netloc, path, params, query, fragment = urlparse(source)
         if proto in ('http', 'https'):
-            auth, barehost = urllib2.splituser(netloc)
+            auth, barehost = splituser(netloc)
             if auth is not None:
-                source = urlparse.urlunparse((proto, barehost, path, params, query, fragment))
-                username, password = urllib2.splitpasswd(auth)
-                passman = urllib2.HTTPPasswordMgrWithDefaultRealm()
+                source = urlunparse((proto, barehost, path, params, query, fragment))
+                username, password = splitpasswd(auth)
+                passman = HTTPPasswordMgrWithDefaultRealm()
                 # Realm is set to None in add_password to force the username and password
                 # to be used whatever the realm
                 passman.add_password(None, source, username, password)
-                authhandler = urllib2.HTTPBasicAuthHandler(passman)
-                opener = urllib2.build_opener(authhandler)
-                urllib2.install_opener(opener)
-        response = urllib2.urlopen(source)
+                authhandler = HTTPBasicAuthHandler(passman)
+                opener = build_opener(authhandler)
+                install_opener(opener)
+        response = urlopen(source)
         try:
             with open(dest, 'w') as dest_file:
                 dest_file.write(response.read())
@@ -91,17 +140,21 @@ class ArchiveUrlFetchHandler(BaseFetchHandler):
         url_parts = self.parse_url(source)
         dest_dir = os.path.join(os.environ.get('CHARM_DIR'), 'fetched')
         if not os.path.exists(dest_dir):
-            mkdir(dest_dir, perms=0755)
+            mkdir(dest_dir, perms=0o755)
         dld_file = os.path.join(dest_dir, os.path.basename(url_parts.path))
         try:
             self.download(source, dld_file)
-        except urllib2.URLError as e:
+        except URLError as e:
             raise UnhandledSource(e.reason)
         except OSError as e:
             raise UnhandledSource(e.strerror)
-        options = urlparse.parse_qs(url_parts.fragment)
+        options = parse_qs(url_parts.fragment)
         for key, value in options.items():
-            if key in hashlib.algorithms:
+            if not six.PY3:
+                algorithms = hashlib.algorithms
+            else:
+                algorithms = hashlib.algorithms_available
+            if key in algorithms:
                 check_hash(dld_file, value, key)
         if checksum:
             check_hash(dld_file, checksum, hash_type)
