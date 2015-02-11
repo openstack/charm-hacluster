@@ -14,6 +14,9 @@ provides:
   ha:
     interface: hacluster
     scope: container
+  nrpe-external-master:
+    interface: nrpe-external-master
+    scope: container
 peers:
   hanode:
     interface: hacluster

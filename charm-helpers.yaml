@@ -9,3 +9,4 @@ include:
     - contrib.network.ip
     - contrib.openstack.utils
     - contrib.python.packages
+    - contrib.charmsupport
