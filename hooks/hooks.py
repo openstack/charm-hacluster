@@ -212,16 +212,14 @@ def config_changed():
         configure_monitor_host()
         configure_stonith()
 
-    if relations_of_type('nrpe-external-master'):
-        update_nrpe_config()
+    update_nrpe_config()
 
 
 @hooks.hook()
 def upgrade_charm():
     install()
 
-    if relations_of_type('nrpe-external-master'):
-        update_nrpe_config()
+    update_nrpe_config()
 
 
 def restart_corosync():
