@@ -212,13 +212,16 @@ def config_changed():
         configure_monitor_host()
         configure_stonith()
 
-    update_nrpe_config()
+    if relations_of_type('nrpe-external-master'):
+        update_nrpe_config()
 
 
 @hooks.hook()
 def upgrade_charm():
     install()
-    update_nrpe_config()
+
+    if relations_of_type('nrpe-external-master'):
+        update_nrpe_config()
 
 
 def restart_corosync():
@@ -611,21 +614,11 @@ def update_nrpe_config():
             shutil.copy2(fname,
                          os.path.join(sudoers_dst, os.path.basename(fname)))
 
-    # Find out if nrpe set nagios_hostname
-    hostname = None
-    host_context = None
-    for rel in relations_of_type('nrpe-external-master'):
-        if 'nagios_hostname' in rel:
-            hostname = rel['nagios_hostname']
-            host_context = rel['nagios_host_context']
-            break
+    hostname = nrpe.get_nagios_hostname()
+    current_unit = nrpe.get_nagios_unit_name()
+
     nrpe = NRPE(hostname=hostname)
     apt_install('python-dbus')
-
-    if host_context:
-        current_unit = "%s:%s" % (host_context, local_unit())
-    else:
-        current_unit = local_unit()
 
     # haproxy checks
     nrpe.add_check(
