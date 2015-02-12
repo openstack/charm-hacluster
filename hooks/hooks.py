@@ -612,10 +612,10 @@ def update_nrpe_config():
             shutil.copy2(fname,
                          os.path.join(sudoers_dst, os.path.basename(fname)))
 
+    nrpe = NRPE(hostname=hostname)
     hostname = nrpe.get_nagios_hostname()
     current_unit = nrpe.get_nagios_unit_name()
 
-    nrpe = NRPE(hostname=hostname)
     apt_install('python-dbus')
 
     # haproxy checks
