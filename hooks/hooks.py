@@ -58,7 +58,7 @@ from charmhelpers.contrib.hahelpers.cluster import (
 
 from charmhelpers.contrib.openstack.utils import get_host_ip
 
-from charmhelpers.contrib.charmsupport.nrpe import NRPE
+from charmhelpers.contrib.charmsupport import nrpe
 
 hooks = Hooks()
 
@@ -612,33 +612,34 @@ def update_nrpe_config():
             shutil.copy2(fname,
                          os.path.join(sudoers_dst, os.path.basename(fname)))
 
-    nrpe = NRPE(hostname=hostname)
     hostname = nrpe.get_nagios_hostname()
     current_unit = nrpe.get_nagios_unit_name()
+
+    nrpe_setup = nrpe.NRPE(hostname=hostname)
 
     apt_install('python-dbus')
 
     # haproxy checks
-    nrpe.add_check(
+    nrpe_setup.add_check(
         shortname='haproxy_servers',
         description='Check HAProxy {%s}' % current_unit,
         check_cmd='check_haproxy.sh')
-    nrpe.add_check(
+    nrpe_setup.add_check(
         shortname='haproxy_queue',
         description='Check HAProxy queue depth {%s}' % current_unit,
         check_cmd='check_haproxy_queue_depth.sh')
 
     # corosync/crm checks
-    nrpe.add_check(
+    nrpe_setup.add_check(
         shortname='corosync_rings',
         description='Check Corosync rings {%s}' % current_unit,
         check_cmd='check_corosync_rings')
-    nrpe.add_check(
+    nrpe_setup.add_check(
         shortname='crm_status',
         description='Check crm status {%s}' % current_unit,
         check_cmd='check_crm')
 
-    nrpe.write()
+    nrpe_setup.write()
 
 
 if __name__ == '__main__':
