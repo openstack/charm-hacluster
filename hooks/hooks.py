@@ -25,7 +25,6 @@ from charmhelpers.core.hookenv import (
     related_units,
     relation_ids,
     relation_set,
-    relations_of_type,
     unit_get,
     config,
     Hooks, UnregisteredHookError,
