@@ -618,16 +618,6 @@ def update_nrpe_config():
 
     apt_install('python-dbus')
 
-    # haproxy checks
-    nrpe_setup.add_check(
-        shortname='haproxy_servers',
-        description='Check HAProxy {%s}' % current_unit,
-        check_cmd='check_haproxy.sh')
-    nrpe_setup.add_check(
-        shortname='haproxy_queue',
-        description='Check HAProxy queue depth {%s}' % current_unit,
-        check_cmd='check_haproxy_queue_depth.sh')
-
     # corosync/crm checks
     nrpe_setup.add_check(
         shortname='corosync_rings',
