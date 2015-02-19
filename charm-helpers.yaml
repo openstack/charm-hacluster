@@ -7,6 +7,6 @@ include:
     - contrib.hahelpers
     - contrib.storage
     - contrib.network.ip
-    - contrib.openstack.utils
+    - contrib.openstack
     - contrib.python.packages
     - contrib.charmsupport
