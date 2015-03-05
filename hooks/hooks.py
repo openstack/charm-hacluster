@@ -628,6 +628,18 @@ def update_nrpe_config():
         description='Check crm status {%s}' % current_unit,
         check_cmd='check_crm')
 
+    # process checks
+    nrpe_setup.add_check(
+        shortname='corosync_proc',
+        description='Check Corosync process {%s}' % current_unit,
+        check_cmd='check_procs -c 1:1 -C corosync'
+    )
+    nrpe_setup.add_check(
+        shortname='pacemakerd_proc',
+        description='Check Pacemakerd process {%s}' % current_unit,
+        check_cmd='check_procs -c 1:1 -C pacemakerd'
+    )
+
     nrpe_setup.write()
 
 
