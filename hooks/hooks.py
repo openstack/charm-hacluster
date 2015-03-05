@@ -350,6 +350,7 @@ def configure_principle_cluster_resources():
         orders = parse_data(relid, unit, 'orders')
         colocations = parse_data(relid, unit, 'colocations')
         clones = parse_data(relid, unit, 'clones')
+        locations = parse_data(relid, unit, 'locations')
         init_services = parse_data(relid, unit, 'init_services')
     else:
         log('Related to {} ha services'.format(len(relids)))
@@ -455,6 +456,15 @@ def configure_principle_cluster_resources():
             if not pcmk.crm_opt_exists(cln_name):
                 cmd = 'crm -w -F configure clone %s %s' % (cln_name,
                                                            cln_params)
+                pcmk.commit(cmd)
+                log('%s' % cmd)
+
+        log('Configuring Locations')
+        log(str(locations))
+        for loc_name, loc_params in locations.iteritems():
+            if not pcmk.crm_opt_exists(loc_name):
+                cmd = 'crm -w -F configure location %s %s' % (loc_name,
+                                                              loc_params)
                 pcmk.commit(cmd)
                 log('%s' % cmd)
 
