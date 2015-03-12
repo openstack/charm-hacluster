@@ -350,6 +350,7 @@ def configure_principle_cluster_resources():
         orders = parse_data(relid, unit, 'orders')
         colocations = parse_data(relid, unit, 'colocations')
         clones = parse_data(relid, unit, 'clones')
+        locations = parse_data(relid, unit, 'locations')
         init_services = parse_data(relid, unit, 'init_services')
     else:
         log('Related to {} ha services'.format(len(relids)))
@@ -374,7 +375,7 @@ def configure_principle_cluster_resources():
     # from the oldest peer unit.
     if oldest_peer(peer_units()):
         log('Deleting Resources')
-        log(str(delete_resources))
+        log(delete_resources)
         for res_name in delete_resources:
             if pcmk.crm_opt_exists(res_name):
                 log('Stopping and deleting resource %s' % res_name)
@@ -383,7 +384,7 @@ def configure_principle_cluster_resources():
                 pcmk.commit('crm -w -F configure delete %s' % res_name)
 
         log('Configuring Resources')
-        log(str(resources))
+        log(resources)
         for res_name, res_type in resources.iteritems():
             # disable the service we are going to put in HA
             if res_type.split(':')[0] == "lsb":
@@ -415,7 +416,7 @@ def configure_principle_cluster_resources():
                     pcmk.commit(cmd)
 
         log('Configuring Groups')
-        log(str(groups))
+        log(groups)
         for grp_name, grp_params in groups.iteritems():
             if not pcmk.crm_opt_exists(grp_name):
                 cmd = 'crm -w -F configure group %s %s' % (grp_name,
@@ -424,7 +425,7 @@ def configure_principle_cluster_resources():
                 log('%s' % cmd)
 
         log('Configuring Master/Slave (ms)')
-        log(str(ms))
+        log(ms)
         for ms_name, ms_params in ms.iteritems():
             if not pcmk.crm_opt_exists(ms_name):
                 cmd = 'crm -w -F configure ms %s %s' % (ms_name, ms_params)
@@ -432,7 +433,7 @@ def configure_principle_cluster_resources():
                 log('%s' % cmd)
 
         log('Configuring Orders')
-        log(str(orders))
+        log(orders)
         for ord_name, ord_params in orders.iteritems():
             if not pcmk.crm_opt_exists(ord_name):
                 cmd = 'crm -w -F configure order %s %s' % (ord_name,
@@ -441,7 +442,7 @@ def configure_principle_cluster_resources():
                 log('%s' % cmd)
 
         log('Configuring Colocations')
-        log(str(colocations))
+        log(colocations)
         for col_name, col_params in colocations.iteritems():
             if not pcmk.crm_opt_exists(col_name):
                 cmd = 'crm -w -F configure colocation %s %s' % (col_name,
@@ -450,11 +451,20 @@ def configure_principle_cluster_resources():
                 log('%s' % cmd)
 
         log('Configuring Clones')
-        log(str(clones))
+        log(clones)
         for cln_name, cln_params in clones.iteritems():
             if not pcmk.crm_opt_exists(cln_name):
                 cmd = 'crm -w -F configure clone %s %s' % (cln_name,
                                                            cln_params)
+                pcmk.commit(cmd)
+                log('%s' % cmd)
+
+        log('Configuring Locations')
+        log(locations)
+        for loc_name, loc_params in locations.iteritems():
+            if not pcmk.crm_opt_exists(loc_name):
+                cmd = 'crm -w -F configure location %s %s' % (loc_name,
+                                                              loc_params)
                 pcmk.commit(cmd)
                 log('%s' % cmd)
 
