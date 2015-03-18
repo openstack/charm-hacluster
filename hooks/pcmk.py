@@ -48,10 +48,11 @@ def crm_opt_exists(opt_name):
 
 
 def crm_res_running(opt_name):
-    output = commands.getstatusoutput("crm resource status %s" % opt_name)[1]
-    if opt_name in output:
+    (c, output) = commands.getstatusoutput("crm resource status %s" % opt_name)
+    if output.startswith("resource %s is running" % opt_name):
+        return True
+    else:
         return False
-    return True
 
 
 def list_nodes():
