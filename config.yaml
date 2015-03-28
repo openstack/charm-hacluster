@@ -1,7 +1,23 @@
 options:
+  debug:
+    type: boolean
+    default: False
+    description: Enable debug logging
+  prefer-ipv6:
+    type: boolean
+    default: False
+    description: |
+      If True enables IPv6 support. The charm will expect network interfaces
+      to be configured with an IPv6 address. If set to False (default) IPv4
+      is expected.
+      .
+      NOTE: these charms do not currently support IPv6 privacy extension. In
+      order for this charm to function correctly, the privacy extension must be
+      disabled and a non-temporary address must be configured/available on
+      your network interface.
   corosync_mcastaddr:
-    default: 226.94.1.1
     type: string
+    default: 226.94.1.1
     description: |
       Multicast IP address to use for exchanging messages over the network.
       If multiple clusters are on the same bindnetaddr network, this value
@@ -34,9 +50,9 @@ options:
     type: string
     default: 'False'
     description: |
-     Enable resource fencing (aka STONITH) for every node in the cluster.
-     This requires MAAS credentials be provided and each node's power
-     parameters are properly configured in its invenvory.
+      Enable resource fencing (aka STONITH) for every node in the cluster.
+      This requires MAAS credentials be provided and each node's power
+      parameters are properly configured in its invenvory.
   maas_url:
     type: string
     default:
@@ -59,38 +75,22 @@ options:
     type: string
     default:
     description: |
-     One or more IPs, separated by space, that will be used as a saftey check
-     for avoiding split brain situations. Nodes in the cluster will ping these
-     IPs periodicaly. Node that can not ping monitor_host will not run shared
-     resources (VIP, shared disk...).
+      One or more IPs, separated by space, that will be used as a saftey check
+      for avoiding split brain situations. Nodes in the cluster will ping these
+      IPs periodicaly. Node that can not ping monitor_host will not run shared
+      resources (VIP, shared disk...).
   monitor_interval:
     type: string
     default: 5s
     description: |
-     Time period between checks of resource health. It consists of a number
-     and a time factor, e.g. 5s = 5 seconds. 2m = 2 minutes.
+      Time period between checks of resource health. It consists of a number
+      and a time factor, e.g. 5s = 5 seconds. 2m = 2 minutes.
   netmtu:
     type: int
     default: 1500
     description: MTU size corosync used for communication.
-  prefer-ipv6:
-    type: boolean
-    default: False
-    description: |
-      If True enables IPv6 support. The charm will expect network interfaces
-      to be configured with an IPv6 address. If set to False (default) IPv4
-      is expected.
-      .
-      NOTE: these charms do not currently support IPv6 privacy extension. In
-      order for this charm to function correctly, the privacy extension must be
-      disabled and a non-temporary address must be configured/available on
-      your network interface.
   corosync_transport:
     type: string
     default: "multicast"
     description: |
       Two supported modes are multicast (udp) or unicast (udpu)
-  debug:
-    default: False
-    type: boolean
-    description: Enable debug logging

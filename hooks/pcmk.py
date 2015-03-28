@@ -2,7 +2,10 @@ import commands
 import subprocess
 import socket
 
-from charmhelpers.core.hookenv import log, ERROR
+from charmhelpers.core.hookenv import (
+    log,
+    ERROR
+)
 
 
 def wait_for_pcmk():
@@ -21,6 +24,7 @@ def is_resource_present(resource):
     status = commands.getstatusoutput("crm resource status %s" % resource)[0]
     if status != 0:
         return False
+
     return True
 
 
@@ -29,6 +33,7 @@ def standby(node=None):
         cmd = "crm -F node standby"
     else:
         cmd = "crm -F node standby %s" % node
+
     commit(cmd)
 
 
@@ -37,6 +42,7 @@ def online(node=None):
         cmd = "crm -F node online"
     else:
         cmd = "crm -F node online %s" % node
+
     commit(cmd)
 
 
@@ -44,6 +50,7 @@ def crm_opt_exists(opt_name):
     output = commands.getstatusoutput("crm configure show")[1]
     if opt_name in output:
         return True
+
     return False
 
 
@@ -51,8 +58,8 @@ def crm_res_running(opt_name):
     (c, output) = commands.getstatusoutput("crm resource status %s" % opt_name)
     if output.startswith("resource %s is running" % opt_name):
         return True
-    else:
-        return False
+
+    return False
 
 
 def list_nodes():
@@ -62,20 +69,21 @@ def list_nodes():
     for line in str(out).split('\n'):
         if line != '':
             nodes.append(line.split(':')[0])
+
     return nodes
 
 
 def _maas_ipmi_stonith_resource(node, power_params):
     rsc_name = 'res_stonith_%s' % node
-    rsc = 'primitive %s stonith:external/ipmi' % rsc_name
-    rsc += ' params hostname=%s ipaddr=%s userid=%s passwd=%s interface=lan' %\
-           (node, power_params['power_address'],
-            power_params['power_user'], power_params['power_pass'])
+    rsc = ('primitive %s stonith:external/ipmi params hostname=%s ipaddr=%s '
+           'userid=%s passwd=%s interface=lan' %
+           (rsc_name, node, power_params['power_address'],
+            power_params['power_user'], power_params['power_pass']))
 
     # ensure ipmi stonith agents are not running on the nodes that
     # they manage.
-    constraint = 'location const_loc_stonith_avoid_%s %s -inf: %s' %\
-        (node, rsc_name, node)
+    constraint = ('location const_loc_stonith_avoid_%s %s -inf: %s' %
+                  (node, rsc_name, node))
 
     return rsc, constraint
 
