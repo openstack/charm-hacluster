@@ -15,7 +15,7 @@ test:
 	# raise_status() messages to stderr:
 	#   https://bugs.launchpad.net/amulet/+bug/1320357
 	@juju test -v -p AMULET_HTTP_PROXY --timeout 900 \
-		00-setup 10-bundles-test
+		00-setup 15-basic-trusty-icehouse
 
 bin/charm_helpers_sync.py:
 	@mkdir -p bin
@@ -23,7 +23,8 @@ bin/charm_helpers_sync.py:
 	> bin/charm_helpers_sync.py
 
 sync: bin/charm_helpers_sync.py
-	@$(PYTHON) bin/charm_helpers_sync.py -c charm-helpers.yaml
+	@$(PYTHON) bin/charm_helpers_sync.py -c charm-helpers-hooks.yaml
+	@$(PYTHON) bin/charm_helpers_sync.py -c charm-helpers-tests.yaml
 
 publish: lint unit_test
 	bzr push lp:charms/hacluster

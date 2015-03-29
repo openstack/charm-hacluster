@@ -290,7 +290,7 @@ def configure_cluster_global():
         cmd = "crm configure property no-quorum-policy=ignore"
 
     pcmk.commit(cmd)
-    cmd = ('crm configure rsc_defaults $id="rsc-options '
+    cmd = ('crm configure rsc_defaults $id="rsc-options" '
            'resource-stickiness="100"')
     pcmk.commit(cmd)
 
