@@ -15,8 +15,6 @@ from charmhelpers.contrib.openstack.amulet.utils import (
 
 # Use DEBUG to turn on debug logging
 u = OpenStackAmuletUtils(DEBUG)
-KEYSTONE_SVC_VIP = '10.5.100.1'
-
 seconds_to_wait = 600
 
 
@@ -26,6 +24,13 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
         """Deploy the entire test environment."""
         super(HAClusterBasicDeployment, self).__init__(series, openstack,
                                                        source, stable)
+        env_var = 'OS_CHARMS_AMULET_VIP'
+        self._vip = os.getenv(env_var, None)
+        if not self._vip:
+            u.log.warning("No vip provided with '%s' - skipping tests" %
+                          (env_var))
+            return
+
         self._add_services()
         self._add_relations()
         self._configure_services()
@@ -46,7 +51,7 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
     def _configure_services(self):
         keystone_config = {'admin-password': 'openstack',
                            'admin-token': 'ubuntutesting',
-                           'vip': KEYSTONE_SVC_VIP}
+                           'vip': self._vip}
         mysql_config = {'dataset-size': '50%'}
         configs = {'keystone': keystone_config,
                    'mysql': mysql_config}
@@ -79,12 +84,11 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
         self.hacluster_sentry = self.d.sentry.unit['hacluster/0']
 
         # Authenticate keystone admin
-        vip = KEYSTONE_SVC_VIP
         self.keystone = self._authenticate_keystone_admin(self.keystone_sentry,
                                                           user='admin',
                                                           password='openstack',
                                                           tenant='admin',
-                                                          service_ip=vip)
+                                                          service_ip=self._vip)
 
         # Create a demo tenant/role/user
         self.demo_tenant = 'demoTenant'
