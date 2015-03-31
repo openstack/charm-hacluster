@@ -27,9 +27,8 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
         env_var = 'OS_CHARMS_AMULET_VIP'
         self._vip = os.getenv(env_var, None)
         if not self._vip:
-            u.log.warning("No vip provided with '%s' - skipping tests" %
-                          (env_var))
-            return
+            amulet.raise_status(amulet.SKIP, msg="No vip provided with '%s' - "
+                                "skipping tests" % (env_var))
 
         self._add_services()
         self._add_relations()
