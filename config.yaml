@@ -71,7 +71,7 @@ options:
      and a time factor, e.g. 5s = 5 seconds. 2m = 2 minutes.
   netmtu:
     type: int
-    default: 1500
+    default:
     description: MTU size corosync used for communication.
   prefer-ipv6:
     type: boolean

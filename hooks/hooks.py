@@ -150,11 +150,13 @@ def get_corosync_conf():
                 'transport': get_transport(),
                 'debug': config('debug'),
             }
+            if config('netmtu'):
+                conf['netmtu'] = config('netmtu')
 
             if config('prefer-ipv6'):
                 conf['nodeid'] = get_corosync_id(local_unit())
-                conf['netmtu'] = config('netmtu')
-
+                if 'netmtu' not in conf:
+                    conf['netmtu'] = 1500
             if None not in conf.itervalues():
                 return conf
     missing = [k for k, v in conf.iteritems() if v is None]
