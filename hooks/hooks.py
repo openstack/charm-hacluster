@@ -136,6 +136,10 @@ def get_corosync_conf():
         return conf
 
     conf = {}
+
+    if config('netmtu'):
+        conf['netmtu'] = config('netmtu')
+
     for relid in relation_ids('ha'):
         for unit in related_units(relid):
             bindiface = relation_get('corosync_bindiface',
@@ -153,8 +157,6 @@ def get_corosync_conf():
 
             if config('prefer-ipv6'):
                 conf['nodeid'] = get_corosync_id(local_unit())
-                conf['netmtu'] = config('netmtu')
-
             if None not in conf.itervalues():
                 return conf
     missing = [k for k, v in conf.iteritems() if v is None]

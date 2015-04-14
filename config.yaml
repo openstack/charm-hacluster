@@ -71,8 +71,11 @@ options:
      and a time factor, e.g. 5s = 5 seconds. 2m = 2 minutes.
   netmtu:
     type: int
-    default: 1500
-    description: MTU size corosync used for communication.
+    default:
+    description: |
+      Specifies the corosync.conf network mtu. If unset, the default
+      corosync.conf value is used (currently 1500). See 'man corosync.conf' for
+      detailed information on this config option.
   prefer-ipv6:
     type: boolean
     default: False
