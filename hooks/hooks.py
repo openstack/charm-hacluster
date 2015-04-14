@@ -155,8 +155,6 @@ def get_corosync_conf():
 
             if config('prefer-ipv6'):
                 conf['nodeid'] = get_corosync_id(local_unit())
-                if 'netmtu' not in conf:
-                    conf['netmtu'] = 1500
             if None not in conf.itervalues():
                 return conf
     missing = [k for k, v in conf.iteritems() if v is None]
