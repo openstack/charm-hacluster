@@ -11,6 +11,7 @@ import ast
 import shutil
 import sys
 import os
+import glob
 from base64 import b64decode
 
 import maas as MAAS
@@ -56,6 +57,8 @@ from charmhelpers.contrib.hahelpers.cluster import (
 
 from charmhelpers.contrib.openstack.utils import get_host_ip
 
+from charmhelpers.contrib.charmsupport import nrpe
+
 hooks = Hooks()
 
 COROSYNC_CONF = '/etc/corosync/corosync.conf'
@@ -68,7 +71,8 @@ COROSYNC_CONF_FILES = [
     COROSYNC_CONF
 ]
 
-PACKAGES = ['corosync', 'pacemaker', 'python-netaddr', 'ipmitool']
+PACKAGES = ['corosync', 'pacemaker', 'python-netaddr', 'ipmitool',
+            'libnagios-plugin-perl']
 SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
 
 
@@ -209,10 +213,14 @@ def config_changed():
         configure_monitor_host()
         configure_stonith()
 
+    update_nrpe_config()
+
 
 @hooks.hook()
 def upgrade_charm():
     install()
+
+    update_nrpe_config()
 
 
 def restart_corosync():
@@ -592,6 +600,59 @@ def assert_charm_supports_ipv6():
     if lsb_release()['DISTRIB_CODENAME'].lower() < "trusty":
         raise Exception("IPv6 is not supported in the charms for Ubuntu "
                         "versions less than Trusty 14.04")
+
+
+@hooks.hook('nrpe-external-master-relation-joined',
+            'nrpe-external-master-relation-changed')
+def update_nrpe_config():
+    scripts_src = os.path.join(os.environ["CHARM_DIR"], "files",
+                               "nrpe")
+    scripts_dst = "/usr/local/lib/nagios/plugins"
+    if not os.path.exists(scripts_dst):
+        os.makedirs(scripts_dst)
+    for fname in glob.glob(os.path.join(scripts_src, "*")):
+        if os.path.isfile(fname):
+            shutil.copy2(fname,
+                         os.path.join(scripts_dst, os.path.basename(fname)))
+
+    sudoers_src = os.path.join(os.environ["CHARM_DIR"], "files",
+                               "sudoers")
+    sudoers_dst = "/etc/sudoers.d"
+    for fname in glob.glob(os.path.join(sudoers_src, "*")):
+        if os.path.isfile(fname):
+            shutil.copy2(fname,
+                         os.path.join(sudoers_dst, os.path.basename(fname)))
+
+    hostname = nrpe.get_nagios_hostname()
+    current_unit = nrpe.get_nagios_unit_name()
+
+    nrpe_setup = nrpe.NRPE(hostname=hostname)
+
+    apt_install('python-dbus')
+
+    # corosync/crm checks
+    nrpe_setup.add_check(
+        shortname='corosync_rings',
+        description='Check Corosync rings {%s}' % current_unit,
+        check_cmd='check_corosync_rings')
+    nrpe_setup.add_check(
+        shortname='crm_status',
+        description='Check crm status {%s}' % current_unit,
+        check_cmd='check_crm')
+
+    # process checks
+    nrpe_setup.add_check(
+        shortname='corosync_proc',
+        description='Check Corosync process {%s}' % current_unit,
+        check_cmd='check_procs -c 1:1 -C corosync'
+    )
+    nrpe_setup.add_check(
+        shortname='pacemakerd_proc',
+        description='Check Pacemakerd process {%s}' % current_unit,
+        check_cmd='check_procs -c 1:1 -C pacemakerd'
+    )
+
+    nrpe_setup.write()
 
 
 if __name__ == '__main__':
