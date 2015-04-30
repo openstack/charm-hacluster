@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Copyright 2012 Canonical Ltd.
+# Copyright 2015 Canonical Ltd.
 #
 import shutil
 import os
