@@ -5,9 +5,9 @@
 import shutil
 import os
 import sys
+import glob
 
 import pcmk
-import hacluster
 import socket
 
 from charmhelpers.core.hookenv import (
@@ -48,11 +48,30 @@ from utils import (
     configure_stonith,
     configure_monitor_host,
     configure_cluster_global,
+    enable_lsb_services,
+    disable_lsb_services,
+    disable_upstart_services,
 )
+
+from charmhelpers.contrib.charmsupport import nrpe
 
 hooks = Hooks()
 
 PACKAGES = ['corosync', 'pacemaker', 'python-netaddr', 'ipmitool']
+COROSYNC_CONF = '/etc/corosync/corosync.conf'
+COROSYNC_DEFAULT = '/etc/default/corosync'
+COROSYNC_AUTHKEY = '/etc/corosync/authkey'
+
+COROSYNC_CONF_FILES = [
+    COROSYNC_DEFAULT,
+    COROSYNC_AUTHKEY,
+    COROSYNC_CONF
+]
+
+PACKAGES = ['corosync', 'pacemaker', 'python-netaddr', 'ipmitool',
+            'libnagios-plugin-perl']
+SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
+DEPRECATED_TRANSPORT_VALUES = {"multicast": "udp", "unicast": "udpu"}
 
 
 @hooks.hook()
@@ -68,6 +87,16 @@ def install():
         shutil.copy('ocf/ceph/rbd', '/usr/lib/ocf/resource.d/ceph/rbd')
 
 
+def get_transport():
+    transport = config('corosync_transport')
+    val = DEPRECATED_TRANSPORT_VALUES.get(transport, transport)
+    if val not in ['udp', 'udpu']:
+        msg = ("Unsupported corosync_transport type '%s' - supported "
+               "types are: %s" % (transport, ', '.join(SUPPORTED_TRANSPORTS)))
+        raise ValueError(msg)
+    return val
+
+
 @hooks.hook()
 def config_changed():
     if config('prefer-ipv6'):
@@ -77,7 +106,7 @@ def config_changed():
     if not corosync_key:
         raise Exception('No Corosync key supplied, cannot proceed')
 
-    hacluster.enable_lsb_services('pacemaker')
+    enable_lsb_services('pacemaker')
 
     if configure_corosync():
         pcmk.wait_for_pcmk()
@@ -85,10 +114,14 @@ def config_changed():
         configure_monitor_host()
         configure_stonith()
 
+    update_nrpe_config()
+
 
 @hooks.hook()
 def upgrade_charm():
     install()
+
+    update_nrpe_config()
 
 
 @hooks.hook('ha-relation-joined',
@@ -176,13 +209,13 @@ def ha_relation_changed():
         for res_name, res_type in resources.iteritems():
             # disable the service we are going to put in HA
             if res_type.split(':')[0] == "lsb":
-                hacluster.disable_lsb_services(res_type.split(':')[1])
+                disable_lsb_services(res_type.split(':')[1])
                 if service_running(res_type.split(':')[1]):
                     service_stop(res_type.split(':')[1])
             elif (len(init_services) != 0 and
                   res_name in init_services and
                   init_services[res_name]):
-                hacluster.disable_upstart_services(init_services[res_name])
+                disable_upstart_services(init_services[res_name])
                 if service_running(init_services[res_name]):
                     service_stop(init_services[res_name])
             # Put the services in HA, if not already done so
@@ -283,6 +316,59 @@ def stop():
     cmd = 'crm -w -F node delete %s' % socket.gethostname()
     pcmk.commit(cmd)
     apt_purge(['corosync', 'pacemaker'], fatal=True)
+
+
+@hooks.hook('nrpe-external-master-relation-joined',
+            'nrpe-external-master-relation-changed')
+def update_nrpe_config():
+    scripts_src = os.path.join(os.environ["CHARM_DIR"], "files",
+                               "nrpe")
+    scripts_dst = "/usr/local/lib/nagios/plugins"
+    if not os.path.exists(scripts_dst):
+        os.makedirs(scripts_dst)
+    for fname in glob.glob(os.path.join(scripts_src, "*")):
+        if os.path.isfile(fname):
+            shutil.copy2(fname,
+                         os.path.join(scripts_dst, os.path.basename(fname)))
+
+    sudoers_src = os.path.join(os.environ["CHARM_DIR"], "files",
+                               "sudoers")
+    sudoers_dst = "/etc/sudoers.d"
+    for fname in glob.glob(os.path.join(sudoers_src, "*")):
+        if os.path.isfile(fname):
+            shutil.copy2(fname,
+                         os.path.join(sudoers_dst, os.path.basename(fname)))
+
+    hostname = nrpe.get_nagios_hostname()
+    current_unit = nrpe.get_nagios_unit_name()
+
+    nrpe_setup = nrpe.NRPE(hostname=hostname)
+
+    apt_install('python-dbus')
+
+    # corosync/crm checks
+    nrpe_setup.add_check(
+        shortname='corosync_rings',
+        description='Check Corosync rings {%s}' % current_unit,
+        check_cmd='check_corosync_rings')
+    nrpe_setup.add_check(
+        shortname='crm_status',
+        description='Check crm status {%s}' % current_unit,
+        check_cmd='check_crm')
+
+    # process checks
+    nrpe_setup.add_check(
+        shortname='corosync_proc',
+        description='Check Corosync process {%s}' % current_unit,
+        check_cmd='check_procs -c 1:1 -C corosync'
+    )
+    nrpe_setup.add_check(
+        shortname='pacemakerd_proc',
+        description='Check Pacemakerd process {%s}' % current_unit,
+        check_cmd='check_procs -c 1:1 -C pacemakerd'
+    )
+
+    nrpe_setup.write()
 
 
 if __name__ == '__main__':

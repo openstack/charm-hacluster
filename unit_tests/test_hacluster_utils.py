@@ -28,7 +28,7 @@ class UtilsTestCase(unittest.TestCase):
     @mock.patch.object(utils, 'relation_get')
     @mock.patch.object(utils, 'related_units')
     @mock.patch.object(utils, 'relation_ids')
-    @mock.patch('hacluster.get_network_address')
+    @mock.patch.object(utils, 'get_network_address')
     @mock.patch.object(utils, 'config')
     def check_debug(self, enabled, mock_config, get_network_address,
                     relation_ids, related_units, relation_get):

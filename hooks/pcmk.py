@@ -55,7 +55,7 @@ def crm_opt_exists(opt_name):
 
 
 def crm_res_running(opt_name):
-    (c, output) = commands.getstatusoutput("crm resource status %s" % opt_name)
+    (_, output) = commands.getstatusoutput("crm resource status %s" % opt_name)
     if output.startswith("resource %s is running" % opt_name):
         return True
 

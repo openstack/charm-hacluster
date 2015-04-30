@@ -87,10 +87,31 @@ options:
       and a time factor, e.g. 5s = 5 seconds. 2m = 2 minutes.
   netmtu:
     type: int
-    default: 1500
-    description: MTU size corosync used for communication.
+    default:
+    description: |
+      Specifies the corosync.conf network mtu. If unset, the default
+      corosync.conf value is used (currently 1500). See 'man corosync.conf' for
+      detailed information on this config option.
   corosync_transport:
     type: string
     default: "multicast"
     description: |
       Two supported modes are multicast (udp) or unicast (udpu)
+  nagios_context:
+    default: "juju"
+    type: string
+    description: |
+      Used by the nrpe-external-master subordinate charm.
+      A string that will be prepended to instance name to set the host name
+      in nagios. So for instance the hostname would be something like:
+      .
+          juju-postgresql-0
+      .
+      If you're running multiple environments with the same services in them
+      this allows you to differentiate between them.
+  nagios_servicegroups:
+    default: ""
+    type: string
+    description: |
+      A comma-separated list of nagios servicegroups.
+      If left empty, the nagios_context will be used as the servicegroup

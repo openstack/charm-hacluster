@@ -2,8 +2,12 @@
 import ast
 import pcmk
 import maas
+import os
+import subprocess
+import socket
+import fcntl
+import struct
 
-import hacluster
 from base64 import b64decode
 
 from charmhelpers.core.hookenv import (
@@ -18,10 +22,7 @@ from charmhelpers.core.hookenv import (
     unit_private_ip,
     unit_get,
 )
-
 from charmhelpers.contrib.openstack.utils import get_host_ip
-
-
 from charmhelpers.core.host import (
     service_start,
     service_stop,
@@ -31,14 +32,26 @@ from charmhelpers.core.host import (
     file_hash,
     lsb_release
 )
-
 from charmhelpers.fetch import (
     apt_install,
 )
-
 from charmhelpers.contrib.hahelpers.cluster import (
     peer_ips,
 )
+from charmhelpers.contrib.network import ip as utils
+
+try:
+    import netifaces
+except ImportError:
+    apt_install('python-netifaces')
+    import netifaces
+
+try:
+    from netaddr import IPNetwork
+except ImportError:
+    apt_install('python-netaddr', fatal=True)
+    from netaddr import IPNetwork
+
 
 try:
     import jinja2
@@ -57,6 +70,86 @@ COROSYNC_CONF_FILES = [
     COROSYNC_CONF
 ]
 SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
+
+
+def disable_upstart_services(*services):
+    for service in services:
+        with open("/etc/init/{}.override".format(service), "w") as override:
+            override.write("manual")
+
+
+def enable_upstart_services(*services):
+    for service in services:
+        path = '/etc/init/{}.override'.format(service)
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def disable_lsb_services(*services):
+    for service in services:
+        subprocess.check_call(['update-rc.d', '-f', service, 'remove'])
+
+
+def enable_lsb_services(*services):
+    for service in services:
+        subprocess.check_call(['update-rc.d', '-f', service, 'defaults'])
+
+
+def get_iface_ipaddr(iface):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    return socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x8919,  # SIOCGIFADDR
+        struct.pack('256s', iface[:15])
+    )[20:24])
+
+
+def get_iface_netmask(iface):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    return socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x891b,  # SIOCGIFNETMASK
+        struct.pack('256s', iface[:15])
+    )[20:24])
+
+
+def get_netmask_cidr(netmask):
+    netmask = netmask.split('.')
+    binary_str = ''
+    for octet in netmask:
+        binary_str += bin(int(octet))[2:].zfill(8)
+    return str(len(binary_str.rstrip('0')))
+
+
+def get_network_address(iface):
+    if iface:
+        iface = str(iface)
+        network = "{}/{}".format(get_iface_ipaddr(iface),
+                                 get_netmask_cidr(get_iface_netmask(iface)))
+        ip = IPNetwork(network)
+        return str(ip.network)
+    else:
+        return None
+
+
+def get_ipv6_network_address(iface):
+    # Behave in same way as ipv4 get_network_address() above if iface is None.
+    if not iface:
+        return None
+
+    try:
+        ipv6_addr = utils.get_ipv6_addr(iface=iface)[0]
+        all_addrs = netifaces.ifaddresses(iface)
+
+        for addr in all_addrs[netifaces.AF_INET6]:
+            if ipv6_addr == addr['addr']:
+                network = "{}/{}".format(addr['addr'], addr['netmask'])
+                return str(IPNetwork(network).network)
+
+    except ValueError:
+        raise Exception("Invalid interface '%s'" % iface)
+
+    raise Exception("No valid network found for interface '%s'" % iface)
 
 
 def get_corosync_id(unit_name):
@@ -78,10 +171,10 @@ def get_ha_nodes():
 def get_corosync_conf():
     if config('prefer-ipv6'):
         ip_version = 'ipv6'
-        bindnetaddr = hacluster.get_ipv6_network_address
+        bindnetaddr = get_ipv6_network_address
     else:
         ip_version = 'ipv4'
-        bindnetaddr = hacluster.get_network_address
+        bindnetaddr = get_network_address
 
     # NOTE(jamespage) use local charm configuration over any provided by
     # principle charm
@@ -100,6 +193,10 @@ def get_corosync_conf():
         return conf
 
     conf = {}
+
+    if config('netmtu'):
+        conf['netmtu'] = config('netmtu')
+
     for relid in relation_ids('ha'):
         for unit in related_units(relid):
             bindiface = relation_get('corosync_bindiface',
@@ -117,7 +214,6 @@ def get_corosync_conf():
 
             if config('prefer-ipv6'):
                 conf['nodeid'] = get_corosync_id(local_unit())
-                conf['netmtu'] = config('netmtu')
 
             if None not in conf.itervalues():
                 return conf
