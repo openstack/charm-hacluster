@@ -4,7 +4,10 @@ import json
 import subprocess
 
 from charmhelpers.fetch import apt_install
-from charmhelpers.core.hookenv import log, ERROR
+from charmhelpers.core.hookenv import (
+    log,
+    ERROR,
+)
 
 MAAS_STABLE_PPA = 'ppa:maas-maintainers/stable '
 MAAS_PROFILE_NAME = 'maas-juju-hacluster'
@@ -18,10 +21,10 @@ class MAASHelper(object):
         self.install_maas_cli()
 
     def install_maas_cli(self):
-        '''
-        Ensure maas-cli is installed.  Fallback to MAAS stable PPA when
-        needed.
-        '''
+        """Ensure maas-cli is installed
+
+        Fallback to MAAS stable PPA when needed.
+        """
         apt.init()
         cache = apt.Cache()
 
@@ -59,5 +62,6 @@ class MAASHelper(object):
         except subprocess.CalledProcessError:
             log('Could not get node inventory from MAAS.', ERROR)
             return False
+
         self.logout()
         return json.loads(out)
