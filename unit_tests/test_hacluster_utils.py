@@ -25,6 +25,7 @@ class UtilsTestCase(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
 
+    @mock.patch.object(utils, 'get_ha_nodes', lambda *args: {'1': '10.0.0.1'})
     @mock.patch.object(utils, 'relation_get')
     @mock.patch.object(utils, 'related_units')
     @mock.patch.object(utils, 'relation_ids')
@@ -47,7 +48,6 @@ class UtilsTestCase(unittest.TestCase):
         related_units.return_value = ['unit-machine-0']
         relation_get.return_value = 'iface'
 
-        utils.get_ha_nodes = mock.MagicMock()
         conf = utils.get_corosync_conf()
 
         if enabled:
@@ -87,3 +87,62 @@ class UtilsTestCase(unittest.TestCase):
     def test_nulls(self):
         self.assertEquals(utils.nulls({'a': '', 'b': None, 'c': False}),
                           ['a', 'b'])
+
+    @mock.patch.object(utils, 'local_unit', lambda *args: 'hanode/0')
+    @mock.patch.object(utils, 'get_ipv6_addr')
+    @mock.patch.object(utils, 'get_host_ip')
+    @mock.patch.object(utils.utils, 'is_ipv6', lambda *args: None)
+    @mock.patch.object(utils, 'get_corosync_id', lambda u: "%s-cid" % (u))
+    @mock.patch.object(utils, 'peer_ips', lambda *args, **kwargs:
+                       {'hanode/1': '10.0.0.2'})
+    @mock.patch.object(utils, 'unit_get')
+    @mock.patch.object(utils, 'config')
+    def test_get_ha_nodes(self, mock_config, mock_unit_get, mock_get_host_ip,
+                          mock_get_ipv6_addr):
+        mock_get_host_ip.side_effect = lambda host: host
+
+        def unit_get(key):
+            return {'private-address': '10.0.0.1'}.get(key)
+
+        mock_unit_get.side_effect = unit_get
+
+        def config(key):
+            return {'prefer-ipv6': False}.get(key)
+
+        mock_config.side_effect = config
+        nodes = utils.get_ha_nodes()
+        self.assertEqual(nodes, {'hanode/0-cid': '10.0.0.1',
+                                 'hanode/1-cid': '10.0.0.2'})
+
+        self.assertTrue(mock_get_host_ip.called)
+        self.assertFalse(mock_get_ipv6_addr.called)
+
+    @mock.patch.object(utils, 'local_unit', lambda *args: 'hanode/0')
+    @mock.patch.object(utils, 'get_ipv6_addr')
+    @mock.patch.object(utils, 'get_host_ip')
+    @mock.patch.object(utils.utils, 'is_ipv6')
+    @mock.patch.object(utils, 'get_corosync_id', lambda u: "%s-cid" % (u))
+    @mock.patch.object(utils, 'peer_ips', lambda *args, **kwargs:
+                       {'hanode/1': '2001:db8:1::2'})
+    @mock.patch.object(utils, 'unit_get')
+    @mock.patch.object(utils, 'config')
+    def test_get_ha_nodes_ipv6(self, mock_config, mock_unit_get, mock_is_ipv6,
+                               mock_get_host_ip, mock_get_ipv6_addr):
+        mock_get_ipv6_addr.return_value = '2001:db8:1::1'
+        mock_get_host_ip.side_effect = lambda host: host
+
+        def unit_get(key):
+            return {'private-address': '10.0.0.1'}.get(key)
+
+        mock_unit_get.side_effect = unit_get
+
+        def config(key):
+            return {'prefer-ipv6': True}.get(key)
+
+        mock_config.side_effect = config
+        nodes = utils.get_ha_nodes()
+        self.assertEqual(nodes, {'hanode/0-cid': '2001:db8:1::1',
+                                 'hanode/1-cid': '2001:db8:1::2'})
+
+        self.assertFalse(mock_get_host_ip.called)
+        self.assertTrue(mock_get_ipv6_addr.called)

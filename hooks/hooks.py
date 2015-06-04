@@ -16,10 +16,12 @@ from charmhelpers.core.hookenv import (
     INFO,
     related_units,
     relation_ids,
+    relation_get,
     relation_set,
     config,
     Hooks,
     UnregisteredHookError,
+    local_unit,
 )
 
 from charmhelpers.core.host import (
@@ -51,9 +53,13 @@ from utils import (
     enable_lsb_services,
     disable_lsb_services,
     disable_upstart_services,
+    get_ipv6_addr,
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
+from charmhelpers.contrib.network.ip import (
+    is_ipv6,
+)
 
 hooks = Hooks()
 
@@ -97,6 +103,18 @@ def get_transport():
     return val
 
 
+def ensure_ipv6_requirements(hanode_rid):
+    # hanode relation needs ipv6 private-address
+    addr = relation_get(rid=hanode_rid, unit=local_unit(),
+                        attribute='private-address')
+    log("Current private-address is %s" % (addr))
+    if not is_ipv6(addr):
+        addr = get_ipv6_addr()
+        log("New private-address is %s" % (addr))
+        relation_set(relation_id=hanode_rid,
+                     **{'private-address': addr})
+
+
 @hooks.hook()
 def config_changed():
     if config('prefer-ipv6'):
@@ -107,6 +125,10 @@ def config_changed():
         raise Exception('No Corosync key supplied, cannot proceed')
 
     enable_lsb_services('pacemaker')
+
+    if config('prefer-ipv6'):
+        for rid in relation_ids('hanode'):
+            ensure_ipv6_requirements(rid)
 
     if configure_corosync():
         pcmk.wait_for_pcmk()
@@ -124,10 +146,17 @@ def upgrade_charm():
     update_nrpe_config()
 
 
-@hooks.hook('ha-relation-joined',
-            'ha-relation-changed',
-            'hanode-relation-joined',
+@hooks.hook('hanode-relation-joined',
             'hanode-relation-changed')
+def hanode_relation_changed():
+    if config('prefer-ipv6'):
+        ensure_ipv6_requirements(None)
+
+    ha_relation_changed()
+
+
+@hooks.hook('ha-relation-joined',
+            'ha-relation-changed')
 def ha_relation_changed():
     # Check that we are related to a principle and that
     # it has already provided the required corosync configuration

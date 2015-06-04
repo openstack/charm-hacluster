@@ -15,11 +15,11 @@ from charmhelpers.core.hookenv import (
     log,
     DEBUG,
     INFO,
+    WARNING,
     relation_get,
     related_units,
     relation_ids,
     config,
-    unit_private_ip,
     unit_get,
 )
 from charmhelpers.contrib.openstack.utils import get_host_ip
@@ -158,16 +158,6 @@ def get_corosync_id(unit_name):
     return off_set + int(unit_name.split('/')[1])
 
 
-def get_ha_nodes():
-    ha_units = peer_ips(peer_relation='hanode')
-    ha_units[local_unit()] = unit_private_ip()
-    ha_nodes = {}
-    for unit in ha_units:
-        corosync_id = get_corosync_id(unit)
-        ha_nodes[corosync_id] = get_host_ip(ha_units[unit])
-    return ha_nodes
-
-
 def nulls(data):
     """Returns keys of values that are null (but not bool)"""
     return [k for k in data.iterkeys()
@@ -297,9 +287,60 @@ def get_transport():
     return val
 
 
+def get_ipv6_addr():
+    """Exclude any ip addresses configured or managed by corosync."""
+    excludes = []
+    for rid in relation_ids('ha'):
+        for unit in related_units(rid):
+            resources = parse_data(rid, unit, 'resources')
+            for res in resources.itervalues():
+                if 'ocf:heartbeat:IPv6addr' in res:
+                    res_params = parse_data(rid, unit, 'resource_params')
+                    res_p = res_params.get(res)
+                    if res_p:
+                        for k, v in res_p.itervalues():
+                            if utils.is_ipv6(v):
+                                log("Excluding '%s' from address list" % v,
+                                    level=DEBUG)
+                                excludes.append(v)
+
+    return utils.get_ipv6_addr(exc_list=excludes)[0]
+
+
+def get_ha_nodes():
+    ha_units = peer_ips(peer_relation='hanode')
+    ha_nodes = {}
+    for unit in ha_units:
+        corosync_id = get_corosync_id(unit)
+        addr = ha_units[unit]
+        if config('prefer-ipv6'):
+            if not utils.is_ipv6(addr):
+                # Not an error since cluster may still be forming/updating
+                log("Expected an ipv6 address but got %s" % (addr),
+                    level=WARNING)
+
+            ha_nodes[corosync_id] = addr
+        else:
+            ha_nodes[corosync_id] = get_host_ip(addr)
+
+    corosync_id = get_corosync_id(local_unit())
+    if config('prefer-ipv6'):
+        addr = get_ipv6_addr()
+    else:
+        addr = get_host_ip(unit_get('private-address'))
+
+    ha_nodes[corosync_id] = addr
+
+    return ha_nodes
+
+
 def get_cluster_nodes():
     hosts = []
-    hosts.append(unit_get('private-address'))
+    if config('prefer-ipv6'):
+        hosts.append(get_ipv6_addr())
+    else:
+        hosts.append(unit_get('private-address'))
+
     for relid in relation_ids('hanode'):
         for unit in related_units(relid):
             if relation_get('ready', rid=relid, unit=unit):
