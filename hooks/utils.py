@@ -168,6 +168,12 @@ def get_ha_nodes():
     return ha_nodes
 
 
+def nulls(data):
+    """Returns keys of values that are null (but not bool)"""
+    return [k for k in data.iterkeys()
+            if not bool == type(data[k]) and not data[k]]
+
+
 def get_corosync_conf():
     if config('prefer-ipv6'):
         ip_version = 'ipv6'
@@ -186,17 +192,23 @@ def get_corosync_conf():
         'ip_version': ip_version,
         'ha_nodes': get_ha_nodes(),
         'transport': get_transport(),
-        'debug': config('debug'),
     }
 
-    if None not in conf.itervalues():
-        return conf
-
-    conf = {}
+    if config('prefer-ipv6'):
+        conf['nodeid'] = get_corosync_id(local_unit())
 
     if config('netmtu'):
         conf['netmtu'] = config('netmtu')
 
+    if config('debug'):
+        conf['debug'] = config('debug')
+
+    if not nulls(conf):
+        log("Found sufficient values in local config to populate "
+            "corosync.conf", level=DEBUG)
+        return conf
+
+    conf = {}
     for relid in relation_ids('ha'):
         for unit in related_units(relid):
             bindiface = relation_get('corosync_bindiface',
@@ -209,14 +221,22 @@ def get_corosync_conf():
                 'ip_version': ip_version,
                 'ha_nodes': get_ha_nodes(),
                 'transport': get_transport(),
-                'debug': config('debug'),
             }
 
             if config('prefer-ipv6'):
                 conf['nodeid'] = get_corosync_id(local_unit())
 
-            if None not in conf.itervalues():
-                return conf
+            if config('netmtu'):
+                conf['netmtu'] = config('netmtu')
+
+            if config('debug'):
+                conf['debug'] = config('debug')
+
+            # Values up to this point must be non-null
+            if nulls(conf):
+                continue
+
+            return conf
 
     missing = [k for k, v in conf.iteritems() if v is None]
     log('Missing required configuration: %s' % missing)

@@ -34,6 +34,7 @@ class UtilsTestCase(unittest.TestCase):
                     relation_ids, related_units, relation_get):
         cfg = {'debug': enabled,
                'prefer-ipv6': False,
+               'corosync_mcastport': '1234',
                'corosync_transport': 'udpu',
                'corosync_mcastaddr': 'corosync_mcastaddr'}
 
@@ -48,7 +49,11 @@ class UtilsTestCase(unittest.TestCase):
 
         utils.get_ha_nodes = mock.MagicMock()
         conf = utils.get_corosync_conf()
-        self.assertEqual(conf['debug'], enabled)
+
+        if enabled:
+            self.assertEqual(conf['debug'], enabled)
+        else:
+            self.assertFalse('debug' in conf)
 
         self.assertTrue(utils.emit_corosync_conf())
 
@@ -78,3 +83,7 @@ class UtilsTestCase(unittest.TestCase):
 
         mock_config.return_value = 'hafu'
         self.assertRaises(ValueError, utils.get_transport)
+
+    def test_nulls(self):
+        self.assertEquals(utils.nulls({'a': '', 'b': None, 'c': False}),
+                          ['a', 'b'])
