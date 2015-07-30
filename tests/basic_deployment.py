@@ -24,7 +24,7 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
         """Deploy the entire test environment."""
         super(HAClusterBasicDeployment, self).__init__(series, openstack,
                                                        source, stable)
-        env_var = 'OS_CHARMS_AMULET_VIP'
+        env_var = 'AMULET_OS_VIP'
         self._vip = os.getenv(env_var, None)
         if not self._vip:
             amulet.raise_status(amulet.SKIP, msg="No vip provided with '%s' - "
