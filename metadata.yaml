@@ -4,7 +4,7 @@ maintainer: Andres Rodriguez <andres.rodriguez@canonical.com>
 subordinate: true
 description: |
  Corosync/Pacemaker
-categories:
+tags:
  - misc
 requires:
   juju-info:

@@ -5,20 +5,18 @@ lint:
 	@flake8 --exclude hooks/charmhelpers hooks unit_tests tests
 	@charm proof
 
-unit_test:
+test:
+	@# Bundletester expects unit tests here.
 	@echo Starting unit tests...
 	@$(PYTHON) /usr/bin/nosetests --nologcapture --with-coverage  unit_tests
 
-test:
+functional_test:
 	@echo Starting Amulet tests...
-ifndef OS_CHARMS_AMULET_VIP
-	@echo "WARNING: HA tests require OS_CHARMS_AMULET_VIP set to usable vip address"
+ifndef AMULET_OS_VIP
+	@echo "ERROR: HA tests require AMULET_OS_VIP set to usable vip address"
+	@exit 1
 endif
-	# coreycb note: The -v should only be temporary until Amulet sends
-	# raise_status() messages to stderr:
-	#   https://bugs.launchpad.net/amulet/+bug/1320357
-	@juju test -v -p AMULET_HTTP_PROXY,OS_CHARMS_AMULET_VIP --timeout 900 \
-		00-setup 15-basic-trusty-icehouse
+	@juju test -v -p AMULET_HTTP_PROXY,AMULET_OS_VIP --timeout 2700
 
 bin/charm_helpers_sync.py:
 	@mkdir -p bin
