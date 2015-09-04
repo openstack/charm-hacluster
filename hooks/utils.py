@@ -64,10 +64,12 @@ TEMPLATES_DIR = 'templates'
 COROSYNC_CONF = '/etc/corosync/corosync.conf'
 COROSYNC_DEFAULT = '/etc/default/corosync'
 COROSYNC_AUTHKEY = '/etc/corosync/authkey'
+COROSYNC_HACLUSTER_ACL = '/etc/corosync/uidgid.d/hacluster'
 COROSYNC_CONF_FILES = [
     COROSYNC_DEFAULT,
     COROSYNC_AUTHKEY,
-    COROSYNC_CONF
+    COROSYNC_CONF,
+    COROSYNC_HACLUSTER_ACL,
 ]
 SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
 
@@ -249,6 +251,9 @@ def emit_base_conf():
     write_file(path=COROSYNC_DEFAULT,
                content=render_template('corosync',
                                        corosync_default_context))
+
+    write_file(path=COROSYNC_HACLUSTER_ACL,
+               content=render_template('hacluster.acl', {}))
 
     corosync_key = config('corosync_key')
     if corosync_key:
