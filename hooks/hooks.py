@@ -22,6 +22,7 @@ from charmhelpers.core.hookenv import (
     Hooks,
     UnregisteredHookError,
     local_unit,
+    status_set,
 )
 
 from charmhelpers.core.host import (
@@ -84,6 +85,7 @@ DEPRECATED_TRANSPORT_VALUES = {"multicast": "udp", "unicast": "udpu"}
 def install():
     # NOTE(dosaboy): we currently disallow upgrades due to bug #1382842. This
     # should be removed once the pacemaker package is fixed.
+    status_set('maintenance', 'Installing apt packages')
     apt_install(filter_installed_packages(PACKAGES), fatal=True)
     # NOTE(adam_g) rbd OCF only included with newer versions of
     # ceph-resource-agents. Bundle /w charm until we figure out a
@@ -99,6 +101,7 @@ def get_transport():
     if val not in ['udp', 'udpu']:
         msg = ("Unsupported corosync_transport type '%s' - supported "
                "types are: %s" % (transport, ', '.join(SUPPORTED_TRANSPORTS)))
+        status_set('blocked', msg)
         raise ValueError(msg)
     return val
 
@@ -122,7 +125,9 @@ def config_changed():
 
     corosync_key = config('corosync_key')
     if not corosync_key:
-        raise Exception('No Corosync key supplied, cannot proceed')
+        message = 'No Corosync key supplied, cannot proceed'
+        status_set('blocked', message)
+        raise Exception(message)
 
     enable_lsb_services('pacemaker')
 
@@ -130,6 +135,7 @@ def config_changed():
         for rid in relation_ids('hanode'):
             ensure_ipv6_requirements(rid)
 
+    status_set('maintenance', "Setting up corosync")
     if configure_corosync():
         pcmk.wait_for_pcmk()
         configure_cluster_global()
@@ -400,8 +406,22 @@ def update_nrpe_config():
     nrpe_setup.write()
 
 
+def assess_status():
+    '''Assess status of current unit'''
+    node_count = int(config('cluster_count'))
+    # not enough peers
+    for relid in relation_ids('hanode'):
+        if len(related_units(relid)) + 1 < node_count:
+            status_set('blocked', 'Insufficient peer units for ha cluster '
+                                  '(require {})'.format(node_count))
+            return
+
+    status_set('active', 'Unit is ready and clustered')
+
+
 if __name__ == '__main__':
     try:
         hooks.execute(sys.argv)
     except UnregisteredHookError as e:
         log('Unknown hook {} - skipping.'.format(e), level=DEBUG)
+    assess_status()

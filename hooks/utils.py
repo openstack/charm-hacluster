@@ -21,6 +21,7 @@ from charmhelpers.core.hookenv import (
     relation_ids,
     config,
     unit_get,
+    status_set,
 )
 from charmhelpers.contrib.openstack.utils import get_host_ip
 from charmhelpers.core.host import (
@@ -149,9 +150,13 @@ def get_ipv6_network_address(iface):
                 return str(IPNetwork(network).network)
 
     except ValueError:
-        raise Exception("Invalid interface '%s'" % iface)
+        msg = "Invalid interface '%s'" % iface
+        status_set('blocked', msg)
+        raise Exception(msg)
 
-    raise Exception("No valid network found for interface '%s'" % iface)
+    msg = "No valid network found for interface '%s'" % iface
+    status_set('blocked', msg)
+    raise Exception(msg)
 
 
 def get_corosync_id(unit_name):
@@ -276,8 +281,10 @@ def render_template(template_name, context, template_dir=TEMPLATES_DIR):
 def assert_charm_supports_ipv6():
     """Check whether we are able to support charms ipv6."""
     if lsb_release()['DISTRIB_CODENAME'].lower() < "trusty":
-        raise Exception("IPv6 is not supported in the charms for Ubuntu "
-                        "versions less than Trusty 14.04")
+        msg = "IPv6 is not supported in the charms for Ubuntu " \
+              "versions less than Trusty 14.04"
+        status_set('blocked', msg)
+        raise Exception(msg)
 
 
 def get_transport():
@@ -287,6 +294,7 @@ def get_transport():
     if val not in ['udp', 'udpu']:
         msg = ("Unsupported corosync_transport type '%s' - supported "
                "types are: %s" % (transport, ', '.join(SUPPORTED_TRANSPORTS)))
+        status_set('blocked', msg)
         raise ValueError(msg)
 
     return val
@@ -378,20 +386,26 @@ def configure_stonith():
         url = config('maas_url')
         creds = config('maas_credentials')
         if None in [url, creds]:
-            raise Exception('maas_url and maas_credentials must be set '
-                            'in config to enable STONITH.')
+            msg = 'maas_url and maas_credentials must be set ' \
+                  'in config to enable STONITH.'
+            status_set('blocked', msg)
+            raise Exception(msg)
 
         nodes = maas.MAASHelper(url, creds).list_nodes()
         if not nodes:
-            raise Exception('Could not obtain node inventory from '
-                            'MAAS @ %s.' % url)
+            msg = 'Could not obtain node inventory from ' \
+                  'MAAS @ %s.' % url
+            status_set('blocked', msg)
+            raise Exception(msg)
 
         cluster_nodes = pcmk.list_nodes()
         for node in cluster_nodes:
             rsc, constraint = pcmk.maas_stonith_primitive(nodes, node)
             if not rsc:
-                raise Exception('Failed to determine STONITH primitive for '
-                                'node %s' % node)
+                msg = 'Failed to determine STONITH primitive for ' \
+                      'node %s' % node
+                status_set('blocked', msg)
+                raise Exception(msg)
 
             rsc_name = str(rsc).split(' ')[1]
             if not pcmk.is_resource_present(rsc_name):
