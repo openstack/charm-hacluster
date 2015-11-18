@@ -1,6 +1,6 @@
 name: hacluster
 summary: Corosync Cluster Engine - membership, messaging and quorum
-maintainer: Andres Rodriguez <andres.rodriguez@canonical.com>
+maintainer: OpenStack Charmers <openstack-charmers@lists.ubuntu.com>
 subordinate: true
 description: |
  Corosync/Pacemaker
