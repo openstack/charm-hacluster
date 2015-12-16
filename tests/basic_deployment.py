@@ -9,8 +9,8 @@ from charmhelpers.contrib.openstack.amulet.deployment import (
 )
 from charmhelpers.contrib.openstack.amulet.utils import (
     OpenStackAmuletUtils,
-    DEBUG, # flake8: noqa
-    ERROR
+    DEBUG,
+    # ERROR
 )
 
 # Use DEBUG to turn on debug logging
@@ -38,7 +38,8 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
 
     def _add_services(self):
         this_service = {'name': 'hacluster'}
-        other_services = [{'name': 'mysql'}, {'name': 'keystone', 'units': 3}]
+        other_services = [{'name': 'mysql'},
+                          {'name': 'keystone', 'units': 3}]
         super(HAClusterBasicDeployment, self)._add_services(this_service,
                                                             other_services)
 
@@ -61,7 +62,7 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
         """Authenticates admin user with the keystone admin endpoint.
 
         This should be factored into:L
-        
+
             charmhelpers.contrib.openstack.amulet.utils.OpenStackAmuletUtils
         """
         if not service_ip:
@@ -98,12 +99,14 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
                                                   description='demo tenant',
                                                   enabled=True)
             self.keystone.roles.create(name=self.demo_role)
-            self.keystone.users.create(name=self.demo_user, password='password',
+            self.keystone.users.create(name=self.demo_user,
+                                       password='password',
                                        tenant_id=tenant.id,
                                        email='demo@demo.com')
 
         # Authenticate keystone demo
-        self.keystone_demo = u.authenticate_keystone_user(self.keystone,
-                                                        user=self.demo_user,
-                                                        password='password',
-                                                        tenant=self.demo_tenant)
+        self.keystone_demo = u.authenticate_keystone_user(
+            self.keystone,
+            user=self.demo_user,
+            password='password',
+            tenant=self.demo_tenant)
