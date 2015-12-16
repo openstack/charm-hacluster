@@ -84,11 +84,11 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
     def _initialize_tests(self):
         """Perform final initialization before tests get run."""
         # Access the sentries for inspecting service units
-        self.mysql_sentry = self.d.sentry.unit['mysql/0']
-        self.keystone_sentry = self.d.sentry.unit['keystone/0']
+        self.mysql_sentry = self.d.sentry['mysql'][0]
+        self.keystone_sentry = self.d.sentry['keystone'][0]
         # NOTE: the hacluster unit id may not correspond with its parent unit
         #       id.
-        self.hacluster_sentry = self.d.sentry.unit['hacluster/0']
+        self.hacluster_sentry = self.d.sentry['hacluster'][0]
 
         u.log.debug('openstack release val: {}'.format(
             self._get_openstack_release()))
