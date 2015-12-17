@@ -58,9 +58,13 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
     def _configure_services(self):
         keystone_config = {'admin-password': 'openstack',
                            'admin-token': 'ubuntutesting',
+                           'debug': 'true',
+                           'verbose': 'true',
                            'vip': self._vip}
         mysql_config = {'dataset-size': '50%'}
+        hacluster_config = {'debug': 'true'}
         configs = {'keystone': keystone_config,
+                   'hacluster': hacluster_config,
                    'mysql': mysql_config}
         super(HAClusterBasicDeployment, self)._configure_services(configs)
 

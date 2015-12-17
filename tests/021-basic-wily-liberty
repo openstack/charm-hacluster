@@ -1,0 +1,9 @@
+#!/usr/bin/python
+
+"""Amulet tests on a basic hacluster deployment on wily-liberty."""
+
+from basic_deployment import HAClusterBasicDeployment
+
+if __name__ == '__main__':
+    deployment = HAClusterBasicDeployment(series='wily')
+    deployment.run_tests()
