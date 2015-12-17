@@ -17,6 +17,7 @@ ifndef AMULET_OS_VIP
 	@echo "ERROR: HA tests require AMULET_OS_VIP set to usable vip address"
 	@exit 1
 endif
+	@tests/setup/00-setup
 	@juju test -v -p AMULET_HTTP_PROXY,AMULET_OS_VIP --timeout 2700
 
 bin/charm_helpers_sync.py:

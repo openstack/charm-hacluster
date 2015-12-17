@@ -9,8 +9,8 @@ from charmhelpers.contrib.openstack.amulet.deployment import (
 )
 from charmhelpers.contrib.openstack.amulet.utils import (
     OpenStackAmuletUtils,
-    DEBUG, # flake8: noqa
-    ERROR
+    DEBUG,
+    # ERROR
 )
 
 # Use DEBUG to turn on debug logging
@@ -34,11 +34,19 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
         self._add_relations()
         self._configure_services()
         self._deploy()
+
+        u.log.info('Waiting on extended status checks...')
+        exclude_services = ['mysql']
+
+        # Wait for deployment ready msgs, except exclusions
+        self._auto_wait_for_status(exclude_services=exclude_services)
+
         self._initialize_tests()
 
     def _add_services(self):
         this_service = {'name': 'hacluster'}
-        other_services = [{'name': 'mysql'}, {'name': 'keystone', 'units': 3}]
+        other_services = [{'name': 'mysql'},
+                          {'name': 'keystone', 'units': 3}]
         super(HAClusterBasicDeployment, self)._add_services(this_service,
                                                             other_services)
 
@@ -61,7 +69,7 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
         """Authenticates admin user with the keystone admin endpoint.
 
         This should be factored into:L
-        
+
             charmhelpers.contrib.openstack.amulet.utils.OpenStackAmuletUtils
         """
         if not service_ip:
@@ -76,13 +84,20 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
     def _initialize_tests(self):
         """Perform final initialization before tests get run."""
         # Access the sentries for inspecting service units
-        self.mysql_sentry = self.d.sentry.unit['mysql/0']
-        self.keystone_sentry = self.d.sentry.unit['keystone/0']
+        self.mysql_sentry = self.d.sentry['mysql'][0]
+        self.keystone_sentry = self.d.sentry['keystone'][0]
         # NOTE: the hacluster unit id may not correspond with its parent unit
         #       id.
-        self.hacluster_sentry = self.d.sentry.unit['hacluster/0']
+        self.hacluster_sentry = self.d.sentry['hacluster'][0]
+
+        u.log.debug('openstack release val: {}'.format(
+            self._get_openstack_release()))
+        u.log.debug('openstack release str: {}'.format(
+            self._get_openstack_release_string()))
 
         # Authenticate keystone admin
+        u.log.debug('Authenticating keystone admin against VIP: '
+                    '{}'.format(self._vip))
         self.keystone = self._authenticate_keystone_admin(self.keystone_sentry,
                                                           user='admin',
                                                           password='openstack',
@@ -90,6 +105,8 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
                                                           service_ip=self._vip)
 
         # Create a demo tenant/role/user
+        u.log.debug('Creating keystone demo tenant, role and user against '
+                    'VIP: {}'.format(self._vip))
         self.demo_tenant = 'demoTenant'
         self.demo_role = 'demoRole'
         self.demo_user = 'demoUser'
@@ -98,12 +115,16 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
                                                   description='demo tenant',
                                                   enabled=True)
             self.keystone.roles.create(name=self.demo_role)
-            self.keystone.users.create(name=self.demo_user, password='password',
+            self.keystone.users.create(name=self.demo_user,
+                                       password='password',
                                        tenant_id=tenant.id,
                                        email='demo@demo.com')
 
         # Authenticate keystone demo
-        self.keystone_demo = u.authenticate_keystone_user(self.keystone,
-                                                        user=self.demo_user,
-                                                        password='password',
-                                                        tenant=self.demo_tenant)
+        u.log.debug('Authenticating keystone demo user against VIP: '
+                    '{}'.format(self._vip))
+        self.keystone_demo = u.authenticate_keystone_user(
+            self.keystone,
+            user=self.demo_user,
+            password='password',
+            tenant=self.demo_tenant)
