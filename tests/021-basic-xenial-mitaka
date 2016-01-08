@@ -1,0 +1,9 @@
+#!/usr/bin/python
+
+"""Amulet tests on a basic hacluster deployment on xenial-mitaka."""
+
+from basic_deployment import HAClusterBasicDeployment
+
+if __name__ == '__main__':
+    deployment = HAClusterBasicDeployment(series='xenial')
+    deployment.run_tests()
