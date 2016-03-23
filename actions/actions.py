@@ -11,13 +11,13 @@ from utils import (
 )
 
 def pause(args):
-    """Pause the Ceilometer services.
+    """Pause the hacluster services.
     @raises Exception should the service fail to stop.
     """
     pause_unit()
 
 def resume(args):
-    """Resume the Ceilometer services.
+    """Resume the hacluster services.
     @raises Exception should the service fail to start."""
     resume_unit()
 
