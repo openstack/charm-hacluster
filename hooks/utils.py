@@ -7,6 +7,7 @@ import subprocess
 import socket
 import fcntl
 import struct
+import xml.etree.ElementTree as ET
 
 from base64 import b64decode
 
@@ -23,7 +24,12 @@ from charmhelpers.core.hookenv import (
     unit_get,
     status_set,
 )
-from charmhelpers.contrib.openstack.utils import get_host_ip
+from charmhelpers.contrib.openstack.utils import (
+    get_host_ip,
+    set_unit_paused,
+    clear_unit_paused,
+    is_unit_paused_set,
+)
 from charmhelpers.core.host import (
     service_start,
     service_stop,
@@ -168,7 +174,7 @@ def get_corosync_id(unit_name):
 def nulls(data):
     """Returns keys of values that are null (but not bool)"""
     return [k for k in data.iterkeys()
-            if not bool == type(data[k]) and not data[k]]
+            if not isinstance(data[k], bool) and not data[k]]
 
 
 def get_corosync_conf():
@@ -503,5 +509,129 @@ def restart_corosync():
     if service_running("pacemaker"):
         service_stop("pacemaker")
 
-    service_restart("corosync")
-    service_start("pacemaker")
+    if not is_unit_paused_set():
+        service_restart("corosync")
+        service_start("pacemaker")
+
+
+def is_in_standby_mode(node_name):
+    """Check if node is in standby mode in pacemaker
+
+    @param node_name: The name of the node to check
+    @returns boolean - True if node_name is in standby mode
+    """
+    out = subprocess.check_output(['crm', 'node', 'status', node_name])
+    root = ET.fromstring(out)
+
+    standby_mode = False
+    for nvpair in root.iter('nvpair'):
+        if (nvpair.attrib.get('name') == 'standby' and
+                nvpair.attrib.get('value') == 'on'):
+            standby_mode = True
+    return standby_mode
+
+
+def get_hostname():
+    """Return the hostname of this unit
+
+    @returns hostname
+    """
+    return subprocess.check_output(['uname', '-n']).rstrip()
+
+
+def enter_standby_mode(node_name, duration='forever'):
+    """Put this node into standby mode in pacemaker
+
+    @returns None
+    """
+    subprocess.check_call(['crm', 'node', 'standby', node_name, duration])
+
+
+def leave_standby_mode(node_name):
+    """Take this node out of standby mode in pacemaker
+
+    @returns None
+    """
+    subprocess.check_call(['crm', 'node', 'online', node_name])
+
+
+def node_has_resources(node_name):
+    """Check if this node is running resources
+
+    @param node_name: The name of the node to check
+    @returns boolean - True if node_name has resources
+    """
+    out = subprocess.check_output(['crm_mon', '-X'])
+    root = ET.fromstring(out)
+    has_resources = False
+    for resource in root.iter('resource'):
+        for child in resource:
+            if child.tag == 'node' and child.attrib.get('name') == node_name:
+                has_resources = True
+    return has_resources
+
+
+def set_unit_status():
+    """Set the workload status for this unit
+
+    @returns None
+    """
+    status, messages = assess_status_helper()
+    status_set(status, messages)
+
+
+def resume_unit():
+    """Resume services on this unit and update the units status
+
+    @returns None
+    """
+    node_name = get_hostname()
+    messages = []
+    leave_standby_mode(node_name)
+    if is_in_standby_mode(node_name):
+        messages.append("Node still in standby mode")
+    if messages:
+        raise Exception("Couldn't resume: {}".format("; ".join(messages)))
+    else:
+        clear_unit_paused()
+        set_unit_status()
+
+
+def pause_unit():
+    """Pause services on this unit and update the units status
+
+    @returns None
+    """
+    node_name = get_hostname()
+    messages = []
+    enter_standby_mode(node_name)
+    if not is_in_standby_mode(node_name):
+        messages.append("Node not in standby mode")
+    if node_has_resources(node_name):
+        messages.append("Resources still running on unit")
+    status, message = assess_status_helper()
+    if status != 'active':
+        messages.append(message)
+    if messages:
+        raise Exception("Couldn't pause: {}".format("; ".join(messages)))
+    else:
+        set_unit_paused()
+        status_set("maintenance",
+                   "Paused. Use 'resume' action to resume normal service.")
+
+
+def assess_status_helper():
+    """Assess status of unit
+
+    @returns status, message - status is workload status and message is any
+                               corresponding messages
+    """
+    node_count = int(config('cluster_count'))
+    status = 'active'
+    message = 'Unit is ready and clustered'
+    for relid in relation_ids('hanode'):
+        if len(related_units(relid)) + 1 < node_count:
+            status = 'blocked'
+            message = ("Insufficient peer units for ha cluster "
+                       "(require {})".format(node_count))
+    return status, message

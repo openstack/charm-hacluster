@@ -20,7 +20,7 @@ import sys
 
 from six.moves import zip
 
-from charmhelpers.core import unitdata
+import charmhelpers.core.unitdata
 
 
 class OutputFormatter(object):
@@ -152,23 +152,19 @@ class CommandLine(object):
         arguments = self.argument_parser.parse_args()
         argspec = inspect.getargspec(arguments.func)
         vargs = []
-        kwargs = {}
         for arg in argspec.args:
             vargs.append(getattr(arguments, arg))
         if argspec.varargs:
             vargs.extend(getattr(arguments, argspec.varargs))
-        if argspec.keywords:
-            for kwarg in argspec.keywords.items():
-                kwargs[kwarg] = getattr(arguments, kwarg)
-        output = arguments.func(*vargs, **kwargs)
+        output = arguments.func(*vargs)
         if getattr(arguments.func, '_cli_test_command', False):
             self.exit_code = 0 if output else 1
             output = ''
         if getattr(arguments.func, '_cli_no_output', False):
             output = ''
         self.formatter.format_output(output, arguments.format)
-        if unitdata._KV:
-            unitdata._KV.flush()
+        if charmhelpers.core.unitdata._KV:
+            charmhelpers.core.unitdata._KV.flush()
 
 
 cmdline = CommandLine()

@@ -90,6 +90,22 @@ CLOUD_ARCHIVE_POCKETS = {
     'kilo/proposed': 'trusty-proposed/kilo',
     'trusty-kilo/proposed': 'trusty-proposed/kilo',
     'trusty-proposed/kilo': 'trusty-proposed/kilo',
+    # Liberty
+    'liberty': 'trusty-updates/liberty',
+    'trusty-liberty': 'trusty-updates/liberty',
+    'trusty-liberty/updates': 'trusty-updates/liberty',
+    'trusty-updates/liberty': 'trusty-updates/liberty',
+    'liberty/proposed': 'trusty-proposed/liberty',
+    'trusty-liberty/proposed': 'trusty-proposed/liberty',
+    'trusty-proposed/liberty': 'trusty-proposed/liberty',
+    # Mitaka
+    'mitaka': 'trusty-updates/mitaka',
+    'trusty-mitaka': 'trusty-updates/mitaka',
+    'trusty-mitaka/updates': 'trusty-updates/mitaka',
+    'trusty-updates/mitaka': 'trusty-updates/mitaka',
+    'mitaka/proposed': 'trusty-proposed/mitaka',
+    'trusty-mitaka/proposed': 'trusty-proposed/mitaka',
+    'trusty-proposed/mitaka': 'trusty-proposed/mitaka',
 }
 
 # The order of this list is very important. Handlers should be listed in from
@@ -217,12 +233,12 @@ def apt_purge(packages, fatal=False):
 
 def apt_mark(packages, mark, fatal=False):
     """Flag one or more packages using apt-mark"""
+    log("Marking {} as {}".format(packages, mark))
     cmd = ['apt-mark', mark]
     if isinstance(packages, six.string_types):
         cmd.append(packages)
     else:
         cmd.extend(packages)
-    log("Holding {}".format(packages))
 
     if fatal:
         subprocess.check_call(cmd, universal_newlines=True)
@@ -403,7 +419,7 @@ def plugins(fetch_handlers=None):
                 importlib.import_module(package),
                 classname)
             plugin_list.append(handler_class())
-        except (ImportError, AttributeError):
+        except NotImplementedError:
             # Skip missing plugins so that they can be ommitted from
             # installation if desired
             log("FetchHandler {} not found, skipping plugin".format(
