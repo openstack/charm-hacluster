@@ -536,7 +536,7 @@ def get_hostname():
 
     @returns hostname
     """
-    return subprocess.check_output(['uname', '-n']).rstrip()
+    return socket.gethostname()
 
 
 def enter_standby_mode(node_name, duration='forever'):
@@ -576,8 +576,7 @@ def set_unit_status():
 
     @returns None
     """
-    status, messages = assess_status_helper()
-    status_set(status, messages)
+    status_set(assess_status_helper())
 
 
 def resume_unit():
