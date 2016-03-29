@@ -576,7 +576,7 @@ def set_unit_status():
 
     @returns None
     """
-    status_set(assess_status_helper())
+    status_set(*assess_status_helper())
 
 
 def resume_unit():
