@@ -55,6 +55,7 @@ from utils import (
     disable_lsb_services,
     disable_upstart_services,
     get_ipv6_addr,
+    set_unit_status,
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
@@ -406,22 +407,9 @@ def update_nrpe_config():
     nrpe_setup.write()
 
 
-def assess_status():
-    '''Assess status of current unit'''
-    node_count = int(config('cluster_count'))
-    # not enough peers
-    for relid in relation_ids('hanode'):
-        if len(related_units(relid)) + 1 < node_count:
-            status_set('blocked', 'Insufficient peer units for ha cluster '
-                                  '(require {})'.format(node_count))
-            return
-
-    status_set('active', 'Unit is ready and clustered')
-
-
 if __name__ == '__main__':
     try:
         hooks.execute(sys.argv)
     except UnregisteredHookError as e:
         log('Unknown hook {} - skipping.'.format(e), level=DEBUG)
-    assess_status()
+    set_unit_status()
