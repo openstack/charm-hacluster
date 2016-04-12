@@ -71,7 +71,8 @@ TEMPLATES_DIR = 'templates'
 COROSYNC_CONF = '/etc/corosync/corosync.conf'
 COROSYNC_DEFAULT = '/etc/default/corosync'
 COROSYNC_AUTHKEY = '/etc/corosync/authkey'
-COROSYNC_HACLUSTER_ACL = '/etc/corosync/uidgid.d/hacluster'
+COROSYNC_HACLUSTER_ACL_DIR = '/etc/corosync/uidgid.d'
+COROSYNC_HACLUSTER_ACL = COROSYNC_HACLUSTER_ACL_DIR + '/hacluster'
 COROSYNC_CONF_FILES = [
     COROSYNC_DEFAULT,
     COROSYNC_AUTHKEY,
@@ -258,6 +259,8 @@ def emit_corosync_conf():
 
 
 def emit_base_conf():
+    if not os.path.isdir(COROSYNC_HACLUSTER_ACL_DIR):
+        os.mkdir(COROSYNC_HACLUSTER_ACL_DIR)
     corosync_default_context = {'corosync_enabled': 'yes'}
     write_file(path=COROSYNC_DEFAULT,
                content=render_template('corosync',
