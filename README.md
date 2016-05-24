@@ -29,6 +29,28 @@ To enable HA clustering support (for mysql for example):
 The principle charm must have explicit support for the hacluster interface
 in order for clustering to occur - otherwise nothing actually get configured.
 
+
+# HA/Clustering
+
+There are two mutually exclusive high availability options: using virtual
+IP(s) or DNS.
+
+To use virtual IP(s) the clustered nodes must be on the same subnet such that
+the VIP is a valid IP on the subnet for one of the node's interfaces and each
+node has an interface in said subnet. The VIP becomes a highly-available API
+endpoint.
+
+To use DNS high availability there are several prerequisites. However, DNS HA
+does not require the clustered nodes to be on the same subnet.
+Currently the DNS HA feature is only available for MAAS 2.0 or greater
+environments. MAAS 2.0 requires Juju 2.0 or greater. The MAAS 2.0 client
+requires Ubuntu 16.04 or greater. The clustered nodes must have static or
+"reserved" IP addresses registered in MAAS. The DNS hostname(s) must be
+pre-registered in MAAS before use with DNS HA.
+
+The charm will throw an exception in the following circumstances:
+If running on a version of Ubuntu less than Xenial 16.04
+
 # Usage for Charm Authors
 
 The hacluster interface supports a number of different cluster configuration

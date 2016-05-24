@@ -8,7 +8,9 @@ include:
     - contrib.hahelpers
     - contrib.storage
     - contrib.network.ip
-    - contrib.openstack.utils
     - contrib.openstack.exceptions
+    - contrib.openstack.ip
+    - contrib.openstack.utils
+    - contrib.openstack.ha.utils
     - contrib.python.packages
     - contrib.charmsupport

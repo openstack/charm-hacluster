@@ -30,7 +30,12 @@ from charmhelpers.contrib.openstack.utils import (
     clear_unit_paused,
     is_unit_paused_set,
 )
+from charmhelpers.contrib.openstack.ha.utils import (
+    assert_charm_supports_dns_ha
+)
 from charmhelpers.core.host import (
+    mkdir,
+    rsync,
     service_start,
     service_stop,
     service_restart,
@@ -41,6 +46,8 @@ from charmhelpers.core.host import (
 )
 from charmhelpers.fetch import (
     apt_install,
+    add_source,
+    apt_update,
 )
 from charmhelpers.contrib.hahelpers.cluster import (
     peer_ips,
@@ -80,6 +87,10 @@ COROSYNC_CONF_FILES = [
     COROSYNC_HACLUSTER_ACL,
 ]
 SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
+
+
+class MAASConfigIncomplete(Exception):
+    pass
 
 
 def disable_upstart_services(*services):
@@ -515,6 +526,50 @@ def restart_corosync():
     if not is_unit_paused_set():
         service_restart("corosync")
         service_start("pacemaker")
+
+
+def validate_dns_ha():
+    """Validate the DNS HA
+
+    Assert the charm will support DNS HA
+    Check MAAS related configuration options are properly set
+    """
+
+    # Will raise an exception if unable to continue
+    assert_charm_supports_dns_ha()
+
+    if config('maas_url') and config('maas_credentials'):
+        return True
+    else:
+        msg = ("DNS HA is requested but the maas_url or maas_credentials "
+               "settings are not set")
+        status_set('blocked', msg)
+        raise MAASConfigIncomplete(msg)
+
+
+def setup_maas_api():
+    """Install MAAS PPA and packages for accessing the MAAS API.
+    """
+    add_source(config('maas_source'))
+    apt_update(fatal=True)
+    apt_install('python3-maas-client', fatal=True)
+
+
+def setup_ocf_files():
+    """Setup OCF resrouce agent files
+    """
+
+    # TODO (thedac) Eventually we want to package the OCF files.
+    # Bundle with the charm until then.
+    mkdir('/usr/lib/ocf/resource.d/ceph')
+    mkdir('/usr/lib/ocf/resource.d/maas')
+    # Xenial corosync is not creating this directory
+    mkdir('/etc/corosync/uidgid.d')
+
+    rsync('ocf/ceph/rbd', '/usr/lib/ocf/resource.d/ceph/rbd')
+    rsync('ocf/maas/dns', '/usr/lib/ocf/resource.d/maas/dns')
+    rsync('ocf/maas/maas_dns.py', '/usr/lib/heartbeat/maas_dns.py')
+    rsync('ocf/maas/maasclient/', '/usr/lib/heartbeat/maasclient/')
 
 
 def is_in_standby_mode(node_name):

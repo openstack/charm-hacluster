@@ -28,7 +28,6 @@ from charmhelpers.core.hookenv import (
 from charmhelpers.core.host import (
     service_stop,
     service_running,
-    mkdir,
 )
 
 from charmhelpers.fetch import (
@@ -55,6 +54,9 @@ from utils import (
     disable_lsb_services,
     disable_upstart_services,
     get_ipv6_addr,
+    validate_dns_ha,
+    setup_maas_api,
+    setup_ocf_files,
     set_unit_status,
 )
 
@@ -88,12 +90,7 @@ def install():
     # should be removed once the pacemaker package is fixed.
     status_set('maintenance', 'Installing apt packages')
     apt_install(filter_installed_packages(PACKAGES), fatal=True)
-    # NOTE(adam_g) rbd OCF only included with newer versions of
-    # ceph-resource-agents. Bundle /w charm until we figure out a
-    # better way to install it.
-    mkdir('/usr/lib/ocf/resource.d/ceph')
-    if not os.path.isfile('/usr/lib/ocf/resource.d/ceph/rbd'):
-        shutil.copy('ocf/ceph/rbd', '/usr/lib/ocf/resource.d/ceph/rbd')
+    setup_ocf_files()
 
 
 def get_transport():
@@ -121,6 +118,9 @@ def ensure_ipv6_requirements(hanode_rid):
 
 @hooks.hook()
 def config_changed():
+
+    setup_ocf_files()
+
     if config('prefer-ipv6'):
         assert_charm_supports_ipv6()
 
@@ -220,6 +220,25 @@ def ha_relation_changed():
     if True in [ra.startswith('ocf:ceph')
                 for ra in resources.itervalues()]:
         apt_install('ceph-resource-agents')
+
+    if True in [ra.startswith('ocf:maas')
+                for ra in resources.values()]:
+        if validate_dns_ha():
+            log('Setting up access to MAAS API', level=INFO)
+            setup_maas_api()
+            # Update resource_parms for DNS resources to include MAAS URL and
+            # credentials
+            for resource in resource_params.keys():
+                if resource.endswith("_hostname"):
+                    resource_params[resource] += (
+                        ' maas_url="{}" maas_credentials="{}"'
+                        ''.format(config('maas_url'),
+                                  config('maas_credentials')))
+        else:
+            msg = ("DNS HA is requested but maas_url "
+                   "or maas_credentials are not set")
+            status_set('blocked', msg)
+            raise ValueError(msg)
 
     # NOTE: this should be removed in 15.04 cycle as corosync
     # configuration should be set directly on subordinate

@@ -61,6 +61,18 @@ options:
     type: string
     default:
     description: MAAS credentials (required for STONITH).
+  maas_source:
+     type: string
+     default: ppa:maas/stable
+     description: |
+       PPA for python3-maas-client:
+       .
+         - ppa:maas/stable
+         - ppa:maas/next
+       .
+       The last option should be used in conjunction with the key configuration
+       option.
+       Used when service_dns is set on the primary charm for DNS HA
   cluster_count:
     type: int
     default: 2

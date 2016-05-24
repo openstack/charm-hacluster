@@ -146,3 +146,39 @@ class UtilsTestCase(unittest.TestCase):
 
         self.assertFalse(mock_get_host_ip.called)
         self.assertTrue(mock_get_ipv6_addr.called)
+
+    @mock.patch.object(utils, 'assert_charm_supports_dns_ha')
+    @mock.patch.object(utils, 'config')
+    def test_validate_dns_ha_valid(self, config,
+                                   assert_charm_supports_dns_ha):
+        cfg = {'maas_url': 'http://maas/MAAAS/',
+               'maas_credentials': 'secret'}
+        config.side_effect = lambda key: cfg.get(key)
+
+        self.assertTrue(utils.validate_dns_ha())
+        self.assertTrue(assert_charm_supports_dns_ha.called)
+
+    @mock.patch.object(utils, 'assert_charm_supports_dns_ha')
+    @mock.patch.object(utils, 'status_set')
+    @mock.patch.object(utils, 'config')
+    def test_validate_dns_ha_invalid(self, config, status_set,
+                                     assert_charm_supports_dns_ha):
+        cfg = {'maas_url': 'http://maas/MAAAS/',
+               'maas_credentials': None}
+        config.side_effect = lambda key: cfg.get(key)
+
+        self.assertRaises(utils.MAASConfigIncomplete,
+                          lambda: utils.validate_dns_ha())
+        self.assertTrue(assert_charm_supports_dns_ha.called)
+
+    @mock.patch.object(utils, 'apt_install')
+    @mock.patch.object(utils, 'apt_update')
+    @mock.patch.object(utils, 'add_source')
+    @mock.patch.object(utils, 'config')
+    def test_setup_maas_api(self, config, add_source, apt_update, apt_install):
+        cfg = {'maas_source': 'ppa:maas/stable'}
+        config.side_effect = lambda key: cfg.get(key)
+
+        utils.setup_maas_api()
+        add_source.assert_called_with(cfg['maas_source'])
+        self.assertTrue(apt_install.called)
