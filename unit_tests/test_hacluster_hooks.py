@@ -1,8 +1,12 @@
 import mock
 import os
+import sys
 import tempfile
 import unittest
 
+
+mock_apt = mock.MagicMock()
+sys.modules['apt_pkg'] = mock_apt
 import hooks
 
 
