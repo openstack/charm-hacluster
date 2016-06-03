@@ -109,4 +109,3 @@ Resources which should run on every service unit participating in the cluster:
     clones = {
         'cl_haproxy': 'res_haproxy_lsb'
         }
-
