@@ -40,6 +40,7 @@ from subprocess import (
     CalledProcessError,
 )
 from charmhelpers.core.hookenv import (
+    config,
     local_unit,
     relation_get,
     relation_ids,
@@ -64,6 +65,7 @@ from charmhelpers.fetch import (
 )
 
 from charmhelpers.core.kernel import modprobe
+from charmhelpers.contrib.openstack.utils import config_flags_parser
 
 KEYRING = '/etc/ceph/ceph.client.{}.keyring'
 KEYFILE = '/etc/ceph/ceph.client.{}.key'
@@ -166,12 +168,19 @@ class Pool(object):
         """
         # read-only is easy, writeback is much harder
         mode = get_cache_mode(self.service, cache_pool)
+        version = ceph_version()
         if mode == 'readonly':
             check_call(['ceph', '--id', self.service, 'osd', 'tier', 'cache-mode', cache_pool, 'none'])
             check_call(['ceph', '--id', self.service, 'osd', 'tier', 'remove', self.name, cache_pool])
 
         elif mode == 'writeback':
-            check_call(['ceph', '--id', self.service, 'osd', 'tier', 'cache-mode', cache_pool, 'forward'])
+            pool_forward_cmd = ['ceph', '--id', self.service, 'osd', 'tier',
+                                'cache-mode', cache_pool, 'forward']
+            if version >= '10.1':
+                # Jewel added a mandatory flag
+                pool_forward_cmd.append('--yes-i-really-mean-it')
+
+            check_call(pool_forward_cmd)
             # Flush the cache and wait for it to return
             check_call(['rados', '--id', self.service, '-p', cache_pool, 'cache-flush-evict-all'])
             check_call(['ceph', '--id', self.service, 'osd', 'tier', 'remove-overlay', self.name])
@@ -221,6 +230,10 @@ class ReplicatedPool(Pool):
                    self.name, str(self.pg_num)]
             try:
                 check_call(cmd)
+                # Set the pool replica size
+                update_pool(client=self.service,
+                            pool=self.name,
+                            settings={'size': str(self.replicas)})
             except CalledProcessError:
                 raise
 
@@ -604,7 +617,7 @@ def pool_exists(service, name):
     except CalledProcessError:
         return False
 
-    return name in out
+    return name in out.split()
 
 
 def get_osds(service):
@@ -1193,3 +1206,42 @@ def send_request_if_needed(request, relation='ceph'):
         for rid in relation_ids(relation):
             log('Sending request {}'.format(request.request_id), level=DEBUG)
             relation_set(relation_id=rid, broker_req=request.request)
+
+
+class CephConfContext(object):
+    """Ceph config (ceph.conf) context.
+
+    Supports user-provided Ceph configuration settings. Use can provide a
+    dictionary as the value for the config-flags charm option containing
+    Ceph configuration settings keyede by their section in ceph.conf.
+    """
+    def __init__(self, permitted_sections=None):
+        self.permitted_sections = permitted_sections or []
+
+    def __call__(self):
+        conf = config('config-flags')
+        if not conf:
+            return {}
+
+        conf = config_flags_parser(conf)
+        if type(conf) != dict:
+            log("Provided config-flags is not a dictionary - ignoring",
+                level=WARNING)
+            return {}
+
+        permitted = self.permitted_sections
+        if permitted:
+            diff = set(conf.keys()).difference(set(permitted))
+            if diff:
+                log("Config-flags contains invalid keys '%s' - they will be "
+                    "ignored" % (', '.join(diff)), level=WARNING)
+
+        ceph_conf = {}
+        for key in conf:
+            if permitted and key not in permitted:
+                log("Ignoring key '%s'" % key, level=WARNING)
+                continue
+
+            ceph_conf[key] = conf[key]
+
+        return ceph_conf

@@ -128,11 +128,8 @@ def service(action, service_name):
     return subprocess.call(cmd) == 0
 
 
-def systemv_services_running():
-    output = subprocess.check_output(
-        ['service', '--status-all'],
-        stderr=subprocess.STDOUT).decode('UTF-8')
-    return [row.split()[-1] for row in output.split('\n') if '[ + ]' in row]
+_UPSTART_CONF = "/etc/init/{}.conf"
+_INIT_D_CONF = "/etc/init.d/{}"
 
 
 def service_running(service_name):
@@ -140,22 +137,22 @@ def service_running(service_name):
     if init_is_systemd():
         return service('is-active', service_name)
     else:
-        try:
-            output = subprocess.check_output(
-                ['service', service_name, 'status'],
-                stderr=subprocess.STDOUT).decode('UTF-8')
-        except subprocess.CalledProcessError:
-            return False
-        else:
-            # This works for upstart scripts where the 'service' command
-            # returns a consistent string to represent running 'start/running'
-            if ("start/running" in output or "is running" in output or
-                    "up and running" in output):
-                return True
+        if os.path.exists(_UPSTART_CONF.format(service_name)):
+            try:
+                output = subprocess.check_output(
+                    ['status', service_name],
+                    stderr=subprocess.STDOUT).decode('UTF-8')
+            except subprocess.CalledProcessError:
+                return False
+            else:
+                # This works for upstart scripts where the 'service' command
+                # returns a consistent string to represent running 'start/running'
+                if "start/running" in output:
+                    return True
+        elif os.path.exists(_INIT_D_CONF.format(service_name)):
             # Check System V scripts init script return codes
-            if service_name in systemv_services_running():
-                return True
-            return False
+            return service('status', service_name)
+        return False
 
 
 def service_available(service_name):
@@ -179,7 +176,7 @@ def init_is_systemd():
 
 
 def adduser(username, password=None, shell='/bin/bash', system_user=False,
-            primary_group=None, secondary_groups=None):
+            primary_group=None, secondary_groups=None, uid=None):
     """Add a user to the system.
 
     Will log but otherwise succeed if the user already exists.
@@ -190,15 +187,21 @@ def adduser(username, password=None, shell='/bin/bash', system_user=False,
     :param bool system_user: Whether to create a login or system user
     :param str primary_group: Primary group for user; defaults to username
     :param list secondary_groups: Optional list of additional groups
+    :param int uid: UID for user being created
 
     :returns: The password database entry struct, as returned by `pwd.getpwnam`
     """
     try:
         user_info = pwd.getpwnam(username)
         log('user {0} already exists!'.format(username))
+        if uid:
+            user_info = pwd.getpwuid(int(uid))
+            log('user with uid {0} already exists!'.format(uid))
     except KeyError:
         log('creating user {0}'.format(username))
         cmd = ['useradd']
+        if uid:
+            cmd.extend(['--uid', str(uid)])
         if system_user or password is None:
             cmd.append('--system')
         else:
@@ -233,14 +236,58 @@ def user_exists(username):
     return user_exists
 
 
-def add_group(group_name, system_group=False):
-    """Add a group to the system"""
+def uid_exists(uid):
+    """Check if a uid exists"""
+    try:
+        pwd.getpwuid(uid)
+        uid_exists = True
+    except KeyError:
+        uid_exists = False
+    return uid_exists
+
+
+def group_exists(groupname):
+    """Check if a group exists"""
+    try:
+        grp.getgrnam(groupname)
+        group_exists = True
+    except KeyError:
+        group_exists = False
+    return group_exists
+
+
+def gid_exists(gid):
+    """Check if a gid exists"""
+    try:
+        grp.getgrgid(gid)
+        gid_exists = True
+    except KeyError:
+        gid_exists = False
+    return gid_exists
+
+
+def add_group(group_name, system_group=False, gid=None):
+    """Add a group to the system
+
+    Will log but otherwise succeed if the group already exists.
+
+    :param str group_name: group to create
+    :param bool system_group: Create system group
+    :param int gid: GID for user being created
+
+    :returns: The password database entry struct, as returned by `grp.getgrnam`
+    """
     try:
         group_info = grp.getgrnam(group_name)
         log('group {0} already exists!'.format(group_name))
+        if gid:
+            group_info = grp.getgrgid(gid)
+            log('group with gid {0} already exists!'.format(gid))
     except KeyError:
         log('creating group {0}'.format(group_name))
         cmd = ['addgroup']
+        if gid:
+            cmd.extend(['--gid', str(gid)])
         if system_group:
             cmd.append('--system')
         else:
