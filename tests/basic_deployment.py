@@ -79,8 +79,13 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
                            'debug': 'true',
                            'verbose': 'true',
                            'vip': self._vip}
+
+        if self._get_openstack_release() >= self.xenial_mitaka:
+            keystone_config.update({'ha-bindiface': 'ens2'})
+
         mysql_config = {'dataset-size': '50%'}
         hacluster_config = {'debug': 'true'}
+
         configs = {'keystone': keystone_config,
                    'hacluster': hacluster_config,
                    'mysql': mysql_config}
@@ -180,8 +185,8 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
     def test_910_pause_and_resume(self):
         """The services can be paused and resumed. """
         u.log.debug('Checking pause and resume actions...')
-        unit_name = "hacluster/0"
-        unit = self.d.sentry.unit[unit_name]
+        unit = self.hacluster_sentry
+        unit_name = unit.info['unit_name']
 
         assert u.status_get(unit)[0] == "active"
 

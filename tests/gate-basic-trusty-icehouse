@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Copyright 2016 Canonical Ltd
 #
@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Amulet tests on a basic hacluster deployment on xenial-mitaka."""
+"""Amulet tests on a basic hacluster deployment on trusty-icehouse."""
 
 from basic_deployment import HAClusterBasicDeployment
 
 if __name__ == '__main__':
-    deployment = HAClusterBasicDeployment(series='xenial')
+    deployment = HAClusterBasicDeployment(series='trusty')
     deployment.run_tests()
