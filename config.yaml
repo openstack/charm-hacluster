@@ -15,25 +15,32 @@ options:
       order for this charm to function correctly, the privacy extension must be
       disabled and a non-temporary address must be configured/available on
       your network interface.
+  corosync_transport:
+    type: string
+    default: "unicast"
+    description: |
+      Two supported modes are multicast (udp) or unicast (udpu)
   corosync_mcastaddr:
     type: string
     default: 226.94.1.1
     description: |
       Multicast IP address to use for exchanging messages over the network.
       If multiple clusters are on the same bindnetaddr network, this value
-      can be changed.
+      can be changed.  Only used when corosync_transport = multicast.
   corosync_bindiface:
     type: string
     default:
     description: |
       Default network interface on which HA cluster will bind to communication
-      with the other members of the HA Cluster.
+      with the other members of the HA Cluster.  Defaults to the network
+      interface hosting the units private-address.  Only used when
+      corosync_transport = multicast.
   corosync_mcastport:
     type: int
     default:
     description: |
       Default multicast port number that will be used to communicate between
-      HA Cluster nodes.
+      HA Cluster nodes. Only used when corosync_transport = multicast.
   corosync_key:
     type: string
     default: "64RxJNcCkwo8EJYBsaacitUvbQp5AW4YolJi5/2urYZYp2jfLxY+3IUCOaAUJHPle4Yqfy+WBXO0I/6ASSAjj9jaiHVNaxmVhhjcmyBqy2vtPf+m+0VxVjUXlkTyYsODwobeDdO3SIkbIABGfjLTu29yqPTsfbvSYr6skRb9ne0="
@@ -104,11 +111,6 @@ options:
       Specifies the corosync.conf network mtu. If unset, the default
       corosync.conf value is used (currently 1500). See 'man corosync.conf' for
       detailed information on this config option.
-  corosync_transport:
-    type: string
-    default: "multicast"
-    description: |
-      Two supported modes are multicast (udp) or unicast (udpu)
   nagios_context:
     default: "juju"
     type: string

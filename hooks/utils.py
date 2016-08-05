@@ -212,17 +212,24 @@ def get_corosync_conf():
         ip_version = 'ipv4'
         bindnetaddr = get_network_address
 
+    transport = get_transport()
+
     # NOTE(jamespage) use local charm configuration over any provided by
     # principle charm
     conf = {
-        'corosync_bindnetaddr':
-        bindnetaddr(config('corosync_bindiface')),
-        'corosync_mcastport': config('corosync_mcastport'),
-        'corosync_mcastaddr': config('corosync_mcastaddr'),
         'ip_version': ip_version,
         'ha_nodes': get_ha_nodes(),
-        'transport': get_transport(),
+        'transport': transport,
     }
+
+    # NOTE(jamespage): only populate multicast configuration if udp is
+    #                  configured
+    if transport == 'udp':
+        conf.update({
+            'corosync_bindnetaddr': bindnetaddr(config('corosync_bindiface')),
+            'corosync_mcastport': config('corosync_mcastport'),
+            'corosync_mcastaddr': config('corosync_mcastaddr')
+        })
 
     if config('prefer-ipv6'):
         conf['nodeid'] = get_corosync_id(local_unit())
@@ -241,17 +248,23 @@ def get_corosync_conf():
     conf = {}
     for relid in relation_ids('ha'):
         for unit in related_units(relid):
-            bindiface = relation_get('corosync_bindiface',
-                                     unit, relid)
             conf = {
-                'corosync_bindnetaddr': bindnetaddr(bindiface),
-                'corosync_mcastport': relation_get('corosync_mcastport',
-                                                   unit, relid),
-                'corosync_mcastaddr': config('corosync_mcastaddr'),
                 'ip_version': ip_version,
                 'ha_nodes': get_ha_nodes(),
-                'transport': get_transport(),
+                'transport': transport,
             }
+
+            # NOTE(jamespage): only populate multicast configuration if udpu is
+            #                  configured
+            if transport == 'udp':
+                bindiface = relation_get('corosync_bindiface',
+                                         unit, relid)
+                conf.update({
+                    'corosync_bindnetaddr': bindnetaddr(bindiface),
+                    'corosync_mcastport': relation_get('corosync_mcastport',
+                                                       unit, relid),
+                    'corosync_mcastaddr': config('corosync_mcastaddr'),
+                })
 
             if config('prefer-ipv6'):
                 conf['nodeid'] = get_corosync_id(local_unit())
