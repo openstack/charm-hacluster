@@ -6,6 +6,10 @@ description: |
  Corosync/Pacemaker
 tags:
  - misc
+series:
+ - xenial
+ - trusty
+ - yakkety
 requires:
   juju-info:
     interface: juju-info
