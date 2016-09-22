@@ -20,8 +20,6 @@ import json
 import amulet
 import time
 
-import keystoneclient.v2_0 as keystone_client
-
 from charmhelpers.contrib.openstack.amulet.deployment import (
     OpenStackAmuletDeployment
 )
@@ -54,64 +52,61 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
         self._deploy()
 
         u.log.info('Waiting on extended status checks...')
-        exclude_services = ['mysql']
+        exclude_services = []
 
         # Wait for deployment ready msgs, except exclusions
         self._auto_wait_for_status(exclude_services=exclude_services)
 
+        self.d.sentry.wait()
         self._initialize_tests()
 
     def _add_services(self):
         this_service = {'name': 'hacluster'}
-        other_services = [{'name': 'mysql'},
-                          {'name': 'keystone', 'units': 3}]
+        other_services = [
+            {'name': 'percona-cluster', 'constraints': {'mem': '3072M'}},
+            {'name': 'keystone', 'units': 3},
+        ]
         super(HAClusterBasicDeployment, self)._add_services(this_service,
                                                             other_services)
 
     def _add_relations(self):
-        relations = {'keystone:shared-db': 'mysql:shared-db',
+        relations = {'keystone:shared-db': 'percona-cluster:shared-db',
                      'hacluster:ha': 'keystone:ha'}
         super(HAClusterBasicDeployment, self)._add_relations(relations)
 
     def _configure_services(self):
-        keystone_config = {'admin-password': 'openstack',
-                           'admin-token': 'ubuntutesting',
-                           'debug': 'true',
-                           'verbose': 'true',
-                           'vip': self._vip}
+        keystone_config = {
+            'admin-password': 'openstack',
+            'admin-token': 'ubuntutesting',
+            'debug': 'true',
+            'verbose': 'true',
+            'vip': self._vip,
+        }
 
         if self._get_openstack_release() >= self.xenial_mitaka:
             keystone_config.update({'ha-bindiface': 'ens2'})
 
-        mysql_config = {'dataset-size': '50%'}
-        hacluster_config = {'debug': 'true'}
+        pxc_config = {
+            'dataset-size': '25%',
+            'max-connections': 1000,
+            'root-password': 'ChangeMe123',
+            'sst-password': 'ChangeMe123',
+        }
+        hacluster_config = {
+            'debug': 'true'
+        }
 
-        configs = {'keystone': keystone_config,
-                   'hacluster': hacluster_config,
-                   'mysql': mysql_config}
+        configs = {
+            'keystone': keystone_config,
+            'hacluster': hacluster_config,
+            'percona-cluster': pxc_config,
+        }
         super(HAClusterBasicDeployment, self)._configure_services(configs)
-
-    def _authenticate_keystone_admin(self, keystone_sentry, user, password,
-                                     tenant, service_ip=None):
-        """Authenticates admin user with the keystone admin endpoint.
-
-        This should be factored into:L
-
-            charmhelpers.contrib.openstack.amulet.utils.OpenStackAmuletUtils
-        """
-        if not service_ip:
-            unit = keystone_sentry
-            service_ip = unit.relation('shared-db',
-                                       'mysql:shared-db')['private-address']
-
-        ep = "http://{}:35357/v2.0".format(service_ip.strip().decode('utf-8'))
-        return keystone_client.Client(username=user, password=password,
-                                      tenant_name=tenant, auth_url=ep)
 
     def _initialize_tests(self):
         """Perform final initialization before tests get run."""
         # Access the sentries for inspecting service units
-        self.mysql_sentry = self.d.sentry['mysql'][0]
+        self.pxc_sentry = self.d.sentry['percona-cluster'][0]
         self.keystone_sentry = self.d.sentry['keystone'][0]
         # NOTE: the hacluster unit id may not correspond with its parent unit
         #       id.
@@ -125,11 +120,10 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
         # Authenticate keystone admin
         u.log.debug('Authenticating keystone admin against VIP: '
                     '{}'.format(self._vip))
-        self.keystone = self._authenticate_keystone_admin(self.keystone_sentry,
-                                                          user='admin',
-                                                          password='openstack',
-                                                          tenant='admin',
-                                                          service_ip=self._vip)
+        self.keystone = u.authenticate_keystone_admin(self.keystone_sentry,
+                                                      user='admin',
+                                                      password='openstack',
+                                                      tenant='admin')
 
         # Create a demo tenant/role/user
         u.log.debug('Creating keystone demo tenant, role and user against '
