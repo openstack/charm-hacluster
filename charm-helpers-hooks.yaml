@@ -4,6 +4,7 @@ include:
     - core
     - cli
     - fetch
+    - osplatform
     - contrib.storage.linux
     - contrib.hahelpers
     - contrib.storage
