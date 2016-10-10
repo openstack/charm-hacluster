@@ -18,6 +18,7 @@ import ast
 import pcmk
 import maas
 import os
+import re
 import subprocess
 import socket
 import fcntl
@@ -720,3 +721,39 @@ def assess_status_helper():
             message = ("Insufficient peer units for ha cluster "
                        "(require {})".format(node_count))
     return status, message
+
+
+def ocf_file_exists(res_name, resources,
+                    RES_ROOT='/usr/lib/ocf/resource.d'):
+    """To determine whether the ocf file exists, allow multiple ocf
+       files with the same name in different directories
+
+    @param res_name: The name of the ocf resource to check
+    @param resources: ocf resources
+    @return: boolean - True if the ocf resource exists
+    """
+    res_type = None
+    for key, val in resources.iteritems():
+        if res_name == key:
+            if len(val.split(':')) > 2:
+                res_type = val.split(':')[1]
+                ocf_name = res_name.replace('res_', '').replace('_', '-')
+                ocf_file = os.path.join(RES_ROOT, res_type, ocf_name)
+                if os.path.isfile(ocf_file):
+                    return True
+    return False
+
+
+def kill_legacy_ocf_daemon_process(res_name):
+    """Kill legacy ocf daemon process
+
+    @param res_name: The name of the ocf process to kill
+    """
+    ocf_name = res_name.replace('res_', '').replace('_', '-')
+    reg_expr = '([0-9]+)\s+[^0-9]+{}'.format(ocf_name)
+    cmd = ['ps', '-eo', 'pid,cmd']
+    ps = subprocess.check_output(cmd)
+    res = re.search(reg_expr, ps, re.MULTILINE)
+    if res:
+        pid = res.group(1)
+        subprocess.call(['sudo', 'kill', '-9', pid])

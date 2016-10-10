@@ -16,6 +16,7 @@ import mock
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -196,3 +197,24 @@ class UtilsTestCase(unittest.TestCase):
         utils.setup_maas_api()
         add_source.assert_called_with(cfg['maas_source'])
         self.assertTrue(apt_install.called)
+
+    @mock.patch('os.path.isfile')
+    def test_ocf_file_exists(self, isfile_mock):
+        RES_NAME = 'res_ceilometer_agent_central'
+        resources = {RES_NAME: ('ocf:openstack:ceilometer-agent-central')}
+        utils.ocf_file_exists(RES_NAME, resources)
+        wish = '/usr/lib/ocf/resource.d/openstack/ceilometer-agent-central'
+        isfile_mock.assert_called_once_with(wish)
+
+    @mock.patch.object(subprocess, 'check_output')
+    @mock.patch.object(subprocess, 'call')
+    def test_kill_legacy_ocf_daemon_process(self, call_mock,
+                                            check_output_mock):
+        ps_output = '''
+          PID CMD
+          6863 sshd: ubuntu@pts/7
+          11109 /usr/bin/python /usr/bin/ceilometer-agent-central --config
+        '''
+        check_output_mock.return_value = ps_output
+        utils.kill_legacy_ocf_daemon_process('res_ceilometer_agent_central')
+        call_mock.assert_called_once_with(['sudo', 'kill', '-9', '11109'])

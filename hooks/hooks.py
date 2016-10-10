@@ -70,6 +70,8 @@ from utils import (
     setup_maas_api,
     setup_ocf_files,
     set_unit_status,
+    ocf_file_exists,
+    kill_legacy_ocf_daemon_process,
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
@@ -266,10 +268,17 @@ def ha_relation_changed():
         log('Deleting Resources' % (delete_resources), level=DEBUG)
         for res_name in delete_resources:
             if pcmk.crm_opt_exists(res_name):
-                log('Stopping and deleting resource %s' % res_name,
-                    level=DEBUG)
-                if pcmk.crm_res_running(res_name):
-                    pcmk.commit('crm -w -F resource stop %s' % res_name)
+                if ocf_file_exists(res_name, resources):
+                    log('Stopping and deleting resource %s' % res_name,
+                        level=DEBUG)
+                    if pcmk.crm_res_running(res_name):
+                        pcmk.commit('crm -w -F resource stop %s' % res_name)
+                else:
+                    log('Cleanuping and deleting resource %s' % res_name,
+                        level=DEBUG)
+                    pcmk.commit('crm resource cleanup %s' % res_name)
+                # Daemon process may still be running after the upgrade.
+                kill_legacy_ocf_daemon_process(res_name)
                 pcmk.commit('crm -w -F configure delete %s' % res_name)
 
         log('Configuring Resources: %s' % (resources), level=DEBUG)
