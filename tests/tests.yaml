@@ -1,7 +1,7 @@
 # Bootstrap the model if necessary.
 bootstrap: True
-# No reset https://bugs.launchpad.net/juju/+bug/1541482
-reset: False
+# Re-use bootstrap node.
+reset: True
 # Use tox/requirements to drive the venv instead of bundletester's venv feature.
 virtualenv: False
 # Leave makefile empty, otherwise unit/lint tests will rerun ahead of amulet.
