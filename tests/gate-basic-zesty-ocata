@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Amulet tests on a basic hacluster deployment on yakkety-newton."""
+"""Amulet tests on a basic hacluster deployment on zesty-ocata."""
 
 from basic_deployment import HAClusterBasicDeployment
 
 if __name__ == '__main__':
-    deployment = HAClusterBasicDeployment(series='yakkety')
+    deployment = HAClusterBasicDeployment(series='zesty')
     deployment.run_tests()
