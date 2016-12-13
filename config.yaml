@@ -94,7 +94,7 @@ options:
        Used when service_dns is set on the primary charm for DNS HA
   cluster_count:
     type: int
-    default: 2
+    default: 3
     description: |
       Number of peer units required to bootstrap cluster services.
       .
