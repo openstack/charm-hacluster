@@ -53,6 +53,18 @@ options:
       .
       This configuration element is mandatory and the service will fail on
       install if it is not provided.  The value must be base64 encoded.
+  service_start_timeout:
+    type: int
+    default: 180
+    description: |
+      Systemd override value for corosync and pacemaker service start timeout in seconds.
+      Set value to -1 turn off timeout for the services.
+  service_stop_timeout:
+    type: int
+    default: 60
+    description: |
+      Systemd override value for corosync and pacemaker service stop timeout in seconds.
+      Set value to -1 turn off timeout for the services.
   stonith_enabled:
     type: string
     default: 'False'
@@ -89,7 +101,8 @@ options:
       If less that 3 is specified, the cluster will be configured to
       ignore any quorum problems; with 3 or more units, quorum will be
       enforced and services will be stopped in the event of a loss
-      of quorum.
+      of quorum. It is best practice to set this value to the expected
+      number of units to avoid potential race conditions.
   monitor_host:
     type: string
     default:

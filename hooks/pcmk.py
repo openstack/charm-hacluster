@@ -15,6 +15,7 @@
 import commands
 import subprocess
 import socket
+import time
 
 from charmhelpers.core.hookenv import (
     log,
@@ -22,12 +23,23 @@ from charmhelpers.core.hookenv import (
 )
 
 
-def wait_for_pcmk():
+class ServicesNotUp(Exception):
+    pass
+
+
+def wait_for_pcmk(retries=12, sleep=10):
     crm_up = None
     hostname = socket.gethostname()
-    while not crm_up:
+    for i in range(retries):
+        if crm_up:
+            return True
         output = commands.getstatusoutput("crm node list")[1]
         crm_up = hostname in output
+        time.sleep(sleep)
+    if not crm_up:
+        raise ServicesNotUp("Pacemaker or Corosync are still down after "
+                            "waiting for {} retries. Last output: {}"
+                            "".format(retries, output))
 
 
 def commit(cmd):

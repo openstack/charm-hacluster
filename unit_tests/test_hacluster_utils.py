@@ -21,6 +21,7 @@ import tempfile
 import unittest
 
 import utils
+import pcmk
 
 
 def write_file(path, content, *args, **kwargs):
@@ -31,7 +32,7 @@ def write_file(path, content, *args, **kwargs):
 
 @mock.patch.object(utils, 'log', lambda *args, **kwargs: None)
 @mock.patch.object(utils, 'write_file', write_file)
-class UtilsTestCase(unittest.TestCase):
+class UtilsTestCaseWriteTmp(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
@@ -87,6 +88,9 @@ class UtilsTestCase(unittest.TestCase):
 
     def test_debug_off(self):
         self.check_debug(False)
+
+
+class UtilsTestCase(unittest.TestCase):
 
     @mock.patch.object(utils, 'config')
     def test_get_transport(self, mock_config):
@@ -218,3 +222,135 @@ class UtilsTestCase(unittest.TestCase):
         check_output_mock.return_value = ps_output
         utils.kill_legacy_ocf_daemon_process('res_ceilometer_agent_central')
         call_mock.assert_called_once_with(['sudo', 'kill', '-9', '11109'])
+
+    @mock.patch.object(pcmk, 'wait_for_pcmk')
+    def test_try_pcmk_wait(self, mock_wait_for_pcmk):
+        # Returns OK
+        mock_wait_for_pcmk.side_effect = None
+        self.assertEquals(None, utils.try_pcmk_wait())
+
+        # Raises Exception
+        mock_wait_for_pcmk.side_effect = pcmk.ServicesNotUp
+        with self.assertRaises(pcmk.ServicesNotUp):
+            utils.try_pcmk_wait()
+
+    @mock.patch.object(pcmk, 'wait_for_pcmk')
+    @mock.patch.object(utils, 'service_running')
+    def test_services_running(self, mock_service_running,
+                              mock_wait_for_pcmk):
+        # OS not running
+        mock_service_running.return_value = False
+        self.assertFalse(utils.services_running())
+
+        # Functional not running
+        mock_service_running.return_value = True
+        mock_wait_for_pcmk.side_effect = pcmk.ServicesNotUp
+        with self.assertRaises(pcmk.ServicesNotUp):
+            utils.services_running()
+
+        # All running
+        mock_service_running.return_value = True
+        mock_wait_for_pcmk.side_effect = None
+        mock_wait_for_pcmk.return_value = True
+        self.assertTrue(utils.services_running())
+
+    @mock.patch.object(pcmk, 'wait_for_pcmk')
+    @mock.patch.object(utils, 'restart_corosync')
+    def test_validated_restart_corosync(self, mock_restart_corosync,
+                                        mock_wait_for_pcmk):
+        # Services are down
+        mock_restart_corosync.mock_calls = []
+        mock_restart_corosync.return_value = False
+        with self.assertRaises(pcmk.ServicesNotUp):
+            utils.validated_restart_corosync(retries=3)
+        self.assertEqual(3, len(mock_restart_corosync.mock_calls))
+
+        # Services are up
+        mock_restart_corosync.mock_calls = []
+        mock_restart_corosync.return_value = True
+        utils.validated_restart_corosync(retries=10)
+        self.assertEqual(1, len(mock_restart_corosync.mock_calls))
+
+    @mock.patch.object(utils, 'is_unit_paused_set')
+    @mock.patch.object(utils, 'services_running')
+    @mock.patch.object(utils, 'service_start')
+    @mock.patch.object(utils, 'service_stop')
+    @mock.patch.object(utils, 'service_running')
+    def test_restart_corosync(self, mock_service_running,
+                              mock_service_stop, mock_service_start,
+                              mock_services_running, mock_is_unit_paused_set):
+        # PM up, services down
+        mock_service_running.return_value = True
+        mock_is_unit_paused_set.return_value = False
+        mock_services_running.return_value = False
+        self.assertFalse(utils.restart_corosync())
+        mock_service_stop.assert_has_calls([mock.call('pacemaker'),
+                                            mock.call('corosync')])
+        mock_service_start.assert_has_calls([mock.call('corosync'),
+                                            mock.call('pacemaker')])
+
+        # PM already down, services down
+        mock_service_running.return_value = False
+        mock_is_unit_paused_set.return_value = False
+        mock_services_running.return_value = False
+        self.assertFalse(utils.restart_corosync())
+        mock_service_stop.assert_has_calls([mock.call('corosync')])
+        mock_service_start.assert_has_calls([mock.call('corosync'),
+                                            mock.call('pacemaker')])
+
+        # PM already down, services up
+        mock_service_running.return_value = True
+        mock_is_unit_paused_set.return_value = False
+        mock_services_running.return_value = True
+        self.assertTrue(utils.restart_corosync())
+        mock_service_stop.assert_has_calls([mock.call('pacemaker'),
+                                            mock.call('corosync')])
+        mock_service_start.assert_has_calls([mock.call('corosync'),
+                                            mock.call('pacemaker')])
+
+    @mock.patch.object(subprocess, 'check_call')
+    @mock.patch.object(utils.os, 'mkdir')
+    @mock.patch.object(utils.os.path, 'exists')
+    @mock.patch.object(utils, 'render_template')
+    @mock.patch.object(utils, 'write_file')
+    @mock.patch.object(utils, 'is_unit_paused_set')
+    @mock.patch.object(utils, 'config')
+    def test_emit_systemd_overrides_file(self, mock_config,
+                                         mock_is_unit_paused_set,
+                                         mock_write_file, mock_render_template,
+                                         mock_path_exists,
+                                         mock_mkdir, mock_check_call):
+
+        # Normal values
+        cfg = {'service_stop_timeout': 30,
+               'service_start_timeout': 90}
+        mock_config.side_effect = lambda key: cfg.get(key)
+
+        mock_is_unit_paused_set.return_value = True
+        mock_path_exists.return_value = True
+        utils.emit_systemd_overrides_file()
+        self.assertEquals(2, len(mock_write_file.mock_calls))
+        mock_render_template.assert_has_calls(
+            [mock.call('systemd-overrides.conf', cfg),
+             mock.call('systemd-overrides.conf', cfg)])
+        mock_check_call.assert_has_calls([mock.call(['systemctl',
+                                                     'daemon-reload'])])
+        mock_write_file.mock_calls = []
+        mock_render_template.mock_calls = []
+        mock_check_call.mock_calls = []
+
+        # Disable timeout
+        cfg = {'service_stop_timeout': -1,
+               'service_start_timeout': -1}
+        expected_cfg = {'service_stop_timeout': 'infinity',
+                        'service_start_timeout': 'infinity'}
+        mock_config.side_effect = lambda key: cfg.get(key)
+        mock_is_unit_paused_set.return_value = True
+        mock_path_exists.return_value = True
+        utils.emit_systemd_overrides_file()
+        self.assertEquals(2, len(mock_write_file.mock_calls))
+        mock_render_template.assert_has_calls(
+            [mock.call('systemd-overrides.conf', expected_cfg),
+             mock.call('systemd-overrides.conf', expected_cfg)])
+        mock_check_call.assert_has_calls([mock.call(['systemctl',
+                                                     'daemon-reload'])])

@@ -33,6 +33,9 @@ from charmhelpers.contrib.openstack.amulet.utils import (
 u = OpenStackAmuletUtils(DEBUG)
 seconds_to_wait = 600
 
+# Set number of primary units and cluster-count for hacluster
+NUM_UNITS = 3
+
 
 class HAClusterBasicDeployment(OpenStackAmuletDeployment):
 
@@ -64,7 +67,7 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
         this_service = {'name': 'hacluster'}
         other_services = [
             {'name': 'percona-cluster', 'constraints': {'mem': '3072M'}},
-            {'name': 'keystone', 'units': 3},
+            {'name': 'keystone', 'units': NUM_UNITS},
         ]
         super(HAClusterBasicDeployment, self)._add_services(this_service,
                                                             other_services)
@@ -93,7 +96,8 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
             'sst-password': 'ChangeMe123',
         }
         hacluster_config = {
-            'debug': 'true'
+            'debug': 'true',
+            'cluster_count': NUM_UNITS,
         }
 
         configs = {

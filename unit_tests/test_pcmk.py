@@ -34,3 +34,17 @@ class TestPcmk(unittest.TestCase):
     def test_crm_res_running_undefined(self, getstatusoutput):
         getstatusoutput.return_value = (1, "foobar")
         self.assertFalse(pcmk.crm_res_running('res_nova_consoleauth'))
+
+    @mock.patch('socket.gethostname')
+    @mock.patch('commands.getstatusoutput')
+    def test_wait_for_pcmk(self, getstatusoutput, gethostname):
+        # Pacemaker is down
+        gethostname.return_value = 'hanode-1'
+        getstatusoutput.return_value = (1, 'Not the hostname')
+        with self.assertRaises(pcmk.ServicesNotUp):
+            pcmk.wait_for_pcmk(retries=2, sleep=0)
+
+        # Pacemaker is up
+        gethostname.return_value = 'hanode-1'
+        getstatusoutput.return_value = (0, 'Hosname: hanode-1')
+        self.assertTrue(pcmk.wait_for_pcmk(retries=2, sleep=0))

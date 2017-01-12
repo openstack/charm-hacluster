@@ -31,6 +31,7 @@ from charmhelpers.core.hookenv import (
     local_unit,
     log,
     DEBUG,
+    ERROR,
     INFO,
     WARNING,
     relation_get,
@@ -54,11 +55,11 @@ from charmhelpers.core.host import (
     rsync,
     service_start,
     service_stop,
-    service_restart,
     service_running,
     write_file,
     file_hash,
-    lsb_release
+    lsb_release,
+    init_is_systemd,
 )
 from charmhelpers.fetch import (
     apt_install,
@@ -103,6 +104,9 @@ COROSYNC_CONF_FILES = [
     COROSYNC_HACLUSTER_ACL,
 ]
 SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
+
+SYSTEMD_OVERRIDES_DIR = '/etc/systemd/system/{}.service.d'
+SYSTEMD_OVERRIDES_FILE = '{}/overrides.conf'
 
 
 class MAASConfigIncomplete(Exception):
@@ -285,6 +289,41 @@ def get_corosync_conf():
     missing = [k for k, v in conf.iteritems() if v is None]
     log('Missing required configuration: %s' % missing)
     return None
+
+
+def emit_systemd_overrides_file():
+    """Generate the systemd overrides file
+    With Start and Stop timeout values
+    Note: (David Ames) Bug#1654403 Work around
+    May be removed if bug is resolved
+    If timeout value is set to -1 pass infinity
+    """
+    if not init_is_systemd():
+        return
+
+    stop_timeout = int(config('service_stop_timeout'))
+    if stop_timeout < 0:
+        stop_timeout = 'infinity'
+    start_timeout = int(config('service_start_timeout'))
+    if start_timeout < 0:
+        start_timeout = 'infinity'
+
+    systemd_overrides_context = {'service_stop_timeout': stop_timeout,
+                                 'service_start_timeout': start_timeout,
+                                 }
+
+    for service in ['corosync', 'pacemaker']:
+        overrides_dir = SYSTEMD_OVERRIDES_DIR.format(service)
+        overrides_file = SYSTEMD_OVERRIDES_FILE.format(overrides_dir)
+        if not os.path.isdir(overrides_dir):
+            os.mkdir(overrides_dir)
+
+        write_file(path=overrides_file,
+                   content=render_template('systemd-overrides.conf',
+                                           systemd_overrides_context))
+
+    # Update systemd with the new information
+    subprocess.check_call(['systemctl', 'daemon-reload'])
 
 
 def emit_corosync_conf():
@@ -534,7 +573,7 @@ def restart_corosync_on_change():
             if return_data:
                 for path in COROSYNC_CONF_FILES:
                     if checksums[path] != file_hash(path):
-                        restart_corosync()
+                        validated_restart_corosync()
                         break
 
             return return_data
@@ -542,19 +581,87 @@ def restart_corosync_on_change():
     return wrap
 
 
+def try_pcmk_wait():
+    """Try pcmk.wait_for_pcmk()
+    Log results and set status message
+    """
+    try:
+        pcmk.wait_for_pcmk()
+        log("Pacemaker is ready", DEBUG)
+    except pcmk.ServicesNotUp:
+        msg = ("Pacemaker is down. Please manually start it.")
+        log(msg, ERROR)
+        status_set('blocked', msg)
+        raise pcmk.ServicesNotUp(msg)
+
+
 @restart_corosync_on_change()
 def configure_corosync():
     log('Configuring and (maybe) restarting corosync', level=DEBUG)
+    # David Ames Bug#1654403 Work around
+    # May be removed if bug is resolved
+    emit_systemd_overrides_file()
     return emit_base_conf() and emit_corosync_conf()
+
+
+def services_running():
+    """Determine if both Corosync and Pacemaker are running
+    Both from the operating system perspective and with a functional test
+    @returns boolean
+    """
+    pacemaker_status = service_running("pacemaker")
+    corosync_status = service_running("corosync")
+    log("Pacemaker status: {}, Corosync status: {}"
+        "".format(pacemaker_status, corosync_status),
+        level=DEBUG)
+    if not (pacemaker_status and corosync_status):
+        # OS perspective
+        return False
+    else:
+        # Functional test of pacemaker
+        return pcmk.wait_for_pcmk()
+
+
+def validated_restart_corosync(retries=10):
+    """Restart and validate Corosync and Pacemaker are in fact up and running.
+
+    @param retries: number of attempts to restart the services before giving up
+    @raises pcmk.ServicesNotUp if after retries services are still not up
+    """
+    for restart in range(retries):
+        try:
+            if restart_corosync():
+                log("Corosync and Pacemaker are validated as up and running.",
+                    INFO)
+                return
+            else:
+                log("Corosync or Pacemaker not validated as up yet, retrying",
+                    WARNING)
+        except pcmk.ServicesNotUp:
+            log("Pacemaker failed to start, retrying", WARNING)
+            continue
+
+    msg = ("Corosync and/or Pacemaker failed to restart after {} retries"
+           "".format(retries))
+    log(msg, ERROR)
+    status_set('blocked', msg)
+    raise pcmk.ServicesNotUp(msg)
 
 
 def restart_corosync():
     if service_running("pacemaker"):
+        log("Stopping pacemaker", DEBUG)
         service_stop("pacemaker")
 
     if not is_unit_paused_set():
-        service_restart("corosync")
+        log("Stopping corosync", DEBUG)
+        service_stop("corosync")
+        log("Starting corosync", DEBUG)
+        service_start("corosync")
+        log("Starting pacemaker", DEBUG)
         service_start("pacemaker")
+
+    return services_running()
 
 
 def validate_dns_ha():
@@ -715,6 +822,11 @@ def assess_status_helper():
     node_count = int(config('cluster_count'))
     status = 'active'
     message = 'Unit is ready and clustered'
+    try:
+        try_pcmk_wait()
+    except pcmk.ServicesNotUp:
+        message = 'Pacemaker is down'
+        status = 'blocked'
     for relid in relation_ids('hanode'):
         if len(related_units(relid)) + 1 < node_count:
             status = 'blocked'

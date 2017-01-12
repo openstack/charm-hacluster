@@ -29,6 +29,16 @@ To enable HA clustering support (for mysql for example):
 The principle charm must have explicit support for the hacluster interface
 in order for clustering to occur - otherwise nothing actually get configured.
 
+# Settings
+
+It is best practice to set cluster_count to the number of expected units in the
+cluster. The charm will build the cluster without this setting, however, race
+conditions may occur in which one node is not yet aware of the total number of
+relations to other hacluster units, leading to failure of the corosync and
+pacemaker services to complete startup.
+
+Setting cluster_count helps guarantee the hacluster charm waits until all 
+expected peer relations are available before building the corosync cluster.
 
 # HA/Clustering
 

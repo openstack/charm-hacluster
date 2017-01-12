@@ -72,6 +72,7 @@ from utils import (
     set_unit_status,
     ocf_file_exists,
     kill_legacy_ocf_daemon_process,
+    try_pcmk_wait,
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
@@ -152,7 +153,7 @@ def config_changed():
 
     status_set('maintenance', "Setting up corosync")
     if configure_corosync():
-        pcmk.wait_for_pcmk()
+        try_pcmk_wait()
         configure_cluster_global()
         configure_monitor_host()
         configure_stonith()
@@ -257,7 +258,7 @@ def ha_relation_changed():
     # NOTE: this should be removed in 15.04 cycle as corosync
     # configuration should be set directly on subordinate
     configure_corosync()
-    pcmk.wait_for_pcmk()
+    try_pcmk_wait()
     configure_cluster_global()
     configure_monitor_host()
     configure_stonith()
