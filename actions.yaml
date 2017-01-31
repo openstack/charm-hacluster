@@ -3,3 +3,12 @@ pause:
                from this unit to another unit in the hacluster
 resume:
   descrpition: Take hacluster unit out of standby mode
+status:
+  description: Return cluster and resource status
+cleanup:
+  description: Trigger cluster resource cleanup
+  params:
+    resource:
+      default: "all"
+      type: string
+      description: Resource name to cleanup

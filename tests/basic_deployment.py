@@ -243,6 +243,24 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
         assert output == expected, 'maintenance-mode is: %s, expected: %s' \
             % (output, expected)
 
+    def test_900_action_cleanup(self):
+        """The services can be cleaned up. """
+        u.log.debug('Checking cleanup action...')
+        unit = self.hacluster_sentry
+
+        assert u.status_get(unit)[0] == "active"
+
+        action_id = u.run_action(unit, "cleanup")
+        assert u.wait_on_action(action_id), "Cleanup (all) action failed."
+        assert u.status_get(unit)[0] == "active"
+
+        params = {'resource': 'res_ks_haproxy'}
+        action_id = u.run_action(unit, "cleanup", params)
+        assert u.wait_on_action(action_id), "Cleanup action w/resource failed."
+        assert u.status_get(unit)[0] == "active"
+
+        u.log.debug('OK')
+
     def test_910_pause_and_resume(self):
         """The services can be paused and resumed. """
         u.log.debug('Checking pause and resume actions...')
