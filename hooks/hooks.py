@@ -40,6 +40,8 @@ from charmhelpers.core.hookenv import (
 from charmhelpers.core.host import (
     service_stop,
     service_running,
+    lsb_release,
+    CompareHostReleases,
 )
 
 from charmhelpers.fetch import (
@@ -101,6 +103,10 @@ DEPRECATED_TRANSPORT_VALUES = {"multicast": "udp", "unicast": "udpu"}
 
 @hooks.hook()
 def install():
+    ubuntu_release = lsb_release()['DISTRIB_CODENAME'].lower()
+    if CompareHostReleases(ubuntu_release) >= 'zesty':
+        PACKAGES.remove('libnagios-plugin-perl')
+        PACKAGES.append('libnagios-object-perl')
     # NOTE(dosaboy): we currently disallow upgrades due to bug #1382842. This
     # should be removed once the pacemaker package is fixed.
     status_set('maintenance', 'Installing apt packages')
