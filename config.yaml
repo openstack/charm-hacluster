@@ -26,14 +26,14 @@ options:
     description: |
       Multicast IP address to use for exchanging messages over the network.
       If multiple clusters are on the same bindnetaddr network, this value
-      can be changed.  Only used when corosync_transport = multicast.
+      can be changed. Only used when corosync_transport = multicast.
   corosync_bindiface:
     type: string
     default:
     description: |
       Default network interface on which HA cluster will bind to communication
-      with the other members of the HA Cluster.  Defaults to the network
-      interface hosting the units private-address.  Only used when
+      with the other members of the HA Cluster. Defaults to the network
+      interface hosting the units private-address. Only used when
       corosync_transport = multicast.
   corosync_mcastport:
     type: int
@@ -52,26 +52,26 @@ options:
         sudo cat /etc/corosync/authkey | base64 -w 0
       .
       This configuration element is mandatory and the service will fail on
-      install if it is not provided.  The value must be base64 encoded.
+      install if it is not provided. The value must be base64 encoded.
   service_start_timeout:
     type: int
     default: 180
     description: |
-      Systemd override value for corosync and pacemaker service start timeout in seconds.
-      Set value to -1 turn off timeout for the services.
+      Systemd override value for corosync and pacemaker service start timeout
+      in seconds. Set value to -1 turn off timeout for the services.
   service_stop_timeout:
     type: int
     default: 60
     description: |
-      Systemd override value for corosync and pacemaker service stop timeout in seconds.
-      Set value to -1 turn off timeout for the services.
+      Systemd override value for corosync and pacemaker service stop timeout
+      seconds. Set value to -1 turn off timeout for the services.
   stonith_enabled:
     type: string
     default: 'False'
     description: |
       Enable resource fencing (aka STONITH) for every node in the cluster.
       This requires MAAS credentials be provided and each node's power
-      parameters are properly configured in its invenvory.
+      parameters are properly configured in its inventory.
   maas_url:
     type: string
     default:
@@ -81,17 +81,16 @@ options:
     default:
     description: MAAS credentials (required for STONITH).
   maas_source:
-     type: string
-     default: ppa:maas/stable
-     description: |
-       PPA for python3-maas-client:
-       .
-         - ppa:maas/stable
-         - ppa:maas/next
-       .
-       The last option should be used in conjunction with the key configuration
-       option.
-       Used when service_dns is set on the primary charm for DNS HA
+    type: string
+    default: ppa:maas/stable
+    description: |
+      PPA for python3-maas-client:
+      .
+        - ppa:maas/stable
+        - ppa:maas/next
+      .
+      The last option should be used in conjunction with the key configuration
+      option. Used when service_dns is set on the primary charm for DNS HA.
   cluster_count:
     type: int
     default: 3
@@ -107,9 +106,9 @@ options:
     type: string
     default:
     description: |
-      One or more IPs, separated by space, that will be used as a saftey check
+      One or more IPs, separated by space, that will be used as a safety check
       for avoiding split brain situations. Nodes in the cluster will ping these
-      IPs periodicaly. Node that can not ping monitor_host will not run shared
+      IPs periodically. Node that can not ping monitor_host will not run shared
       resources (VIP, shared disk...).
   monitor_interval:
     type: string
@@ -124,21 +123,22 @@ options:
       Specifies the corosync.conf network mtu. If unset, the default
       corosync.conf value is used (currently 1500). See 'man corosync.conf' for
       detailed information on this config option.
+  # Monitoring config
   nagios_context:
-    default: "juju"
     type: string
+    default: "juju"
     description: |
       Used by the nrpe-external-master subordinate charm.
       A string that will be prepended to instance name to set the host name
       in nagios. So for instance the hostname would be something like:
       .
-          juju-postgresql-0
+         juju-postgresql-0
       .
       If you're running multiple environments with the same services in them
       this allows you to differentiate between them.
   nagios_servicegroups:
-    default: ""
     type: string
+    default: ""
     description: |
-      A comma-separated list of nagios servicegroups.
-      If left empty, the nagios_context will be used as the servicegroup
+      A comma-separated list of nagios servicegroups. If left empty, the
+      nagios_context will be used as the servicegroup.
