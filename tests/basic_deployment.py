@@ -15,6 +15,8 @@
 # limitations under the License.
 
 import os
+import time
+
 import amulet
 
 from charmhelpers.contrib.openstack.amulet.deployment import (
@@ -32,6 +34,15 @@ seconds_to_wait = 600
 
 # Set number of primary units and cluster-count for hacluster
 NUM_UNITS = 3
+
+PY_CRM_GET_PROPERTY = """cd hooks;
+python -c 'import pcmk;
+try:
+    print(pcmk.get_property(\"maintenance-mode\"))
+except pcmk.PropertyNotFound:
+    print(\"false\")
+'
+"""
 
 
 class HAClusterBasicDeployment(OpenStackAmuletDeployment):
@@ -151,6 +162,25 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
             password='password',
             tenant=self.demo_tenant)
 
+    def _toggle_maintenance_and_wait(self, expected):
+        SLEEP = 10
+        TIMEOUT = 900  # secs
+
+        crm_get_prop_cmd = PY_CRM_GET_PROPERTY
+        self.d.configure('hacluster', {'maintenance-mode': expected})
+
+        stime = time.time()
+        ha_unit = self.d.sentry['hacluster'][0]
+        while time.time() - stime <= TIMEOUT:
+            time.sleep(SLEEP)
+            (output, exit_code) = ha_unit.run(crm_get_prop_cmd)
+            if output == expected:
+                u.log.debug('maintenance-mode enabled: %s' % output)
+                break
+
+        assert output == expected, 'maintenance-mode is: %s, expected: %s' \
+            % (output, expected)
+
     def test_910_pause_and_resume(self):
         """The services can be paused and resumed. """
         u.log.debug('Checking pause and resume actions...')
@@ -166,3 +196,11 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
         assert u.wait_on_action(action_id), "Resume action failed."
         assert u.status_get(unit)[0] == "active"
         u.log.debug('OK')
+
+    def test_920_put_in_maintenance(self):
+        """Put pacemaker in maintenance mode"""
+        return
+        u.log.debug('Setting cluster in maintenance mode')
+
+        self._toggle_maintenance_and_wait('true')
+        self._toggle_maintenance_and_wait('false')

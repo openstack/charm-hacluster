@@ -354,3 +354,30 @@ class UtilsTestCase(unittest.TestCase):
              mock.call('systemd-overrides.conf', expected_cfg)])
         mock_check_call.assert_has_calls([mock.call(['systemctl',
                                                      'daemon-reload'])])
+
+    @mock.patch('pcmk.set_property')
+    @mock.patch('pcmk.get_property')
+    def test_maintenance_mode(self, mock_get_property, mock_set_property):
+        # enable maintenance-mode
+        mock_get_property.return_value = 'false\n'
+        utils.maintenance_mode(True)
+        mock_get_property.assert_called_with('maintenance-mode')
+        mock_set_property.assert_called_with('maintenance-mode', 'true')
+        mock_get_property.reset_mock()
+        mock_set_property.reset_mock()
+        mock_get_property.return_value = 'true\n'
+        utils.maintenance_mode(True)
+        mock_get_property.assert_called_with('maintenance-mode')
+        mock_set_property.assert_not_called()
+
+        # disable maintenance-mode
+        mock_get_property.return_value = 'true\n'
+        utils.maintenance_mode(False)
+        mock_get_property.assert_called_with('maintenance-mode')
+        mock_set_property.assert_called_with('maintenance-mode', 'false')
+        mock_get_property.reset_mock()
+        mock_set_property.reset_mock()
+        mock_get_property.return_value = 'false\n'
+        utils.maintenance_mode(False)
+        mock_get_property.assert_called_with('maintenance-mode')
+        mock_set_property.assert_not_called()

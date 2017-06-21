@@ -15,6 +15,61 @@
 import mock
 import pcmk
 import unittest
+from distutils.version import StrictVersion
+
+
+CRM_CONFIGURE_SHOW_XML = '''<?xml version="1.0" ?>
+<cib num_updates="1" dc-uuid="1002" update-origin="juju-34fde5-0" crm_feature_set="3.0.7" validate-with="pacemaker-1.2" update-client="cibadmin" epoch="1103" admin_epoch="0" cib-last-written="Fri Aug  4 13:45:06 2017" have-quorum="1">
+  <configuration>
+    <crm_config>
+      <cluster_property_set id="cib-bootstrap-options">
+        <nvpair id="cib-bootstrap-options-dc-version" name="dc-version" value="1.1.10-42f2063"/>
+        <nvpair id="cib-bootstrap-options-cluster-infrastructure" name="cluster-infrastructure" value="corosync"/>
+        <nvpair name="no-quorum-policy" value="stop" id="cib-bootstrap-options-no-quorum-policy"/>
+        <nvpair name="stonith-enabled" value="false" id="cib-bootstrap-options-stonith-enabled"/>
+      </cluster_property_set>
+    </crm_config>
+    <nodes>
+      <node id="1002" uname="juju-34fde5-0"/>
+    </nodes>
+    <resources/>
+    <constraints/>
+    <rsc_defaults>
+      <meta_attributes id="rsc-options">
+        <nvpair name="resource-stickiness" value="100" id="rsc-options-resource-stickiness"/>
+      </meta_attributes>
+    </rsc_defaults>
+  </configuration>
+</cib>
+
+'''  # noqa
+
+CRM_CONFIGURE_SHOW_XML_MAINT_MODE_TRUE = '''<?xml version="1.0" ?>
+<cib num_updates="1" dc-uuid="1002" update-origin="juju-34fde5-0" crm_feature_set="3.0.7" validate-with="pacemaker-1.2" update-client="cibadmin" epoch="1103" admin_epoch="0" cib-last-written="Fri Aug  4 13:45:06 2017" have-quorum="1">
+  <configuration>
+    <crm_config>
+      <cluster_property_set id="cib-bootstrap-options">
+        <nvpair id="cib-bootstrap-options-dc-version" name="dc-version" value="1.1.10-42f2063"/>
+        <nvpair id="cib-bootstrap-options-cluster-infrastructure" name="cluster-infrastructure" value="corosync"/>
+        <nvpair name="no-quorum-policy" value="stop" id="cib-bootstrap-options-no-quorum-policy"/>
+        <nvpair name="stonith-enabled" value="false" id="cib-bootstrap-options-stonith-enabled"/>
+        <nvpair name="maintenance-mode" value="true" id="cib-bootstrap-options-maintenance-mode"/>
+      </cluster_property_set>
+    </crm_config>
+    <nodes>
+      <node id="1002" uname="juju-34fde5-0"/>
+    </nodes>
+    <resources/>
+    <constraints/>
+    <rsc_defaults>
+      <meta_attributes id="rsc-options">
+        <nvpair name="resource-stickiness" value="100" id="rsc-options-resource-stickiness"/>
+      </meta_attributes>
+    </rsc_defaults>
+  </configuration>
+</cib>
+
+'''  # noqa
 
 
 class TestPcmk(unittest.TestCase):
@@ -48,3 +103,67 @@ class TestPcmk(unittest.TestCase):
         gethostname.return_value = 'hanode-1'
         getstatusoutput.return_value = (0, 'Hosname: hanode-1')
         self.assertTrue(pcmk.wait_for_pcmk(retries=2, sleep=0))
+
+    @mock.patch('subprocess.check_output')
+    def test_crm_version(self, mock_check_output):
+        # xenial
+        mock_check_output.return_value = "crm 2.2.0\n"
+        ret = pcmk.crm_version()
+        self.assertEqual(StrictVersion('2.2.0'), ret)
+        mock_check_output.assert_called_with(['crm', '--version'],
+                                             universal_newlines=True)
+
+        # trusty
+        mock_check_output.mock_reset()
+        mock_check_output.return_value = ("1.2.5 (Build f2f315daf6a5fd7ddea8e5"
+                                          "64cd289aa04218427d)\n")
+        ret = pcmk.crm_version()
+        self.assertEqual(StrictVersion('1.2.5'), ret)
+        mock_check_output.assert_called_with(['crm', '--version'],
+                                             universal_newlines=True)
+
+    @mock.patch('subprocess.check_output')
+    @mock.patch.object(pcmk, 'crm_version')
+    def test_get_property(self, mock_crm_version, mock_check_output):
+        mock_crm_version.return_value = StrictVersion('2.2.0')  # xenial
+        mock_check_output.return_value = 'false\n'
+        self.assertEqual('false\n', pcmk.get_property('maintenance-mode'))
+
+        mock_check_output.assert_called_with(['crm', 'configure',
+                                              'show-property',
+                                              'maintenance-mode'],
+                                             universal_newlines=True)
+
+        mock_crm_version.return_value = StrictVersion('2.4.0')
+        mock_check_output.reset_mock()
+        self.assertEqual('false\n', pcmk.get_property('maintenance-mode'))
+        mock_check_output.assert_called_with(['crm', 'configure',
+                                              'get-property',
+                                              'maintenance-mode'],
+                                             universal_newlines=True)
+
+    @mock.patch('subprocess.check_output')
+    @mock.patch.object(pcmk, 'crm_version')
+    def test_get_property_from_xml(self, mock_crm_version, mock_check_output):
+        mock_crm_version.return_value = StrictVersion('1.2.5')  # trusty
+        mock_check_output.return_value = CRM_CONFIGURE_SHOW_XML
+        self.assertRaises(pcmk.PropertyNotFound, pcmk.get_property,
+                          'maintenance-mode')
+
+        mock_check_output.assert_called_with(['crm', 'configure',
+                                              'show', 'xml'],
+                                             universal_newlines=True)
+        mock_check_output.reset_mock()
+        mock_check_output.return_value = CRM_CONFIGURE_SHOW_XML_MAINT_MODE_TRUE
+        self.assertEqual('true', pcmk.get_property('maintenance-mode'))
+
+        mock_check_output.assert_called_with(['crm', 'configure',
+                                              'show', 'xml'],
+                                             universal_newlines=True)
+
+    @mock.patch('subprocess.check_output')
+    def test_set_property(self, mock_check_output):
+        pcmk.set_property('maintenance-mode', 'false')
+        mock_check_output.assert_called_with(['crm', 'configure', 'property',
+                                              'maintenance-mode=false'],
+                                             universal_newlines=True)

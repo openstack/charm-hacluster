@@ -52,7 +52,15 @@ options:
         sudo cat /etc/corosync/authkey | base64 -w 0
       .
       This configuration element is mandatory and the service will fail on
-      install if it is not provided. The value must be base64 encoded.
+      install if it is not provided.  The value must be base64 encoded.
+  maintenance-mode:
+    type: boolean
+    default: false
+    description: |
+      When enabled pacemaker will be put in maintenance mode, this will allow
+      administrators to manipulate cluster resources (e.g. stop daemons, reboot
+      machines, etc). Pacemaker will not monitor the resources while maintence
+      mode is enabled.
   service_start_timeout:
     type: int
     default: 180

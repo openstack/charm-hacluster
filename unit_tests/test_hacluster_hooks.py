@@ -17,7 +17,7 @@ import os
 import sys
 import tempfile
 import unittest
-
+import test_utils
 
 mock_apt = mock.MagicMock()
 sys.modules['apt_pkg'] = mock_apt
@@ -234,3 +234,48 @@ class TestCorosyncConf(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             hooks.ha_relation_changed()
+
+
+class TestHooks(test_utils.CharmTestCase):
+    TO_PATCH = [
+        'config',
+        'enable_lsb_services'
+    ]
+
+    def setUp(self):
+        super(TestHooks, self).setUp(hooks, self.TO_PATCH)
+        self.config.side_effect = self.test_config.get
+
+    @mock.patch.object(hooks, 'maintenance_mode')
+    @mock.patch.object(hooks, 'is_leader')
+    @mock.patch.object(hooks, 'update_nrpe_config')
+    @mock.patch('pcmk.commit')
+    @mock.patch('pcmk.wait_for_pcmk')
+    @mock.patch.object(hooks, 'configure_corosync')
+    @mock.patch('os.mkdir')
+    @mock.patch('utils.config')
+    @mock.patch('utils.rsync')
+    @mock.patch('utils.mkdir')
+    def test_config_changed(self, mock_mkdir, mock_rsync, mock_config,
+                            mock_os_mkdir, mock_configure_corosync,
+                            mock_wait_for_pcmk, mock_pcmk_commit,
+                            mock_update_nrpe_config, mock_is_leader,
+                            mock_maintenance_mode):
+
+        mock_config.side_effect = self.test_config.get
+        mock_wait_for_pcmk.return_value = True
+        mock_is_leader.return_value = True
+        hooks.config_changed()
+        mock_maintenance_mode.assert_not_called()
+
+        # enable maintenance
+        self.test_config.set_previous('maintenance-mode', False)
+        self.test_config.set('maintenance-mode', True)
+        hooks.config_changed()
+        mock_maintenance_mode.assert_called_with(True)
+
+        # disable maintenance
+        self.test_config.set_previous('maintenance-mode', True)
+        self.test_config.set('maintenance-mode', False)
+        hooks.config_changed()
+        mock_maintenance_mode.assert_called_with(False)

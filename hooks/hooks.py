@@ -23,6 +23,7 @@ import pcmk
 import socket
 
 from charmhelpers.core.hookenv import (
+    is_leader,
     log,
     DEBUG,
     INFO,
@@ -75,6 +76,7 @@ from utils import (
     ocf_file_exists,
     kill_legacy_ocf_daemon_process,
     try_pcmk_wait,
+    maintenance_mode,
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
@@ -137,7 +139,7 @@ def ensure_ipv6_requirements(hanode_rid):
                      **{'private-address': addr})
 
 
-@hooks.hook()
+@hooks.hook('config-changed')
 def config_changed():
 
     setup_ocf_files()
@@ -165,6 +167,11 @@ def config_changed():
         configure_stonith()
 
     update_nrpe_config()
+
+    cfg = config()
+    if (is_leader() and
+            cfg.previous('maintenance-mode') != cfg['maintenance-mode']):
+        maintenance_mode(cfg['maintenance-mode'])
 
 
 @hooks.hook()

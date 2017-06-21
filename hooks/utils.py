@@ -834,6 +834,22 @@ def assess_status_helper():
             status = 'blocked'
             message = ("Insufficient peer units for ha cluster "
                        "(require {})".format(node_count))
+
+    # if the status was not changed earlier, we verify the maintenance status
+    try:
+        if status == 'active':
+            prop = pcmk.get_property('maintenance-mode').strip()
+    except pcmk.PropertyNotFound:
+        # the property is not the output of 'crm configure show xml', so we use
+        # the default value for this property. For crmsh>=2.2.0 the default
+        # value is automatically provided by show-property or get-property.
+        prop = 'false'
+
+    if (status == 'active' and prop == 'true'):
+        # maintenance mode enabled in pacemaker
+        status = 'maintenance'
+        message = 'Pacemaker in maintenance mode'
+
     return status, message
 
 
@@ -871,3 +887,22 @@ def kill_legacy_ocf_daemon_process(res_name):
     if res:
         pid = res.group(1)
         subprocess.call(['sudo', 'kill', '-9', pid])
+
+
+def maintenance_mode(enable):
+    """Enable/disable pacemaker's maintenance mode"""
+
+    log('Setting maintenance-mode to %s' % enable, level=INFO)
+
+    try:
+        current_state = pcmk.get_property('maintenance-mode').strip().lower()
+    except pcmk.PropertyNotFound:
+        current_state = 'false'
+
+    current_state = True if current_state == 'true' else False
+    log('Is maintenance-mode currently enabled? %s' % current_state,
+        level=DEBUG)
+    if current_state != enable:
+        pcmk.set_property('maintenance-mode', str(enable).lower())
+    else:
+        log('Desired value for maintenance-mode is already set', level=DEBUG)
