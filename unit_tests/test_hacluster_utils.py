@@ -381,3 +381,30 @@ class UtilsTestCase(unittest.TestCase):
         utils.maintenance_mode(False)
         mock_get_property.assert_called_with('maintenance-mode')
         mock_set_property.assert_not_called()
+
+    @mock.patch('subprocess.check_call')
+    def test_needs_maas_dns_migration(self, check_call):
+        ret = utils.needs_maas_dns_migration()
+        self.assertEqual(True, ret)
+
+        check_call.side_effect = subprocess.CalledProcessError(1, '')
+        ret = utils.needs_maas_dns_migration()
+        self.assertEqual(False, ret)
+
+    def test_get_ip_addr_from_resource_params(self):
+        param_str = 'params fqdn="keystone.maas" ip_address="{}" '
+        for addr in ("172.16.0.4", "2001:0db8:85a3:0000:0000:8a2e:0370:7334"):
+            ip = utils.get_ip_addr_from_resource_params(param_str.format(addr))
+            self.assertEqual(addr, ip)
+
+        ip = utils.get_ip_addr_from_resource_params("no_ip_addr")
+        self.assertEqual(None, ip)
+
+    @mock.patch.object(utils, 'write_file')
+    @mock.patch.object(utils, 'mkdir')
+    def test_write_maas_dns_address(self, mkdir, write_file):
+        utils.write_maas_dns_address("res_keystone_public_hostname",
+                                     "172.16.0.1")
+        mkdir.assert_called_once_with("/etc/maas_dns")
+        write_file.assert_called_once_with(
+            "/etc/maas_dns/res_keystone_public_hostname", content="172.16.0.1")
