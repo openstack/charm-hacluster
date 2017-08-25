@@ -32,6 +32,7 @@ class TestCorosyncConf(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
 
+    @mock.patch.object(hooks, 'write_maas_dns_address')
     @mock.patch('pcmk.wait_for_pcmk')
     @mock.patch.object(hooks, 'peer_units')
     @mock.patch('pcmk.crm_opt_exists')
@@ -54,7 +55,7 @@ class TestCorosyncConf(unittest.TestCase):
                                  configure_stonith, configure_monitor_host,
                                  configure_cluster_global, configure_corosync,
                                  oldest_peer, crm_opt_exists, peer_units,
-                                 wait_for_pcmk):
+                                 wait_for_pcmk, write_maas_dns_address):
         crm_opt_exists.return_value = False
         oldest_peer.return_value = True
         related_units.return_value = ['ha/0', 'ha/1', 'ha/2']
@@ -90,6 +91,7 @@ class TestCorosyncConf(unittest.TestCase):
         configure_monitor_host.assert_called_with()
         configure_cluster_global.assert_called_with()
         configure_corosync.assert_called_with()
+        write_maas_dns_address.assert_not_called()
 
         for kw, key in [('location', 'locations'),
                         ('clone', 'clones'),
@@ -108,6 +110,7 @@ class TestCorosyncConf(unittest.TestCase):
                     commit.assert_any_call(
                         'crm -w -F configure %s %s %s' % (kw, name, params))
 
+    @mock.patch.object(hooks, 'write_maas_dns_address')
     @mock.patch.object(hooks, 'setup_maas_api')
     @mock.patch.object(hooks, 'validate_dns_ha')
     @mock.patch('pcmk.wait_for_pcmk')
@@ -135,7 +138,7 @@ class TestCorosyncConf(unittest.TestCase):
                                         configure_corosync, oldest_peer,
                                         crm_opt_exists, peer_units,
                                         wait_for_pcmk, validate_dns_ha,
-                                        setup_maas_api):
+                                        setup_maas_api, write_maas_dns_addr):
         validate_dns_ha.return_value = True
         crm_opt_exists.return_value = False
         oldest_peer.return_value = True
@@ -158,7 +161,9 @@ class TestCorosyncConf(unittest.TestCase):
                         'groups': {'grp_foo': 'res_foo'},
                         'colocations': {'co_foo': 'inf: grp_foo cl_foo'},
                         'resources': {'res_foo_hostname': 'ocf:maas:dns'},
-                        'resource_params': {'res_foo_hostname': 'params bar'},
+                        'resource_params': {
+                            'res_foo_hostname': 'params bar '
+                                                'ip_address="172.16.0.1"'},
                         'ms': {'ms_foo': 'res_foo meta notify=true'},
                         'orders': {'foo_after': 'inf: res_foo ms_foo'}}
 
@@ -170,10 +175,12 @@ class TestCorosyncConf(unittest.TestCase):
         hooks.ha_relation_changed()
         self.assertTrue(validate_dns_ha.called)
         self.assertTrue(setup_maas_api.called)
+        write_maas_dns_addr.assert_called_with('res_foo_hostname',
+                                               '172.16.0.1')
         # Validate maas_credentials and maas_url are added to params
         commit.assert_any_call(
             'crm -w -F configure primitive res_foo_hostname ocf:maas:dns '
-            'params bar maas_url="http://maas/MAAAS/" '
+            'params bar ip_address="172.16.0.1" maas_url="http://maas/MAAAS/" '
             'maas_credentials="secret"')
 
     @mock.patch.object(hooks, 'setup_maas_api')
@@ -279,3 +286,37 @@ class TestHooks(test_utils.CharmTestCase):
         self.test_config.set('maintenance-mode', False)
         hooks.config_changed()
         mock_maintenance_mode.assert_called_with(False)
+
+    @mock.patch.object(hooks, 'needs_maas_dns_migration')
+    @mock.patch.object(hooks, 'relation_ids')
+    def test_migrate_maas_dns_no_migration(self, relation_ids,
+                                           needs_maas_dns_migration):
+        needs_maas_dns_migration.return_value = False
+        hooks.migrate_maas_dns()
+        relation_ids.assert_not_called()
+
+    @mock.patch.object(hooks, 'needs_maas_dns_migration')
+    @mock.patch.object(hooks, 'write_maas_dns_address')
+    @mock.patch.object(hooks, 'relation_ids')
+    @mock.patch.object(hooks, 'related_units')
+    @mock.patch.object(hooks, 'parse_data')
+    def test_migrate_maas_dns_(self, parse_data, related_units, relation_ids,
+                               write_maas_dns_address,
+                               needs_maas_dns_migration):
+        needs_maas_dns_migration.return_value = True
+        related_units.return_value = 'keystone/0'
+        relation_ids.return_value = 'ha:4'
+
+        def mock_parse_data(relid, unit, key):
+            if key == 'resources':
+                return {'res_keystone_public_hostname': 'ocf:maas:dns'}
+            elif key == 'resource_params':
+                return {'res_keystone_public_hostname':
+                        'params fqdn="keystone.maas" ip_address="172.16.0.1"'}
+            else:
+                raise KeyError("unexpected key {}".format(key))
+
+        parse_data.side_effect = mock_parse_data
+        hooks.migrate_maas_dns()
+        write_maas_dns_address.assert_called_with(
+            "res_keystone_public_hostname", "172.16.0.1")

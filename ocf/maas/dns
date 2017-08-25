@@ -42,6 +42,7 @@
 #    OCF_RESKEY_ttl
 #    OCF_RESKEY_maas_url
 #    OCF_RESKEY_maas_credentials
+#    OCF_RESKEY_cfg_dir
 
 # Defaults
 
@@ -53,6 +54,28 @@ Expects to have a fully populated OCF RA-compliant environment set.
 END
 }
 
+# Retrieve the local IP for the current resource
+#
+# returns:
+# ip address contained in $OCF_RESKEY_cfg_dir/$OCF_RESOURCE_INSTANCE
+# no = nothing or no file
+my_ip() {
+	if [ ! -r $ipaddrfile ]
+	then
+		echo "no"
+		return 0
+	fi
+
+	ip_addr=`cat $OCF_RESKEY_cfg_dir/$OCF_RESOURCE_INSTANCE`
+	if [ "x$ip_addr" != "x" ]
+	then
+		echo $ip_addr
+		return 0
+	else
+		echo "no"
+		return 0
+	fi
+}
 
 # Do we already serve this IP address on the given $NIC?
 #
@@ -66,7 +89,17 @@ dns_served() {
 	target=`dig +short $OCF_RESKEY_fqdn`
 	if [ "x$target" != "x" ]
 	then
-		if test "$OCF_RESKEY_ip_address" = "$target"
+		ip_address=`my_ip`
+		# The $ip_address should be set as it is ensured in the validate
+		# function, but this is a sanity check. The maas_dns.log file should
+		# contain the error that the $ip_address file is not found.
+		if test "$ip_address" = "no"
+		then
+			echo "no"
+			return 0
+		fi
+
+		if test "$ip_address" = "$target"
 		then
 			echo "ok"
 			return 0
@@ -95,8 +128,13 @@ maas_dns_start() {
 	if [ "$dns_status" = "ok" ]; then
 		exit $OCF_SUCCESS
 	fi
+	local myipaddr=`my_ip`
+	if [ "$myipaddr" = "no" ]; then
+		ocf_log err "No ip address found in $ipaddrfile"
+		exit $OCF_ERR_GENERIC
+	fi
 
-	cmd="python3 $binfile --fqdn=$OCF_RESKEY_fqdn --ip_address=$OCF_RESKEY_ip_address --maas_server=$OCF_RESKEY_maas_url --maas_credentials=$OCF_RESKEY_maas_credentials "
+	cmd="python3 $binfile --fqdn=$OCF_RESKEY_fqdn --ip_address=$myipaddr --maas_server=$OCF_RESKEY_maas_url --maas_credentials=$OCF_RESKEY_maas_credentials "
 	if [ -n "$OCF_RESKEY_ttl" ]; then
 		cmd="$cmd --ttl=$OCF_RESKEY_ttl"
 	fi
@@ -133,7 +171,6 @@ maas_dns_monitor() {
 		return $OCF_SUCCESS
 		;;
 	no)
-		exit 7
 		exit $OCF_NOT_RUNNING
 		;;
 	*)
@@ -148,6 +185,7 @@ binfile="$HA_BIN/maas_dns.py"
 logfile="$OCF_RESKEY_logfile"
 errlogfile="$OCF_RESKEY_errlogfile"
 user="$OCF_RESKEY_user"
+ipaddrfile="$OCF_RESKEY_cfg_dir/$OCF_RESOURCE_INSTANCE"
 [ -z "$user" ] && user=root
 
 maas_dns_validate() {
@@ -171,6 +209,16 @@ maas_dns_validate() {
 			}
 		fi
 	done
+	if [ ! -r $ipaddrfile ]
+	then
+		ocf_log err "$ipaddrfile does not exist or cannot be read"
+		exit $OCF_ERR_INSTALLED
+	fi
+	if [ `my_ip` = "no" ]
+	then
+		ocf_log err "IP address is not found in $ipaddrfile"
+		exit $OCF_ERR_INSTALLED
+	fi
 	return $OCF_SUCCESS
 }
 
@@ -192,9 +240,9 @@ The fully qualified domain name for the DNS entry.
 <shortdesc lang="en">Fully qualified domain name</shortdesc>
 <content type="string" default=""/>
 </parameter>
-<parameter name="ip_address" required="1">
+<parameter name="ip_address" required="0">
 <longdesc lang="en">
-The IP address for the DNS entry
+The IP address for the DNS entry. Deprecated option, do not use.
 </longdesc>
 <shortdesc lang="en">IP Address</shortdesc>
 <content type="string" />
@@ -226,6 +274,14 @@ File to write STDERR to
 </longdesc>
 <shortdesc lang="en">File to write STDERR to</shortdesc>
 <content type="string" />
+</parameter>
+<parameter name="cfg_dir" required="0">
+<longdesc lang="en">
+Directory containing resource config files containing IP address information
+for the resource running on the local server.
+</longdesc>
+<shortdesc lang="en">IP address config file directory</shortdesc>
+<content type="string" default="/etc/maas_dns"/>
 </parameter>
 </parameters>
 <actions>

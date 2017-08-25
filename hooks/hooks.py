@@ -69,6 +69,7 @@ from utils import (
     disable_lsb_services,
     disable_upstart_services,
     get_ipv6_addr,
+    get_ip_addr_from_resource_params,
     validate_dns_ha,
     setup_maas_api,
     setup_ocf_files,
@@ -77,6 +78,8 @@ from utils import (
     kill_legacy_ocf_daemon_process,
     try_pcmk_wait,
     maintenance_mode,
+    needs_maas_dns_migration,
+    write_maas_dns_address,
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
@@ -174,10 +177,34 @@ def config_changed():
         maintenance_mode(cfg['maintenance-mode'])
 
 
+def migrate_maas_dns():
+    """
+    Migrates the MAAS DNS HA configuration to write local IP address
+    information to files.
+    """
+    if not needs_maas_dns_migration():
+        log("MAAS DNS migration is not necessary.", INFO)
+        return
+
+    for relid in relation_ids('ha'):
+        for unit in related_units(relid):
+            resources = parse_data(relid, unit, 'resources')
+            resource_params = parse_data(relid, unit, 'resource_params')
+
+            if True in [ra.startswith('ocf:maas')
+                        for ra in resources.values()]:
+                for resource in resource_params.keys():
+                    if resource.endswith("_hostname"):
+                        res_ipaddr = get_ip_addr_from_resource_params(
+                            resource_params[resource])
+                        log("Migrating MAAS DNS resource %s" % resource, INFO)
+                        write_maas_dns_address(resource, res_ipaddr)
+
+
 @hooks.hook()
 def upgrade_charm():
     install()
-
+    migrate_maas_dns()
     update_nrpe_config()
 
 
@@ -258,10 +285,13 @@ def ha_relation_changed():
             # credentials
             for resource in resource_params.keys():
                 if resource.endswith("_hostname"):
+                    res_ipaddr = get_ip_addr_from_resource_params(
+                        resource_params[resource])
                     resource_params[resource] += (
                         ' maas_url="{}" maas_credentials="{}"'
                         ''.format(config('maas_url'),
                                   config('maas_credentials')))
+                    write_maas_dns_address(resource, res_ipaddr)
         else:
             msg = ("DNS HA is requested but maas_url "
                    "or maas_credentials are not set")
