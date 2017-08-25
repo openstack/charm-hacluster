@@ -103,7 +103,7 @@ SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
 DEPRECATED_TRANSPORT_VALUES = {"multicast": "udp", "unicast": "udpu"}
 
 
-@hooks.hook()
+@hooks.hook('install.real')
 def install():
     ubuntu_release = lsb_release()['DISTRIB_CODENAME'].lower()
     if CompareHostReleases(ubuntu_release) >= 'zesty':
