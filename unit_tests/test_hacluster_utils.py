@@ -104,8 +104,8 @@ class UtilsTestCase(unittest.TestCase):
         self.assertRaises(ValueError, utils.get_transport)
 
     def test_nulls(self):
-        self.assertEquals(utils.nulls({'a': '', 'b': None, 'c': False}),
-                          ['a', 'b'])
+        self.assertEqual(utils.nulls({'a': '', 'b': None, 'c': False}),
+                         ['a', 'b'])
 
     @mock.patch.object(utils, 'local_unit', lambda *args: 'hanode/0')
     @mock.patch.object(utils, 'get_ipv6_addr')
@@ -227,7 +227,7 @@ class UtilsTestCase(unittest.TestCase):
     def test_try_pcmk_wait(self, mock_wait_for_pcmk):
         # Returns OK
         mock_wait_for_pcmk.side_effect = None
-        self.assertEquals(None, utils.try_pcmk_wait())
+        self.assertEqual(None, utils.try_pcmk_wait())
 
         # Raises Exception
         mock_wait_for_pcmk.side_effect = pcmk.ServicesNotUp
@@ -329,7 +329,7 @@ class UtilsTestCase(unittest.TestCase):
         mock_is_unit_paused_set.return_value = True
         mock_path_exists.return_value = True
         utils.emit_systemd_overrides_file()
-        self.assertEquals(2, len(mock_write_file.mock_calls))
+        self.assertEqual(2, len(mock_write_file.mock_calls))
         mock_render_template.assert_has_calls(
             [mock.call('systemd-overrides.conf', cfg),
              mock.call('systemd-overrides.conf', cfg)])
@@ -348,7 +348,7 @@ class UtilsTestCase(unittest.TestCase):
         mock_is_unit_paused_set.return_value = True
         mock_path_exists.return_value = True
         utils.emit_systemd_overrides_file()
-        self.assertEquals(2, len(mock_write_file.mock_calls))
+        self.assertEqual(2, len(mock_write_file.mock_calls))
         mock_render_template.assert_has_calls(
             [mock.call('systemd-overrides.conf', expected_cfg),
              mock.call('systemd-overrides.conf', expected_cfg)])
