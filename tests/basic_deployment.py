@@ -47,7 +47,7 @@ except pcmk.PropertyNotFound:
 
 class HAClusterBasicDeployment(OpenStackAmuletDeployment):
 
-    def __init__(self, series=None, openstack=None, source=None, stable=False):
+    def __init__(self, series=None, openstack=None, source=None, stable=True):
         """Deploy the entire test environment."""
         super(HAClusterBasicDeployment, self).__init__(series, openstack,
                                                        source, stable)
