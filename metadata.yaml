@@ -5,11 +5,12 @@ subordinate: true
 description: |
  Corosync/Pacemaker
 tags:
- - misc
+  - misc
 series:
- - xenial
- - trusty
- - zesty
+  - xenial
+  - artful
+  - trusty
+  - zesty
 requires:
   juju-info:
     interface: juju-info
