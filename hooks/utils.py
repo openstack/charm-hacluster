@@ -110,6 +110,9 @@ SYSTEMD_OVERRIDES_DIR = '/etc/systemd/system/{}.service.d'
 SYSTEMD_OVERRIDES_FILE = '{}/overrides.conf'
 
 
+MAAS_DNS_CONF_DIR = '/etc/maas_dns'
+
+
 class MAASConfigIncomplete(Exception):
     pass
 
@@ -561,6 +564,16 @@ def configure_cluster_global():
     pcmk.commit(cmd)
 
 
+def get_ip_addr_from_resource_params(params):
+    """Returns the IP address in the resource params provided
+
+    :return: the IP address in the params or None if not found
+    """
+    reg_ex = r'.* ip_address="([a-fA-F\d\:\.]+)".*'
+    res = re.search(reg_ex, params)
+    return res.group(1) if res else None
+
+
 def restart_corosync_on_change():
     """Simple decorator to restart corosync if any of its config changes"""
     def wrap(f):
@@ -708,6 +721,33 @@ def setup_ocf_files():
     rsync('ocf/maas/dns', '/usr/lib/ocf/resource.d/maas/dns')
     rsync('ocf/maas/maas_dns.py', '/usr/lib/heartbeat/maas_dns.py')
     rsync('ocf/maas/maasclient/', '/usr/lib/heartbeat/maasclient/')
+
+
+def write_maas_dns_address(resource_name, resource_addr):
+    """Writes the specified IP address to the resource file for MAAS dns.
+
+    :param resource_name: the name of the resource the address belongs to.
+        This is the name of the file that will be written in /etc/maas_dns.
+    :param resource_addr: the IP address for the resource. This will be
+        written to the resource_name file.
+    """
+    mkdir(MAAS_DNS_CONF_DIR)
+    write_file(os.path.join(MAAS_DNS_CONF_DIR, resource_name),
+               content=resource_addr)
+
+
+def needs_maas_dns_migration():
+    """Determines if the MAAS DNS ocf resources need migration.
+
+    :return: True if migration is necessary, False otherwise.
+    """
+    try:
+        subprocess.check_call(['grep', 'OCF_RESOURCE_INSTANCE',
+                               '/usr/lib/ocf/resource.d/maas/dns'])
+        return True
+    except subprocess.CalledProcessError:
+        # check_call will raise an exception if grep doesn't find the string
+        return False
 
 
 def is_in_standby_mode(node_name):
