@@ -3,3 +3,4 @@ bin/
 .tox
 .testrepository
 .coverage
+.stestr

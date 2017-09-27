@@ -29,12 +29,10 @@ from charmhelpers.core.hookenv import (
     INFO,
     related_units,
     relation_ids,
-    relation_get,
     relation_set,
     config,
     Hooks,
     UnregisteredHookError,
-    local_unit,
     status_set,
 )
 
@@ -43,6 +41,10 @@ from charmhelpers.core.host import (
     service_running,
     lsb_release,
     CompareHostReleases,
+)
+
+from charmhelpers.contrib.network.ip import (
+    get_relation_ip,
 )
 
 from charmhelpers.fetch import (
@@ -68,7 +70,6 @@ from utils import (
     enable_lsb_services,
     disable_lsb_services,
     disable_upstart_services,
-    get_ipv6_addr,
     get_ip_addr_from_resource_params,
     validate_dns_ha,
     setup_maas_api,
@@ -83,9 +84,6 @@ from utils import (
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
-from charmhelpers.contrib.network.ip import (
-    is_ipv6,
-)
 
 hooks = Hooks()
 
@@ -130,18 +128,6 @@ def get_transport():
     return val
 
 
-def ensure_ipv6_requirements(hanode_rid):
-    # hanode relation needs ipv6 private-address
-    addr = relation_get(rid=hanode_rid, unit=local_unit(),
-                        attribute='private-address')
-    log("Current private-address is %s" % (addr))
-    if not is_ipv6(addr):
-        addr = get_ipv6_addr()
-        log("New private-address is %s" % (addr))
-        relation_set(relation_id=hanode_rid,
-                     **{'private-address': addr})
-
-
 @hooks.hook('config-changed')
 def config_changed():
 
@@ -158,9 +144,8 @@ def config_changed():
 
     enable_lsb_services('pacemaker')
 
-    if config('prefer-ipv6'):
-        for rid in relation_ids('hanode'):
-            ensure_ipv6_requirements(rid)
+    for rid in relation_ids('hanode'):
+        hanode_relation_joined(rid)
 
     status_set('maintenance', "Setting up corosync")
     if configure_corosync():
@@ -208,17 +193,17 @@ def upgrade_charm():
     update_nrpe_config()
 
 
-@hooks.hook('hanode-relation-joined',
-            'hanode-relation-changed')
-def hanode_relation_changed():
-    if config('prefer-ipv6'):
-        ensure_ipv6_requirements(None)
-
-    ha_relation_changed()
+@hooks.hook('hanode-relation-joined')
+def hanode_relation_joined(relid=None):
+    relation_set(
+        relation_id=relid,
+        relation_settings={'private-address': get_relation_ip('hanode')}
+    )
 
 
 @hooks.hook('ha-relation-joined',
-            'ha-relation-changed')
+            'ha-relation-changed',
+            'hanode-relation-changed')
 def ha_relation_changed():
     # Check that we are related to a principle and that
     # it has already provided the required corosync configuration

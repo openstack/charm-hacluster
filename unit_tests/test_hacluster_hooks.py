@@ -253,6 +253,8 @@ class TestHooks(test_utils.CharmTestCase):
         super(TestHooks, self).setUp(hooks, self.TO_PATCH)
         self.config.side_effect = self.test_config.get
 
+    @mock.patch.object(hooks, 'relation_ids')
+    @mock.patch.object(hooks, 'hanode_relation_joined')
     @mock.patch.object(hooks, 'maintenance_mode')
     @mock.patch.object(hooks, 'is_leader')
     @mock.patch.object(hooks, 'update_nrpe_config')
@@ -267,13 +269,18 @@ class TestHooks(test_utils.CharmTestCase):
                             mock_os_mkdir, mock_configure_corosync,
                             mock_wait_for_pcmk, mock_pcmk_commit,
                             mock_update_nrpe_config, mock_is_leader,
-                            mock_maintenance_mode):
+                            mock_maintenance_mode,
+                            mock_hanode_relation_joined,
+                            mock_relation_ids):
 
         mock_config.side_effect = self.test_config.get
+        mock_relation_ids.return_value = ['hanode:1']
         mock_wait_for_pcmk.return_value = True
         mock_is_leader.return_value = True
         hooks.config_changed()
         mock_maintenance_mode.assert_not_called()
+        mock_relation_ids.assert_called_with('hanode')
+        mock_hanode_relation_joined.assert_called_once_with('hanode:1')
 
         # enable maintenance
         self.test_config.set_previous('maintenance-mode', False)
@@ -320,3 +327,16 @@ class TestHooks(test_utils.CharmTestCase):
         hooks.migrate_maas_dns()
         write_maas_dns_address.assert_called_with(
             "res_keystone_public_hostname", "172.16.0.1")
+
+    @mock.patch.object(hooks, 'get_relation_ip')
+    @mock.patch.object(hooks, 'relation_set')
+    def test_hanode_relation_joined(self,
+                                    mock_relation_set,
+                                    mock_get_relation_ip):
+        mock_get_relation_ip.return_value = '10.10.10.2'
+        hooks.hanode_relation_joined('hanode:1')
+        mock_get_relation_ip.assert_called_once_with('hanode')
+        mock_relation_set.assert_called_once_with(
+            relation_id='hanode:1',
+            relation_settings={'private-address': '10.10.10.2'}
+        )
