@@ -14,7 +14,7 @@ functional_test:
 
 bin/charm_helpers_sync.py:
 	@mkdir -p bin
-	@bzr cat lp:charm-helpers/tools/charm_helpers_sync/charm_helpers_sync.py \
+	@bzr cat lp:~openstack-charmers/charm-helpers/stable/tools/charm_helpers_sync/charm_helpers_sync.py \
 	> bin/charm_helpers_sync.py
 
 sync: bin/charm_helpers_sync.py
