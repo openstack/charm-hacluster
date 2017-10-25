@@ -45,6 +45,13 @@
 #    OCF_RESKEY_cfg_dir
 
 # Defaults
+OCF_RESKEY_cfg_dir_default="/etc/maas_dns"
+OCF_RESKEY_logfile_default="/var/log/maas_dns_${OCF_RESOURCE_INSTANCE}.log"
+OCF_RESKEY_errlogfile_default="/var/log/maas_dns_${OCF_RESOURCE_INSTANCE}_error.log"
+
+: ${OCF_RESKEY_cfg_dir=${OCF_RESKEY_cfg_dir_default}}
+: ${OCF_RESKEY_logfile=${OCF_RESKEY_logfile_default}}
+: ${OCF_RESKEY_errlogfile=${OCF_RESKEY_errlogfile_default}}
 
 
 maas_dns_usage() {
@@ -181,11 +188,11 @@ maas_dns_monitor() {
 
 }
 
-binfile="$HA_BIN/maas_dns.py"
+binfile="${HA_BIN}/maas_dns.py"
 logfile="$OCF_RESKEY_logfile"
 errlogfile="$OCF_RESKEY_errlogfile"
 user="$OCF_RESKEY_user"
-ipaddrfile="$OCF_RESKEY_cfg_dir/$OCF_RESOURCE_INSTANCE"
+ipaddrfile="${OCF_RESKEY_cfg_dir}/${OCF_RESOURCE_INSTANCE}"
 [ -z "$user" ] && user=root
 
 maas_dns_validate() {
@@ -266,14 +273,14 @@ MAAS Oauth credentials for the MAAS API
 File to write STDOUT to
 </longdesc>
 <shortdesc lang="en">File to write STDOUT to</shortdesc>
-<content type="string" />
+<content type="string" default="${OCF_RESKEY_logfile_default_default}"/>
 </parameter>
 <parameter name="errlogfile" required="0">
 <longdesc lang="en">
 File to write STDERR to
 </longdesc>
 <shortdesc lang="en">File to write STDERR to</shortdesc>
-<content type="string" />
+<content type="string" default="${OCF_RESKEY_errlogfile_default_default}"/>
 </parameter>
 <parameter name="cfg_dir" required="0">
 <longdesc lang="en">
@@ -281,7 +288,7 @@ Directory containing resource config files containing IP address information
 for the resource running on the local server.
 </longdesc>
 <shortdesc lang="en">IP address config file directory</shortdesc>
-<content type="string" default="/etc/maas_dns"/>
+<content type="string" default="${OCF_RESKEY_cfg_dir_default}"/>
 </parameter>
 </parameters>
 <actions>
