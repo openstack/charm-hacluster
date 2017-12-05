@@ -8,9 +8,9 @@ tags:
   - misc
 series:
   - xenial
+  - bionic
   - artful
   - trusty
-  - zesty
 requires:
   juju-info:
     interface: juju-info
