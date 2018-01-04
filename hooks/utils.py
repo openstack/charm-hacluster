@@ -17,6 +17,7 @@
 import ast
 import pcmk
 import maas
+import json
 import os
 import re
 import subprocess
@@ -457,10 +458,14 @@ def get_cluster_nodes():
 
 
 def parse_data(relid, unit, key):
-    """Simple helper to ast parse relation data"""
-    data = relation_get(key, unit, relid)
+    """Helper to detect and parse json or ast based relation data"""
+    _key = 'json_{}'.format(key)
+    data = relation_get(_key, unit, relid) or relation_get(key, unit, relid)
     if data:
-        return ast.literal_eval(data)
+        try:
+            return json.loads(data)
+        except (TypeError, ValueError):
+            return ast.literal_eval(data)
 
     return {}
 
