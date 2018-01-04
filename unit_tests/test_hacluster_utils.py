@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import mock
 import os
 import re
@@ -408,3 +409,35 @@ class UtilsTestCase(unittest.TestCase):
         mkdir.assert_called_once_with("/etc/maas_dns")
         write_file.assert_called_once_with(
             "/etc/maas_dns/res_keystone_public_hostname", content="172.16.0.1")
+
+    @mock.patch.object(utils, 'relation_get')
+    def test_parse_data_legacy(self, relation_get):
+        _rel_data = {
+            'testkey': repr({'test': 1})
+        }
+        relation_get.side_effect = lambda key, relid, unit: _rel_data.get(key)
+        self.assertEqual(utils.parse_data('hacluster:1',
+                                          'neutron-api/0',
+                                          'testkey'),
+                         {'test': 1})
+        relation_get.assert_has_calls([
+            mock.call('json_testkey', 'neutron-api/0', 'hacluster:1'),
+            mock.call('testkey', 'neutron-api/0', 'hacluster:1'),
+        ])
+
+    @mock.patch.object(utils, 'relation_get')
+    def test_parse_data_json(self, relation_get):
+        _rel_data = {
+            'json_testkey': json.dumps({'test': 1}),
+            'testkey': repr({'test': 1})
+        }
+        relation_get.side_effect = lambda key, relid, unit: _rel_data.get(key)
+        self.assertEqual(utils.parse_data('hacluster:1',
+                                          'neutron-api/0',
+                                          'testkey'),
+                         {'test': 1})
+        # NOTE(jamespage): as json is the preferred format, the call for
+        #                  testkey should not occur.
+        relation_get.assert_has_calls([
+            mock.call('json_testkey', 'neutron-api/0', 'hacluster:1'),
+        ])
