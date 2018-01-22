@@ -10,7 +10,6 @@ series:
   - xenial
   - artful
   - trusty
-  - zesty
 requires:
   juju-info:
     interface: juju-info
