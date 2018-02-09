@@ -552,16 +552,12 @@ def configure_monitor_host():
 def configure_cluster_global():
     """Configure global cluster options"""
     log('Applying global cluster configuration', level=DEBUG)
-    if int(config('cluster_count')) >= 3:
-        # NOTE(jamespage) if 3 or more nodes, then quorum can be
-        # managed effectively, so stop if quorum lost
-        log('Configuring no-quorum-policy to stop', level=DEBUG)
-        cmd = "crm configure property no-quorum-policy=stop"
-    else:
-        # NOTE(jamespage) if less that 3 nodes, quorum not possible
-        # so ignore
-        log('Configuring no-quorum-policy to ignore', level=DEBUG)
-        cmd = "crm configure property no-quorum-policy=ignore"
+    # NOTE(lathiat) quorum in a two-node scenario is handled by
+    # corosync two_node=1.  In this case quorum is required for
+    # initial cluster startup but not if a node was previously in
+    # contact with the full cluster.
+    log('Configuring no-quorum-policy to stop', level=DEBUG)
+    cmd = "crm configure property no-quorum-policy=stop"
 
     pcmk.commit(cmd)
     cmd = ('crm configure rsc_defaults $id="rsc-options" '
