@@ -27,6 +27,9 @@ from charmhelpers.contrib.openstack.amulet.utils import (
     DEBUG,
     # ERROR
 )
+import keystoneclient
+from keystoneclient.v2_0 import client as keystone_client
+from keystoneclient.v3 import client as keystone_client_v3
 
 # Use DEBUG to turn on debug logging
 u = OpenStackAmuletUtils(DEBUG)
@@ -132,10 +135,22 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
         # Authenticate keystone admin
         u.log.debug('Authenticating keystone admin against VIP: '
                     '{}'.format(self._vip))
-        self.keystone = u.authenticate_keystone_admin(self.keystone_sentry,
-                                                      user='admin',
-                                                      password='openstack',
-                                                      tenant='admin')
+#
+        api_version = 2
+        client_class = keystone_client.Client
+        if self._get_openstack_release() >= self.xenial_queens:
+            api_version = 3
+            client_class = keystone_client_v3.Client
+        self.keystone_session, auth = u.get_keystone_session(
+            self._vip,
+            api_version=api_version,
+            username='admin',
+            password='openstack',
+            project_name='admin',
+            user_domain_name='admin_domain',
+            project_domain_name='admin_domain')
+        self.keystone = client_class(session=self.keystone_session)
+        self.keystone.auth_ref = auth.get_access(self.keystone_session)
 
         # Create a demo tenant/role/user
         u.log.debug('Creating keystone demo tenant, role and user against '
@@ -143,24 +158,71 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
         self.demo_tenant = 'demoTenant'
         self.demo_role = 'demoRole'
         self.demo_user = 'demoUser'
+        self.demo_project = 'demoProject'
+        self.demo_domain = 'demoDomain'
+        if self._get_openstack_release() >= self.xenial_queens:
+            self.create_users_v3()
+            self.demo_user_session, auth = u.get_keystone_session(
+                self._vip,
+                self.demo_user,
+                'password',
+                api_version=3,
+                user_domain_name=self.demo_domain,
+                project_domain_name=self.demo_domain,
+                project_name=self.demo_project
+            )
+            self.keystone_demo = keystone_client_v3.Client(
+                session=self.demo_user_session)
+        else:
+            self.create_users_v2()
+            # Authenticate demo user with keystone (authenticate_keystone_user
+            # looks up identity-service in service catalogue so uses vip)
+            self.keystone_demo = \
+                u.authenticate_keystone_user(
+                    self.keystone, user=self.demo_user,
+                    password='password',
+                    tenant=self.demo_tenant)
+
+    def create_users_v3(self):
+        try:
+            self.keystone.projects.find(name=self.demo_project)
+        except keystoneclient.exceptions.NotFound:
+            domain = self.keystone.domains.create(
+                self.demo_domain,
+                description='Demo Domain',
+                enabled=True
+            )
+            project = self.keystone.projects.create(
+                self.demo_project,
+                domain,
+                description='Demo Project',
+                enabled=True,
+            )
+            user = self.keystone.users.create(
+                self.demo_user,
+                domain=domain.id,
+                project=self.demo_project,
+                password='password',
+                email='demov3@demo.com',
+                description='Demo',
+                enabled=True)
+            role = self.keystone.roles.find(name='Admin')
+            self.keystone.roles.grant(
+                role.id,
+                user=user.id,
+                project=project.id)
+
+    def create_users_v2(self):
         if not u.tenant_exists(self.keystone, self.demo_tenant):
             tenant = self.keystone.tenants.create(tenant_name=self.demo_tenant,
                                                   description='demo tenant',
                                                   enabled=True)
+
             self.keystone.roles.create(name=self.demo_role)
             self.keystone.users.create(name=self.demo_user,
                                        password='password',
                                        tenant_id=tenant.id,
                                        email='demo@demo.com')
-
-        # Authenticate keystone demo
-        u.log.debug('Authenticating keystone demo user against VIP: '
-                    '{}'.format(self._vip))
-        self.keystone_demo = u.authenticate_keystone_user(
-            self.keystone,
-            user=self.demo_user,
-            password='password',
-            tenant=self.demo_tenant)
 
     def _toggle_maintenance_and_wait(self, expected):
         SLEEP = 10
