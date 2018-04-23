@@ -55,8 +55,9 @@ does not require the clustered nodes to be on the same subnet.
 Currently the DNS HA feature is only available for MAAS 2.0 or greater
 environments. MAAS 2.0 requires Juju 2.0 or greater. The MAAS 2.0 client
 requires Ubuntu 16.04 or greater. The clustered nodes must have static or
-"reserved" IP addresses registered in MAAS. The DNS hostname(s) must be
-pre-registered in MAAS before use with DNS HA.
+"reserved" IP addresses registered in MAAS. If using a version of MAAS earlier
+than 2.3 the DNS hostname(s) should be pre-registered in MAAS before use with
+DNS HA.
 
 The charm will throw an exception in the following circumstances:
 If running on a version of Ubuntu less than Xenial 16.04
