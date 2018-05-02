@@ -32,7 +32,7 @@ Configuration stanzas::
       YAML map of units to device names, e.g:
         "{ rsyslog/0: /dev/vdb, rsyslog/1: /dev/vdb }"
       Service units will raise a configure-error if volume-ephemeral
-      is 'true' and no volume-map value is set. Use 'juju set' to set a
+      is 'true' and no volume-map value is set. Use 'juju config' to set a
       value and 'juju resolved' to complete configuration.
 
 Usage::

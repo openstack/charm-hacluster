@@ -266,7 +266,7 @@ class Config(dict):
         >>> config['mykey'] = 'myval'
 
 
-        >>> # user runs `juju set mycharm foo=baz`
+        >>> # user runs `juju config mycharm foo=baz`
         >>> # now we're inside subsequent config-changed hook
         >>> config = hookenv.config()
         >>> config['foo']
