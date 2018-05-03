@@ -22,7 +22,7 @@ To enable HA clustering support (for mysql for example):
 
     juju deploy -n 2 mysql
     juju deploy -n 3 ceph
-    juju set mysql vip="192.168.21.1"
+    juju config mysql vip="192.168.21.1"
     juju add-relation mysql ceph
     juju add-relation mysql mysql-hacluster
 
