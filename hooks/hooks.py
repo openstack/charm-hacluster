@@ -99,7 +99,7 @@ COROSYNC_CONF_FILES = [
 ]
 
 PACKAGES = ['crmsh', 'corosync', 'pacemaker', 'python-netaddr', 'ipmitool',
-            'libnagios-plugin-perl']
+            'libnagios-plugin-perl', 'python3-requests-oauthlib']
 SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
 DEPRECATED_TRANSPORT_VALUES = {"multicast": "udp", "unicast": "udpu"}
 

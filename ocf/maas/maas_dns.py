@@ -14,10 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import maasclient
 import argparse
-import sys
+import requests_oauthlib
 import logging
+import sys
+
+import maasclient
 
 
 class MAASDNS(object):
@@ -33,6 +35,8 @@ class MAASDNS(object):
         self.ttl = str(options.ttl)
         # String representation of the ip
         self.ip = options.ip_address
+        self.maas_server = options.maas_server
+        self.maas_creds = options.maas_credentials
 
     def get_dnsresource(self):
         """ Get a dnsresource object """
@@ -56,11 +60,29 @@ class MAASDNS(object):
     def create_dnsresource(self):
         """ Create a DNS resource object
         Due to https://bugs.launchpad.net/maas/+bug/1555393
-        This is currently unused
+        this is implemented outside of the maas lib.
         """
-        return self.maas.create_dnsresource(self.fqdn,
-                                            self.ip,
-                                            self.ttl)
+        dns_url = '{}/api/2.0/dnsresources/?format=json'.format(
+            self.maas_server)
+        (consumer_key, access_token, token_secret) = self.maas_creds.split(':')
+
+        # The use of PLAINTEXT signature is inline with libmaas
+        # https://goo.gl/EJPrM7 but as noted there should be switched
+        # to HMAC once it works server-side.
+        maas_session = requests_oauthlib.OAuth1Session(
+            consumer_key,
+            signature_method='PLAINTEXT',
+            resource_owner_key=access_token,
+            resource_owner_secret=token_secret)
+        fqdn_list = self.fqdn.split('.')
+        payload = {
+            'fqdn': self.fqdn,
+            'name': fqdn_list[0],
+            'domain': '.'.join(fqdn_list[1:]),
+            'address_ttl': self.ttl,
+            'ip_addresses': self.ip,
+        }
+        return maas_session.post(dns_url, data=payload)
 
 
 class MAASIP(object):
@@ -144,8 +166,7 @@ def dns_ha():
 
     dns_obj = MAASDNS(options)
     if not dns_obj.dnsresource:
-        logging.info('DNS Resource does not exist. '
-                     'Create it with the maas cli.')
+        dns_obj.create_dnsresource()
     elif dns_obj.dnsresource.get('ip_addresses'):
         # TODO: Handle multiple IPs returned for ip_addresses
         for ip in dns_obj.dnsresource['ip_addresses']:
