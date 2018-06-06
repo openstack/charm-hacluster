@@ -14,13 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import shutil
-import os
-import sys
 import glob
+import os
+import shutil
+import socket
+import sys
 
 import pcmk
-import socket
 
 from charmhelpers.core.hookenv import (
     is_leader,
@@ -356,6 +356,15 @@ def ha_relation_changed():
                     cmd = ('crm -F configure location Ping-%s %s rule '
                            '-inf: pingd lte 0' % (res_name, res_name))
                     pcmk.commit(cmd)
+
+            else:
+                # the resource already exists so it will be updated.
+                code = pcmk.crm_update_resource(res_name, res_type,
+                                                resource_params.get(res_name))
+                if code != 0:
+                    msg = "Cannot update pcmkr resource: {}".format(res_name)
+                    status_set('blocked', msg)
+                    raise Exception(msg)
 
         log('Configuring Groups: %s' % (groups), level=DEBUG)
         for grp_name, grp_params in groups.iteritems():
