@@ -9,7 +9,7 @@ tags:
 series:
   - xenial
   - bionic
-  - artful
+  - cosmic
   - trusty
 requires:
   juju-info:
