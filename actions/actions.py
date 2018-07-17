@@ -16,8 +16,15 @@
 
 import sys
 import os
+import subprocess
+import traceback
 sys.path.append('hooks/')
-from charmhelpers.core.hookenv import action_fail
+from charmhelpers.core.hookenv import (
+    action_fail,
+    action_get,
+    action_set,
+    log,
+)
 from utils import (
     pause_unit,
     resume_unit,
@@ -37,7 +44,46 @@ def resume(args):
     resume_unit()
 
 
-ACTIONS = {"pause": pause, "resume": resume}
+def status(args):
+    """Display status of cluster resources.
+    Includes inactive resources in results."""
+    cmd = ['crm', 'status', '--inactive']
+
+    try:
+        result = subprocess.check_output(cmd)
+        action_set({'result': result})
+    except subprocess.CalledProcessError as e:
+        log("ERROR: Failed call to crm resource status. "
+            "output: {}. return-code: {}".format(e.output, e.returncode))
+        log(traceback.format_exc())
+        action_set({'result': ''})
+        action_fail("failed to get cluster status")
+
+
+def cleanup(args):
+    """Cleanup an/all hacluster resource(s).
+        Optional arg "resource=res_xyz_abc" """
+    resource_name = (action_get("resource")).lower()
+    if resource_name == 'all':
+        cmd = ['crm_resource', '-C']
+    else:
+        cmd = ['crm', 'resource', 'cleanup', resource_name]
+
+    try:
+        subprocess.check_call(cmd)
+        action_set({'result': 'success'})
+    except subprocess.CalledProcessError as e:
+        log("ERROR: Failed call to crm resource cleanup for {}. "
+            "output: {}. return-code: {}".format(resource_name, e.output,
+                                                 e.returncode))
+        log(traceback.format_exc())
+        action_set({'result': 'failure'})
+        action_fail("failed to cleanup crm resource "
+                    "'{}'".format(resource_name))
+
+
+ACTIONS = {"pause": pause, "resume": resume,
+           "status": status, "cleanup": cleanup}
 
 
 def main(args):
