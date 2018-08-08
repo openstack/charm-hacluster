@@ -47,6 +47,7 @@ from charmhelpers.contrib.openstack.utils import (
     set_unit_paused,
     clear_unit_paused,
     is_unit_paused_set,
+    is_unit_upgrading_set,
 )
 from charmhelpers.contrib.openstack.ha.utils import (
     assert_charm_supports_dns_ha
@@ -849,7 +850,7 @@ def pause_unit():
     status, message = assess_status_helper()
     if status != 'active':
         messages.append(message)
-    if messages:
+    if messages and not is_unit_upgrading_set():
         raise Exception("Couldn't pause: {}".format("; ".join(messages)))
     else:
         set_unit_paused()
@@ -863,6 +864,14 @@ def assess_status_helper():
     @returns status, message - status is workload status and message is any
                                corresponding messages
     """
+
+    if is_unit_upgrading_set():
+        return ("blocked",
+                "Ready for do-release-upgrde. Set complete when finished")
+    if is_unit_paused_set():
+        return ("maintenance",
+                "Paused. Use 'resume' action to resume normal service.")
+
     node_count = int(config('cluster_count'))
     status = 'active'
     message = 'Unit is ready and clustered'

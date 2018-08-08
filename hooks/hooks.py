@@ -48,6 +48,13 @@ from charmhelpers.contrib.network.ip import (
     get_relation_ip,
 )
 
+from charmhelpers.contrib.openstack.utils import (
+    is_unit_paused_set,
+    set_unit_upgrading,
+    clear_unit_upgrading,
+    clear_unit_paused,
+)
+
 from charmhelpers.fetch import (
     apt_install,
     apt_purge,
@@ -83,6 +90,8 @@ from utils import (
     needs_maas_dns_migration,
     write_maas_dns_address,
     MAASConfigIncomplete,
+    pause_unit,
+    resume_unit,
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
@@ -132,6 +141,12 @@ def get_transport():
 
 @hooks.hook('config-changed')
 def config_changed():
+
+    # if we are paused, delay doing any config changed hooks.
+    # It is forced on the resume.
+    if is_unit_paused_set():
+        log("Unit is pause or upgrading. Skipping config_changed", "WARN")
+        return
 
     setup_ocf_files()
 
@@ -479,6 +494,22 @@ def update_nrpe_config():
     )
 
     nrpe_setup.write()
+
+
+@hooks.hook('pre-series-upgrade')
+def series_upgrade_prepare():
+    set_unit_upgrading()
+    if not is_unit_paused_set():
+        pause_unit()
+
+
+@hooks.hook('post-series-upgrade')
+def series_upgrade_complete():
+    log("Running complete series upgrade hook", "INFO")
+    clear_unit_paused()
+    clear_unit_upgrading()
+    config_changed()
+    resume_unit()
 
 
 if __name__ == '__main__':
