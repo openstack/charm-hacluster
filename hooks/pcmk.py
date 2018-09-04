@@ -39,6 +39,10 @@ class PropertyNotFound(Exception):
     pass
 
 
+class PcmkError(Exception):
+    pass
+
+
 def wait_for_pcmk(retries=12, sleep=10):
     crm_up = None
     hostname = socket.gethostname()
@@ -85,11 +89,23 @@ def online(node=None):
 
 
 def crm_opt_exists(opt_name):
-    output = commands.getstatusoutput("crm configure show")[1]
-    if opt_name in output:
-        return True
+    (code, output) = commands.getstatusoutput("crm configure show xml")
+    if code != 0:
+        raise PcmkError(code, output)
 
-    return False
+    tree = etree.parse(StringIO(output))
+    root = tree.getroot()
+    resources = root.find('configuration').find('resources')
+    result = resources.findall(".//*[@id='%s']" % opt_name)
+    if len(result) == 0:
+        return False
+    elif len(result) == 1:
+        return True
+    else:
+        log('crm configure show xml:\n%s' % output, level=DEBUG)
+        raise PcmkError(len(result),
+                        "Found more %d elements with id '%s'" % (len(result),
+                                                                 opt_name))
 
 
 def crm_res_running(opt_name):
