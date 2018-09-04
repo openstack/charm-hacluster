@@ -27,6 +27,7 @@ from charmhelpers.core.hookenv import (
     log,
     DEBUG,
     INFO,
+    ERROR,
     related_units,
     relation_ids,
     relation_set,
@@ -81,6 +82,7 @@ from utils import (
     maintenance_mode,
     needs_maas_dns_migration,
     write_maas_dns_address,
+    MAASConfigIncomplete,
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
@@ -263,25 +265,28 @@ def ha_relation_changed():
 
     if True in [ra.startswith('ocf:maas')
                 for ra in resources.values()]:
-        if validate_dns_ha():
-            log('Setting up access to MAAS API', level=INFO)
-            setup_maas_api()
-            # Update resource_parms for DNS resources to include MAAS URL and
-            # credentials
-            for resource in resource_params.keys():
-                if resource.endswith("_hostname"):
-                    res_ipaddr = get_ip_addr_from_resource_params(
-                        resource_params[resource])
-                    resource_params[resource] += (
-                        ' maas_url="{}" maas_credentials="{}"'
-                        ''.format(config('maas_url'),
-                                  config('maas_credentials')))
-                    write_maas_dns_address(resource, res_ipaddr)
-        else:
-            msg = ("DNS HA is requested but maas_url "
-                   "or maas_credentials are not set")
-            status_set('blocked', msg)
-            raise ValueError(msg)
+        try:
+            validate_dns_ha()
+        except MAASConfigIncomplete as ex:
+            log(ex.args[0], level=ERROR)
+            status_set('blocked', ex.args[0])
+            # if an exception is raised the hook will end up in error state
+            # which will obfuscate the workload status and message.
+            return
+
+        log('Setting up access to MAAS API', level=INFO)
+        setup_maas_api()
+        # Update resource_parms for DNS resources to include MAAS URL and
+        # credentials
+        for resource in resource_params.keys():
+            if resource.endswith("_hostname"):
+                res_ipaddr = get_ip_addr_from_resource_params(
+                    resource_params[resource])
+                resource_params[resource] += (
+                    ' maas_url="{}" maas_credentials="{}"'
+                    ''.format(config('maas_url'),
+                              config('maas_credentials')))
+                write_maas_dns_address(resource, res_ipaddr)
 
     # NOTE: this should be removed in 15.04 cycle as corosync
     # configuration should be set directly on subordinate
