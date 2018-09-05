@@ -14,8 +14,6 @@
 
 import mock
 import pcmk
-import os
-import tempfile
 import unittest
 from distutils.version import StrictVersion
 
@@ -75,12 +73,6 @@ CRM_CONFIGURE_SHOW_XML_MAINT_MODE_TRUE = '''<?xml version="1.0" ?>
 
 
 class TestPcmk(unittest.TestCase):
-    def setUp(self):
-        self.tmpfile = tempfile.NamedTemporaryFile(delete=False)
-
-    def tearDown(self):
-        os.remove(self.tmpfile.name)
-
     @mock.patch('commands.getstatusoutput')
     def test_crm_res_running_true(self, getstatusoutput):
         getstatusoutput.return_value = (0, ("resource res_nova_consoleauth is "
@@ -175,20 +167,3 @@ class TestPcmk(unittest.TestCase):
         mock_check_output.assert_called_with(['crm', 'configure', 'property',
                                               'maintenance-mode=false'],
                                              universal_newlines=True)
-
-    @mock.patch('subprocess.call')
-    def test_crm_update_resource(self, mock_call):
-        mock_call.return_value = 0
-
-        with mock.patch.object(tempfile, "NamedTemporaryFile",
-                               side_effect=lambda: self.tmpfile):
-            pcmk.crm_update_resource('res_test', 'IPaddr2',
-                                     ('params ip=1.2.3.4 '
-                                      'cidr_netmask=255.255.0.0'))
-
-        mock_call.assert_any_call(['crm', 'configure', 'load',
-                                   'update', self.tmpfile.name])
-        with open(self.tmpfile.name, 'r') as f:
-            self.assertEqual(f.read(),
-                             ('primitive res_test IPaddr2 \\\n'
-                              '\tparams ip=1.2.3.4 cidr_netmask=255.255.0.0'))

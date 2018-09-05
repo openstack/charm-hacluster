@@ -16,7 +16,6 @@ import commands
 import re
 import subprocess
 import socket
-import tempfile
 import time
 import xml.etree.ElementTree as etree
 
@@ -25,9 +24,6 @@ from StringIO import StringIO
 from charmhelpers.core.hookenv import (
     log,
     ERROR,
-    INFO,
-    DEBUG,
-    WARNING,
 )
 
 
@@ -55,7 +51,7 @@ def wait_for_pcmk(retries=12, sleep=10):
 
 
 def commit(cmd):
-    return subprocess.call(cmd.split())
+    subprocess.call(cmd.split())
 
 
 def is_resource_present(resource):
@@ -225,34 +221,3 @@ def crm_version():
         raise ValueError('error parsin crm version: %s' % ver)
     else:
         return StrictVersion(matched.group(1))
-
-
-def crm_update_resource(res_name, res_type, res_params=None):
-    """Update a resource using `crm configure load update`
-
-    :param res_name: resource name
-    :param res_type: resource type (e.g. IPaddr2)
-    :param res_params: resource's parameters (e.g. "params ip=10.5.250.250")
-    """
-    with tempfile.NamedTemporaryFile() as f:
-        f.write('primitive {} {}'.format(res_name, res_type))
-
-        if res_params:
-            f.write(' \\\n\t{}'.format(res_params))
-        else:
-            f.write('\n')
-
-        f.flush()
-        f.seek(0)
-        log('Updating resource {}'.format(res_name), level=INFO)
-        log('File content:\n{}'.format(f.read()), level=DEBUG)
-        cmd = "crm configure load update {}".format(f.name)
-        log('Update command: {}'.format(cmd))
-        retcode = commit(cmd)
-        if retcode == 0:
-            level = DEBUG
-        else:
-            level = WARNING
-
-        log('crm command exit code: {}'.format(retcode), level=level)
-        return retcode

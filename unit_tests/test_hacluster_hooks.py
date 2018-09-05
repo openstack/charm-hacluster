@@ -14,7 +14,6 @@
 
 import mock
 import os
-import shutil
 import sys
 import tempfile
 import unittest
@@ -32,11 +31,6 @@ class TestCorosyncConf(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
-        self.tmpfile = tempfile.NamedTemporaryFile(delete=False)
-
-    def tearDown(self):
-        shutil.rmtree(self.tmpdir)
-        os.remove(self.tmpfile.name)
 
     @mock.patch.object(hooks, 'write_maas_dns_address')
     @mock.patch('pcmk.wait_for_pcmk')
@@ -62,13 +56,7 @@ class TestCorosyncConf(unittest.TestCase):
                                  configure_cluster_global, configure_corosync,
                                  oldest_peer, crm_opt_exists, peer_units,
                                  wait_for_pcmk, write_maas_dns_address):
-
-        def fake_crm_opt_exists(res_name):
-            # res_ubuntu will take the "update resource" route
-            return res_name == "res_ubuntu"
-
-        crm_opt_exists.side_effect = fake_crm_opt_exists
-        commit.return_value = 0
+        crm_opt_exists.return_value = False
         oldest_peer.return_value = True
         related_units.return_value = ['ha/0', 'ha/1', 'ha/2']
         get_cluster_nodes.return_value = ['10.0.3.2', '10.0.3.3', '10.0.3.4']
@@ -87,10 +75,8 @@ class TestCorosyncConf(unittest.TestCase):
                         'groups': {'grp_foo': 'res_foo'},
                         'colocations': {'co_foo': 'inf: grp_foo cl_foo'},
                         'resources': {'res_foo': 'ocf:heartbeat:IPaddr2',
-                                      'res_bar': 'ocf:heartbear:IPv6addr',
-                                      'res_ubuntu': 'IPaddr2'},
-                        'resource_params': {'res_foo': 'params bar',
-                                            'res_ubuntu': 'params ubuntu=42'},
+                                      'res_bar': 'ocf:heartbear:IPv6addr'},
+                        'resource_params': {'res_foo': 'params bar'},
                         'ms': {'ms_foo': 'res_foo meta notify=true'},
                         'orders': {'foo_after': 'inf: res_foo ms_foo'}}
 
@@ -99,10 +85,7 @@ class TestCorosyncConf(unittest.TestCase):
 
         parse_data.side_effect = fake_parse_data
 
-        with mock.patch.object(tempfile, "NamedTemporaryFile",
-                               side_effect=lambda: self.tmpfile):
-            hooks.ha_relation_changed()
-
+        hooks.ha_relation_changed()
         relation_set.assert_any_call(relation_id='hanode:1', ready=True)
         configure_stonith.assert_called_with()
         configure_monitor_host.assert_called_with()
@@ -118,11 +101,7 @@ class TestCorosyncConf(unittest.TestCase):
                         ('ms', 'ms'),
                         ('order', 'orders')]:
             for name, params in rel_get_data[key].items():
-                if name == "res_ubuntu":
-                    commit.assert_any_call(
-                        'crm configure load update %s' % self.tmpfile.name)
-
-                elif name in rel_get_data['resource_params']:
+                if name in rel_get_data['resource_params']:
                     res_params = rel_get_data['resource_params'][name]
                     commit.assert_any_call(
                         'crm -w -F configure %s %s %s %s' % (kw, name, params,
