@@ -279,7 +279,6 @@ class TestHooks(test_utils.CharmTestCase):
     @mock.patch.object(hooks, 'maintenance_mode')
     @mock.patch.object(hooks, 'is_leader')
     @mock.patch.object(hooks, 'update_nrpe_config')
-    @mock.patch('pcmk.crm_opt_exists')
     @mock.patch('pcmk.commit')
     @mock.patch('pcmk.wait_for_pcmk')
     @mock.patch.object(hooks, 'configure_corosync')
@@ -290,11 +289,11 @@ class TestHooks(test_utils.CharmTestCase):
     def test_config_changed(self, mock_mkdir, mock_rsync, mock_config,
                             mock_os_mkdir, mock_configure_corosync,
                             mock_wait_for_pcmk, mock_pcmk_commit,
-                            mock_crm_opt_exists, mock_update_nrpe_config,
-                            mock_is_leader, mock_maintenance_mode,
-                            mock_hanode_relation_joined, mock_relation_ids):
+                            mock_update_nrpe_config, mock_is_leader,
+                            mock_maintenance_mode,
+                            mock_hanode_relation_joined,
+                            mock_relation_ids):
 
-        mock_crm_opt_exists.return_value = False
         mock_config.side_effect = self.test_config.get
         mock_relation_ids.return_value = ['hanode:1']
         mock_wait_for_pcmk.return_value = True

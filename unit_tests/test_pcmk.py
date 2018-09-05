@@ -73,70 +73,6 @@ CRM_CONFIGURE_SHOW_XML_MAINT_MODE_TRUE = '''<?xml version="1.0" ?>
 
 '''  # noqa
 
-CRM_CONFIGURE_SHOW_XML_OPT_EXISTS = '''<?xml version="1.0" ?>
-<cib num_updates="30" dc-uuid="1000" update-origin="juju-3a5deb-radosgw-5" crm_feature_set="3.0.10" validate-with="pacemaker-2.4" update-client="crmd" epoch="32" admin_epoch="0" update-user="hacluster" cib-last-written="Tue Sep  4 01:09:37 2018" have-quorum="1">
-  <configuration>
-    <crm_config>
-      <cluster_property_set id="cib-bootstrap-options">
-        <nvpair id="cib-bootstrap-options-have-watchdog" name="have-watchdog" value="false"/>
-        <nvpair id="cib-bootstrap-options-dc-version" name="dc-version" value="1.1.14-70404b0"/>
-        <nvpair id="cib-bootstrap-options-cluster-infrastructure" name="cluster-infrastructure" value="corosync"/>
-        <nvpair id="cib-bootstrap-options-cluster-name" name="cluster-name" value="debian"/>
-        <nvpair name="no-quorum-policy" value="stop" id="cib-bootstrap-options-no-quorum-policy"/>
-        <nvpair name="stonith-enabled" value="false" id="cib-bootstrap-options-stonith-enabled"/>
-        <nvpair id="cib-bootstrap-options-last-lrm-refresh" name="last-lrm-refresh" value="1536023377"/>
-      </cluster_property_set>
-    </crm_config>
-    <nodes>
-      <node id="1002" uname="juju-3a5deb-radosgw-5"/>
-      <node id="1000" uname="juju-3a5deb-radosgw-4"/>
-      <node id="1001" uname="juju-3a5deb-radosgw-6"/>
-    </nodes>
-    <resources>
-      <group id="grp_ceph-radosgw_hostnames">
-        <primitive id="res_ceph-radosgw_admin_hostname" class="ocf" provider="maas" type="dns">
-          <instance_attributes id="res_ceph-radosgw_admin_hostname-instance_attributes">
-            <nvpair name="fqdn" value="rgw-public.maas" id="res_ceph-radosgw_admin_hostname-instance_attributes-fqdn"/>
-            <nvpair name="ip_address" value="10.5.0.8" id="res_ceph-radosgw_admin_hostname-instance_attributes-ip_address"/>
-            <nvpair name="maas_url" value="http://localhost/MAAS" id="res_ceph-radosgw_admin_hostname-instance_attributes-maas_url"/>
-            <nvpair name="maas_credentials" value="ubuntu" id="res_ceph-radosgw_admin_hostname-instance_attributes-maas_credentials"/>
-          </instance_attributes>
-        </primitive>
-        <primitive id="res_ceph-radosgw_int_hostname" class="ocf" provider="maas" type="dns">
-          <instance_attributes id="res_ceph-radosgw_int_hostname-instance_attributes">
-            <nvpair name="fqdn" value="rgw-internal.maas" id="res_ceph-radosgw_int_hostname-instance_attributes-fqdn"/>
-            <nvpair name="ip_address" value="10.5.0.8" id="res_ceph-radosgw_int_hostname-instance_attributes-ip_address"/>
-            <nvpair name="maas_url" value="http://localhost/MAAS" id="res_ceph-radosgw_int_hostname-instance_attributes-maas_url"/>
-            <nvpair name="maas_credentials" value="ubuntu" id="res_ceph-radosgw_int_hostname-instance_attributes-maas_credentials"/>
-          </instance_attributes>
-        </primitive>
-        <primitive id="res_ceph-radosgw_public_hostname" class="ocf" provider="maas" type="dns">
-          <instance_attributes id="res_ceph-radosgw_public_hostname-instance_attributes">
-            <nvpair name="fqdn" value="rgw-public.maas" id="res_ceph-radosgw_public_hostname-instance_attributes-fqdn"/>
-            <nvpair name="ip_address" value="10.5.0.8" id="res_ceph-radosgw_public_hostname-instance_attributes-ip_address"/>
-            <nvpair name="maas_url" value="http://localhost/MAAS" id="res_ceph-radosgw_public_hostname-instance_attributes-maas_url"/>
-            <nvpair name="maas_credentials" value="ubuntu" id="res_ceph-radosgw_public_hostname-instance_attributes-maas_credentials"/>
-          </instance_attributes>
-        </primitive>
-      </group>
-      <clone id="cl_cephrg_haproxy">
-        <primitive id="res_cephrg_haproxy" class="lsb" type="haproxy">
-          <operations>
-            <op name="monitor" interval="5s" id="res_cephrg_haproxy-monitor-5s"/>
-          </operations>
-        </primitive>
-      </clone>
-    </resources>
-    <constraints/>
-    <rsc_defaults>
-      <meta_attributes id="rsc-options">
-        <nvpair name="resource-stickiness" value="100" id="rsc-options-resource-stickiness"/>
-      </meta_attributes>
-    </rsc_defaults>
-  </configuration>
-</cib>
-'''  # noqa
-
 
 class TestPcmk(unittest.TestCase):
     def setUp(self):
@@ -256,16 +192,3 @@ class TestPcmk(unittest.TestCase):
             self.assertEqual(f.read(),
                              ('primitive res_test IPaddr2 \\\n'
                               '\tparams ip=1.2.3.4 cidr_netmask=255.255.0.0'))
-
-    @mock.patch('commands.getstatusoutput')
-    def test_crm_opt_exists(self, mock_getstatusoutput):
-        mock_getstatusoutput.return_value = (0,
-                                             CRM_CONFIGURE_SHOW_XML_OPT_EXISTS)
-        self.assertTrue(pcmk.crm_opt_exists(
-            'res_ceph-radosgw_public_hostname'))
-        self.assertFalse(pcmk.crm_opt_exists('foobar'))
-        self.assertFalse(pcmk.crm_opt_exists('rsc-options'))
-
-        mock_getstatusoutput.return_value = (1, 'error')
-        self.assertRaises(pcmk.PcmkError, pcmk.crm_opt_exists,
-                          'res_ceph-radosgw_public_hostname')
