@@ -22,6 +22,7 @@ import test_utils
 mock_apt = mock.MagicMock()
 sys.modules['apt_pkg'] = mock_apt
 import hooks
+import utils
 
 
 @mock.patch.object(hooks, 'log', lambda *args, **kwargs: None)
@@ -208,7 +209,10 @@ class TestCorosyncConf(unittest.TestCase):
             configure_corosync, oldest_peer, crm_opt_exists, peer_units,
             wait_for_pcmk, validate_dns_ha, setup_maas_api):
 
-        validate_dns_ha.return_value = False
+        def fake_validate():
+            raise utils.MAASConfigIncomplete('DNS HA invalid config')
+
+        validate_dns_ha.side_effect = fake_validate
         crm_opt_exists.return_value = False
         oldest_peer.return_value = True
         related_units.return_value = ['ha/0', 'ha/1', 'ha/2']
@@ -238,9 +242,10 @@ class TestCorosyncConf(unittest.TestCase):
             return rel_get_data.get(key, {})
 
         parse_data.side_effect = fake_parse_data
-
-        with self.assertRaises(ValueError):
+        with mock.patch.object(hooks, 'status_set') as mock_status_set:
             hooks.ha_relation_changed()
+            mock_status_set.assert_called_with('blocked',
+                                               'DNS HA invalid config')
 
 
 class TestHooks(test_utils.CharmTestCase):

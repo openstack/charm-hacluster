@@ -685,6 +685,8 @@ def validate_dns_ha():
 
     Assert the charm will support DNS HA
     Check MAAS related configuration options are properly set
+
+    :raises MAASConfigIncomplete: if maas_url and maas_credentials are not set
     """
 
     # Will raise an exception if unable to continue
@@ -695,7 +697,6 @@ def validate_dns_ha():
     else:
         msg = ("DNS HA is requested but the maas_url or maas_credentials "
                "settings are not set")
-        status_set('blocked', msg)
         raise MAASConfigIncomplete(msg)
 
 

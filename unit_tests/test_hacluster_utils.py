@@ -190,6 +190,7 @@ class UtilsTestCase(unittest.TestCase):
         self.assertRaises(utils.MAASConfigIncomplete,
                           lambda: utils.validate_dns_ha())
         self.assertTrue(assert_charm_supports_dns_ha.called)
+        status_set.assert_not_called()
 
     @mock.patch.object(utils, 'apt_install')
     @mock.patch.object(utils, 'apt_update')
