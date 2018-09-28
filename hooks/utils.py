@@ -24,6 +24,7 @@ import subprocess
 import socket
 import fcntl
 import struct
+import time
 import xml.etree.ElementTree as ET
 
 from base64 import b64decode
@@ -107,6 +108,8 @@ COROSYNC_CONF_FILES = [
     COROSYNC_HACLUSTER_ACL,
 ]
 SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
+PCMKR_MAX_RETRIES = 3
+PCMKR_SLEEP_SECS = 5
 
 SYSTEMD_OVERRIDES_DIR = '/etc/systemd/system/{}.service.d'
 SYSTEMD_OVERRIDES_FILE = '{}/overrides.conf'
@@ -845,7 +848,22 @@ def pause_unit():
     enter_standby_mode(node_name)
     if not is_in_standby_mode(node_name):
         messages.append("Node not in standby mode")
-    if node_has_resources(node_name):
+
+    # some resources may take some time to be migrated out from the node. So 3
+    # retries are made with a 5 seconds wait between each one.
+    i = 0
+    ready = False
+    has_resources = False
+    while i < PCMKR_MAX_RETRIES and not ready:
+        if node_has_resources(node_name):
+            has_resources = True
+            i += 1
+            time.sleep(PCMKR_SLEEP_SECS)
+        else:
+            ready = True
+            has_resources = False
+
+    if has_resources:
         messages.append("Resources still running on unit")
     status, message = assess_status_helper()
     if status != 'active':
