@@ -35,9 +35,8 @@ class TestCorosyncConf(unittest.TestCase):
 
     @mock.patch.object(hooks, 'write_maas_dns_address')
     @mock.patch('pcmk.wait_for_pcmk')
-    @mock.patch.object(hooks, 'peer_units')
     @mock.patch('pcmk.crm_opt_exists')
-    @mock.patch.object(hooks, 'oldest_peer')
+    @mock.patch.object(hooks, 'is_leader')
     @mock.patch.object(hooks, 'configure_corosync')
     @mock.patch.object(hooks, 'configure_cluster_global')
     @mock.patch.object(hooks, 'configure_monitor_host')
@@ -55,10 +54,10 @@ class TestCorosyncConf(unittest.TestCase):
                                  get_cluster_nodes, related_units,
                                  configure_stonith, configure_monitor_host,
                                  configure_cluster_global, configure_corosync,
-                                 oldest_peer, crm_opt_exists, peer_units,
+                                 is_leader, crm_opt_exists,
                                  wait_for_pcmk, write_maas_dns_address):
         crm_opt_exists.return_value = False
-        oldest_peer.return_value = True
+        is_leader.return_value = True
         related_units.return_value = ['ha/0', 'ha/1', 'ha/2']
         get_cluster_nodes.return_value = ['10.0.3.2', '10.0.3.3', '10.0.3.4']
         relation_ids.return_value = ['hanode:1']
@@ -115,9 +114,8 @@ class TestCorosyncConf(unittest.TestCase):
     @mock.patch.object(hooks, 'setup_maas_api')
     @mock.patch.object(hooks, 'validate_dns_ha')
     @mock.patch('pcmk.wait_for_pcmk')
-    @mock.patch.object(hooks, 'peer_units')
     @mock.patch('pcmk.crm_opt_exists')
-    @mock.patch.object(hooks, 'oldest_peer')
+    @mock.patch.object(hooks, 'is_leader')
     @mock.patch.object(hooks, 'configure_corosync')
     @mock.patch.object(hooks, 'configure_cluster_global')
     @mock.patch.object(hooks, 'configure_monitor_host')
@@ -136,13 +134,13 @@ class TestCorosyncConf(unittest.TestCase):
                                         related_units, configure_stonith,
                                         configure_monitor_host,
                                         configure_cluster_global,
-                                        configure_corosync, oldest_peer,
-                                        crm_opt_exists, peer_units,
+                                        configure_corosync, is_leader,
+                                        crm_opt_exists,
                                         wait_for_pcmk, validate_dns_ha,
                                         setup_maas_api, write_maas_dns_addr):
         validate_dns_ha.return_value = True
         crm_opt_exists.return_value = False
-        oldest_peer.return_value = True
+        is_leader.return_value = True
         related_units.return_value = ['ha/0', 'ha/1', 'ha/2']
         get_cluster_nodes.return_value = ['10.0.3.2', '10.0.3.3', '10.0.3.4']
         relation_ids.return_value = ['ha:1']
@@ -187,9 +185,8 @@ class TestCorosyncConf(unittest.TestCase):
     @mock.patch.object(hooks, 'setup_maas_api')
     @mock.patch.object(hooks, 'validate_dns_ha')
     @mock.patch('pcmk.wait_for_pcmk')
-    @mock.patch.object(hooks, 'peer_units')
     @mock.patch('pcmk.crm_opt_exists')
-    @mock.patch.object(hooks, 'oldest_peer')
+    @mock.patch.object(hooks, 'is_leader')
     @mock.patch.object(hooks, 'configure_corosync')
     @mock.patch.object(hooks, 'configure_cluster_global')
     @mock.patch.object(hooks, 'configure_monitor_host')
@@ -206,7 +203,7 @@ class TestCorosyncConf(unittest.TestCase):
             self, parse_data, config, commit, get_corosync_conf, relation_ids,
             relation_set, get_cluster_nodes, related_units, configure_stonith,
             configure_monitor_host, configure_cluster_global,
-            configure_corosync, oldest_peer, crm_opt_exists, peer_units,
+            configure_corosync, is_leader, crm_opt_exists,
             wait_for_pcmk, validate_dns_ha, setup_maas_api):
 
         def fake_validate():
@@ -214,7 +211,7 @@ class TestCorosyncConf(unittest.TestCase):
 
         validate_dns_ha.side_effect = fake_validate
         crm_opt_exists.return_value = False
-        oldest_peer.return_value = True
+        is_leader.return_value = True
         related_units.return_value = ['ha/0', 'ha/1', 'ha/2']
         get_cluster_nodes.return_value = ['10.0.3.2', '10.0.3.3', '10.0.3.4']
         relation_ids.return_value = ['ha:1']

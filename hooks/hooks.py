@@ -61,11 +61,6 @@ from charmhelpers.fetch import (
     filter_installed_packages,
 )
 
-from charmhelpers.contrib.hahelpers.cluster import (
-    peer_units,
-    oldest_peer
-)
-
 from utils import (
     get_corosync_conf,
     assert_charm_supports_ipv6,
@@ -313,7 +308,7 @@ def ha_relation_changed():
 
     # Only configure the cluster resources
     # from the oldest peer unit.
-    if oldest_peer(peer_units()):
+    if is_leader():
         log('Deleting Resources' % (delete_resources), level=DEBUG)
         for res_name in delete_resources:
             if pcmk.crm_opt_exists(res_name):
