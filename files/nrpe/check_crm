@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# check_crm_v0_7
+# check_crm_v0_8
 #
 # Copyright © 2013 Philip Garner, Sysnix Consultants Limited
 #
@@ -31,6 +31,7 @@
 # v0.7 01/09/2013 - In testing as still not fully tested.  Adds optional
 #		    constraints check (Boris Wesslowski). Adds fail count
 #		    threshold ( Zoran Bosnjak & Marko Hrastovec )
+# v0.8 06/11/2018 - Choose whether to ignore/warn/crit on failed actions
 #
 # NOTE:- Requires Perl 5.8 or higher & either the Perl Module Nagios::Plugin
 #        or Monitoring::Plugin, whichever is available for your system.
@@ -78,13 +79,13 @@ my $np;
 if ($plugin_provider eq 'Monitoring') {
     $np = Monitoring::Plugin->new(
         shortname => 'check_crm',
-        version   => '0.7',
+        version   => '0.8',
         usage     => "Usage: %s <ARGS>\n\t\t--help for help\n",
     );
 } else {
     $np = Nagios::Plugin->new(
         shortname => 'check_crm',
-        version   => '0.7',
+        version   => '0.8',
         usage     => "Usage: %s <ARGS>\n\t\t--help for help\n",
     );
 }
@@ -113,6 +114,14 @@ $np->add_arg(
     help     => 'resource fail count to start warning on [default = 1].',
     required => 0,
     default  => 1,
+);
+
+$np->add_arg(
+    spec     => 'failedactions=s',
+    help     => q{What to do if failed actions are detected: ignore/warning/critical [default = critical].
+   Any value that is not 'warning' or 'critical' will be considered equivalent to 'ignore'},
+    required => 0,
+    default  => 'CRITICAL',
 );
 
 $np->getopts;
@@ -173,11 +182,12 @@ foreach my $line (<$fh>) {
         # Check Master/Slave stopped
         $np->add_message( $warn_or_crit, ": $1 Stopped" );
     }
-    elsif ( $line =~ m/^Failed actions\:/ ) {
-
-        # Check Failed Actions
-        $np->add_message("CRITICAL",
-            ": FAILED actions detected or not cleaned up" );
+    elsif ( $line =~ m/^failed actions\:/i ) {
+        if ($np->opts->failedactions =~ /^(warning|critical)$/i) {
+            # Check Failed Actions
+            $np->add_message( uc $np->opts->failedactions,
+                ": FAILED actions detected or not cleaned up" );
+        }
     }
     elsif ( $line =~ m/\s*(\S+?)\s+ \(.*\)\:\s+\w+\s+\w+\s+\(unmanaged\)\s+/i )
     {
