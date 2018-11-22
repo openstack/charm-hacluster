@@ -568,6 +568,10 @@ def configure_cluster_global():
            'resource-stickiness="100"')
     pcmk.commit(cmd)
 
+    log('Configuring cluster-recheck-interval to 60 seconds', level=DEBUG)
+    cmd = "crm configure property cluster-recheck-interval=60"
+    pcmk.commit(cmd)
+
 
 def get_ip_addr_from_resource_params(params):
     """Returns the IP address in the resource params provided
