@@ -378,19 +378,23 @@ def ha_relation_changed():
                 pcmk.commit(cmd)
                 log('%s' % cmd, level=DEBUG)
 
-        log('Configuring Colocations: %s' % colocations, level=DEBUG)
-        for col_name, col_params in colocations.iteritems():
-            if not pcmk.crm_opt_exists(col_name):
-                cmd = 'crm -w -F configure colocation %s %s' % (col_name,
-                                                                col_params)
-                pcmk.commit(cmd)
-                log('%s' % cmd, level=DEBUG)
-
         log('Configuring Clones: %s' % clones, level=DEBUG)
         for cln_name, cln_params in clones.iteritems():
             if not pcmk.crm_opt_exists(cln_name):
                 cmd = 'crm -w -F configure clone %s %s' % (cln_name,
                                                            cln_params)
+                pcmk.commit(cmd)
+                log('%s' % cmd, level=DEBUG)
+
+        # Ordering is important here, colocation and location constraints
+        # reference resources. All resources referenced by the constraints
+        # need to exist otherwise constraint creation will fail.
+
+        log('Configuring Colocations: %s' % colocations, level=DEBUG)
+        for col_name, col_params in colocations.iteritems():
+            if not pcmk.crm_opt_exists(col_name):
+                cmd = 'crm -w -F configure colocation %s %s' % (col_name,
+                                                                col_params)
                 pcmk.commit(cmd)
                 log('%s' % cmd, level=DEBUG)
 
