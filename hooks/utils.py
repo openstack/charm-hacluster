@@ -585,8 +585,13 @@ def configure_monitor_host():
             pcmk.commit('crm -w -F configure delete ping')
 
 
-def configure_cluster_global():
-    """Configure global cluster options"""
+def configure_cluster_global(failure_timeout):
+    """Configure global cluster options
+
+    :param failure_timeout: Duration in seconds (measured from the most recent
+                             failure) to wait before resetting failcount to 0.
+    :type failure_timeout: int
+    """
     log('Applying global cluster configuration', level=DEBUG)
     # NOTE(lathiat) quorum in a two-node scenario is handled by
     # corosync two_node=1.  In this case quorum is required for
@@ -594,10 +599,11 @@ def configure_cluster_global():
     # contact with the full cluster.
     log('Configuring no-quorum-policy to stop', level=DEBUG)
     cmd = "crm configure property no-quorum-policy=stop"
-
     pcmk.commit(cmd)
+
     cmd = ('crm configure rsc_defaults $id="rsc-options" '
-           'resource-stickiness="100"')
+           'resource-stickiness="100" '
+           'failure-timeout={}'.format(failure_timeout))
     pcmk.commit(cmd)
 
     log('Configuring cluster-recheck-interval to 60 seconds', level=DEBUG)

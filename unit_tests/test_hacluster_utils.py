@@ -1022,3 +1022,11 @@ class UtilsTestCase(unittest.TestCase):
             clones=clones,
             groups=groups)
         self.assertFalse(commit.called)
+
+    @mock.patch('pcmk.commit')
+    def test_configure_global_cluster(self, mock_commit):
+        utils.configure_cluster_global(240)
+        mock_commit.assert_any_call('crm configure rsc_defaults '
+                                    '$id="rsc-options" '
+                                    'resource-stickiness="100" '
+                                    'failure-timeout=240')

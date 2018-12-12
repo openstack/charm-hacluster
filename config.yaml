@@ -143,6 +143,15 @@ options:
       Specifies the corosync.conf network mtu. If unset, the default
       corosync.conf value is used (currently 1500). See 'man corosync.conf' for
       detailed information on this config option.
+  failure_timeout:
+    type: int
+    default: 0
+    description: |
+      Sets the pacemaker default resource meta-attribute value for
+      failure_timeout. This value represents the duration in seconds to wait
+      before resetting failcount to 0. In practice, this is measured as the
+      time elapsed since the most recent failure. Setting this to 0 disables
+      the feature.
   # Monitoring config
   nagios_context:
     type: string

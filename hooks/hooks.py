@@ -186,7 +186,8 @@ def config_changed():
     status_set('maintenance', "Setting up corosync")
     if configure_corosync():
         try_pcmk_wait()
-        configure_cluster_global()
+        failure_timeout = config('failure_timeout')
+        configure_cluster_global(failure_timeout)
         configure_monitor_host()
         configure_stonith()
 
@@ -329,7 +330,8 @@ def ha_relation_changed():
     # configuration should be set directly on subordinate
     configure_corosync()
     try_pcmk_wait()
-    configure_cluster_global()
+    failure_timeout = config('failure_timeout')
+    configure_cluster_global(failure_timeout)
     configure_monitor_host()
     configure_stonith()
 
