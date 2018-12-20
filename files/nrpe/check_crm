@@ -28,11 +28,12 @@
 # v0.6 14/03/2013 - Change from \w+ to \S+ in stopped check to cope with
 #                   Servers that have non word charachters in.  Suggested by
 #                   Igal Baevsky.
-# v0.7 01/09/2013 - In testing as still not fully tested.  Adds optional 
-#		    constraints check (Boris Wesslowski). Adds fail count 
+# v0.7 01/09/2013 - In testing as still not fully tested.  Adds optional
+#		    constraints check (Boris Wesslowski). Adds fail count
 #		    threshold ( Zoran Bosnjak & Marko Hrastovec )
 #
-# NOTES: Requires Perl 5.8 or higher & the Perl Module Nagios::Plugin
+# NOTE:- Requires Perl 5.8 or higher & either the Perl Module Nagios::Plugin
+#        or Monitoring::Plugin, whichever is available for your system.
 #        Nagios user will need sudo acces - suggest adding line below to
 #        sudoers
 #	     nagios  ALL=(ALL) NOPASSWD: /usr/sbin/crm_mon -1 -r -f
@@ -47,7 +48,24 @@
 
 use warnings;
 use strict;
-use Nagios::Plugin;
+
+my $plugin_provider='';
+
+my $rc = eval {
+  require Monitoring::Plugin;
+  Monitoring::Plugin->import();
+  1;
+};
+
+if ($rc)
+{
+    $plugin_provider = 'Monitoring';
+} else{
+    require Nagios::Plugin;
+    Nagios::Plugin->import();
+    $plugin_provider = 'Nagios';
+}
+
 
 # Lines below may need changing if crm_mon or sudo installed in a
 # different location.
@@ -56,11 +74,20 @@ my $sudo               = '/usr/bin/sudo';
 my $crm_mon            = '/usr/sbin/crm_mon -1 -r -f';
 my $crm_configure_show = '/usr/sbin/crm configure show';
 
-my $np = Nagios::Plugin->new(
-    shortname => 'check_crm',
-    version   => '0.7',
-    usage     => "Usage: %s <ARGS>\n\t\t--help for help\n",
-);
+my $np;
+if ($plugin_provider eq 'Monitoring') {
+    $np = Monitoring::Plugin->new(
+        shortname => 'check_crm',
+        version   => '0.7',
+        usage     => "Usage: %s <ARGS>\n\t\t--help for help\n",
+    );
+} else {
+    $np = Nagios::Plugin->new(
+        shortname => 'check_crm',
+        version   => '0.7',
+        usage     => "Usage: %s <ARGS>\n\t\t--help for help\n",
+    );
+}
 
 $np->add_arg(
     spec => 'warning|w',
@@ -100,14 +127,14 @@ $warn_or_crit = 'WARNING' if $np->opts->warning;
 my $fh;
 
 open( $fh, "$sudo $crm_mon |" )
-  or $np->nagios_exit( CRITICAL, "Running $sudo $crm_mon has failed" );
+  or $np->nagios_exit("CRITICAL", "Running $sudo $crm_mon has failed" );
 
 foreach my $line (<$fh>) {
 
     if ( $line =~ m/Connection to cluster failed\:(.*)/i ) {
 
         # Check Cluster connected
-        $np->nagios_exit( CRITICAL, "Connection to cluster FAILED: $1" );
+        $np->nagios_exit("CRITICAL", "Connection to cluster FAILED: $1" );
     }
     elsif ( $line =~ m/Current DC:/ ) {
 
@@ -116,10 +143,10 @@ foreach my $line (<$fh>) {
 
             # Assume cluster is OK - we only add warn/crit after here
 
-            $np->add_message( OK, "Cluster OK" );
+            $np->add_message("OK", "Cluster OK" );
         }
         else {
-            $np->add_message( CRITICAL, "No Quorum" );
+            $np->add_message("CRITICAL", "No Quorum" );
         }
     }
     elsif ( $line =~ m/^offline:\s*\[\s*(\S.*?)\s*\]/i ) {
@@ -149,25 +176,25 @@ foreach my $line (<$fh>) {
     elsif ( $line =~ m/^Failed actions\:/ ) {
 
         # Check Failed Actions
-        $np->add_message( CRITICAL,
+        $np->add_message("CRITICAL",
             ": FAILED actions detected or not cleaned up" );
     }
     elsif ( $line =~ m/\s*(\S+?)\s+ \(.*\)\:\s+\w+\s+\w+\s+\(unmanaged\)\s+/i )
     {
 
         # Check Unmanaged
-        $np->add_message( CRITICAL, ": $1 unmanaged FAILED" );
+        $np->add_message("CRITICAL", ": $1 unmanaged FAILED" );
     }
     elsif ( $line =~ m/\s*(\S+?)\s+ \(.*\)\:\s+not installed/i ) {
 
         # Check for errors
-        $np->add_message( CRITICAL, ": $1 not installed" );
+        $np->add_message("CRITICAL", ": $1 not installed" );
     }
     elsif ( $line =~ m/\s*(\S+?):.*fail-count=(\d+)/i ) {
         if ( $2 >= $np->opts->failcount ) {
 
             # Check for resource Fail count (suggested by Vadym Chepkov)
-            $np->add_message( WARNING, ": $1 failure detected, fail-count=$2" );
+            $np->add_message("WARNING", ": $1 failure detected, fail-count=$2" );
         }
     }
 }
@@ -178,23 +205,23 @@ if ( scalar @standby > 0 && !$np->opts->standbyignore ) {
         ": " . join( ', ', @standby ) . " in Standby" );
 }
 
-close($fh) or $np->nagios_exit( CRITICAL, "Running $crm_mon FAILED" );
+close($fh) or $np->nagios_exit("CRITICAL", "Running $crm_mon FAILED" );
 
 # if -c flag set check configuration for constraints
 if ($ConstraintsFlag) {
 
     open( $fh, "$sudo $crm_configure_show|" )
-      or $np->nagios_exit( CRITICAL,
+      or $np->nagios_exit("CRITICAL",
         "Running $sudo $crm_configure_show has failed" );
 
     foreach my $line (<$fh>) {
         if ( $line =~ m/location cli-(prefer|standby)-\S+\s+(\S+)/ ) {
-            $np->add_message( WARNING,
+            $np->add_message("WARNING",
                 ": $2 blocking location constraint detected" );
         }
     }
     close($fh)
-      or $np->nagios_exit( CRITICAL, "Running $crm_configure_show FAILED" );
+      or $np->nagios_exit("CRITICAL", "Running $crm_configure_show FAILED" );
 }
 
 $np->nagios_exit( $np->check_messages() );
