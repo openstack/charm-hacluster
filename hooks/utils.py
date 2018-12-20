@@ -229,7 +229,7 @@ def get_corosync_conf():
     transport = get_transport()
 
     # NOTE(jamespage) use local charm configuration over any provided by
-    # principle charm
+    # principal charm
     conf = {
         'ip_version': ip_version,
         'ha_nodes': get_ha_nodes(),

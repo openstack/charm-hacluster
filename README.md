@@ -1,7 +1,7 @@
 # Overview
 
 The hacluster subordinate charm provides corosync and pacemaker cluster
-configuration for principle charms which support the hacluster, container
+configuration for principal charms which support the hacluster, container
 scoped relation.
 
 The charm will only configure for HA once more that one service unit is
@@ -26,7 +26,7 @@ To enable HA clustering support (for mysql for example):
     juju add-relation mysql ceph
     juju add-relation mysql mysql-hacluster
 
-The principle charm must have explicit support for the hacluster interface
+The principal charm must have explicit support for the hacluster interface
 in order for clustering to occur - otherwise nothing actually get configured.
 
 # Settings
@@ -69,14 +69,14 @@ options.
 
 ## Mandatory Relation Data (deprecated)
 
-Principle charms should provide basic corosync configuration:
+Principal charms should provide basic corosync configuration:
 
     corosync\_bindiface: The network interface to use for cluster messaging.
     corosync\_mcastport: The multicast port to use for cluster messaging.
 
 however, these can also be provided via configuration on the hacluster charm
 itself.  If configuration is provided directly to the hacluster charm, this
-will be preferred over these relation options from the principle charm.
+will be preferred over these relation options from the principal charm.
 
 ## Resource Configuration
 

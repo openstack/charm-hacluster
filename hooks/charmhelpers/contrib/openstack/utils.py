@@ -1215,9 +1215,9 @@ def remote_restart(rel_name, remote_service=None):
     if remote_service:
         trigger['remote-service'] = remote_service
     for rid in relation_ids(rel_name):
-        # This subordinate can be related to two seperate services using
+        # This subordinate can be related to two separate services using
         # different subordinate relations so only issue the restart if
-        # the principle is conencted down the relation we think it is
+        # the principal is connected down the relation we think it is
         if related_units(relid=rid):
             relation_set(relation_id=rid,
                          relation_settings=trigger,

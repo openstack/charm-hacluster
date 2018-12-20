@@ -217,7 +217,7 @@ def hanode_relation_joined(relid=None):
             'ha-relation-changed',
             'hanode-relation-changed')
 def ha_relation_changed():
-    # Check that we are related to a principle and that
+    # Check that we are related to a principal and that
     # it has already provided the required corosync configuration
     if not get_corosync_conf():
         log('Unable to configure corosync right now, deferring configuration',
@@ -245,7 +245,7 @@ def ha_relation_changed():
         relid = relids[0]
         units = related_units(relid)
         if len(units) < 1:
-            log('No principle unit found, deferring configuration',
+            log('No principal unit found, deferring configuration',
                 level=INFO)
             return
 
