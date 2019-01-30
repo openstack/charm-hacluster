@@ -105,7 +105,8 @@ COROSYNC_CONF_FILES = [
 ]
 
 PACKAGES = ['crmsh', 'corosync', 'pacemaker', 'python-netaddr', 'ipmitool',
-            'libnagios-plugin-perl', 'python3-requests-oauthlib']
+            'libmonitoring-plugin-perl', 'python3-requests-oauthlib']
+
 SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
 DEPRECATED_TRANSPORT_VALUES = {"multicast": "udp", "unicast": "udpu"}
 
@@ -113,9 +114,10 @@ DEPRECATED_TRANSPORT_VALUES = {"multicast": "udp", "unicast": "udpu"}
 @hooks.hook('install.real')
 def install():
     ubuntu_release = lsb_release()['DISTRIB_CODENAME'].lower()
-    if CompareHostReleases(ubuntu_release) >= 'zesty':
-        PACKAGES.remove('libnagios-plugin-perl')
-        PACKAGES.append('libnagios-object-perl')
+    # use libnagios on anything older than Xenial
+    if CompareHostReleases(ubuntu_release) < 'xenial':
+        PACKAGES.remove('libmonitoring-plugin-perl')
+        PACKAGES.append('libnagios-plugin-perl')
     # NOTE(dosaboy): we currently disallow upgrades due to bug #1382842. This
     # should be removed once the pacemaker package is fixed.
     status_set('maintenance', 'Installing apt packages')
@@ -447,6 +449,7 @@ def stop():
 def update_nrpe_config():
     scripts_src = os.path.join(os.environ["CHARM_DIR"], "files",
                                "nrpe")
+
     scripts_dst = "/usr/local/lib/nagios/plugins"
     if not os.path.exists(scripts_dst):
         os.makedirs(scripts_dst)

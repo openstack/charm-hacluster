@@ -20,10 +20,11 @@
 # Authors: Phil Garner - phil@sysnix.com & Peter Mottram peter@sysnix.com
 #
 # v0.1 05/01/2011
-# v0.2 31/10/2011 - additional crit when closing the file handle and additional 
+# v0.2 31/10/2011 - additional crit when closing the file handle and additional
 #                   comments added
 #
-# NOTE:- Requires Perl 5.8 or higher & the Perl Module Nagios::Plugin
+# NOTE:- Requires Perl 5.8 or higher & either the Perl Module Nagios::Plugin
+#        or Monitoring::Plugin, whichever is available for your system.
 #        Nagios user will need sudo acces - suggest adding line below to
 #        sudoers.
 #        nagios  ALL=(ALL) NOPASSWD: /usr/sbin/corosync-cfgtool -s
@@ -35,7 +36,23 @@
 
 use warnings;
 use strict;
-use Nagios::Plugin;
+
+my $plugin_provider='';
+
+my $rc = eval {
+  require Monitoring::Plugin;
+  Monitoring::Plugin->import();
+  1;
+};
+
+if ($rc)
+{
+    $plugin_provider = 'Monitoring';
+} else{
+    require Nagios::Plugin;
+    Nagios::Plugin->import();
+    $plugin_provider = 'Nagios';
+}
 
 # Lines below may need changing if corosync-cfgtool or sudo installed in a
 # diffrent location.
@@ -44,15 +61,28 @@ my $sudo    = '/usr/bin/sudo';
 my $cfgtool = '/usr/sbin/corosync-cfgtool -s';
 
 # Now set up the plugin
-my $np = Nagios::Plugin->new(
-    shortname => 'check_cororings',
-    version   => '0.2',
-    usage     => "Usage: %s <ARGS>\n\t\t--help for help\n",
-    license   => "License - GPL v3 see code for more details",
-    url       => "http://www.sysnix.com",
-    blurb =>
-"\tNagios plugin that checks the status of corosync rings, requires Perl         \t5.8+ and CPAN modules Nagios::Plugin.",
-);
+my $np;
+if ($plugin_provider eq 'Monitoring') {
+    $np = Monitoring::Plugin->new(
+        shortname => 'check_cororings',
+        version   => '0.2',
+        usage     => "Usage: %s <ARGS>\n\t\t--help for help\n",
+        license   => "License - GPL v3 see code for more details",
+        url       => "http://www.sysnix.com",
+        blurb =>
+        "\tMonitoring plugin that checks the status of corosync rings, requires Perl         \t5.8+ and CPAN modules Monitoring::Plugin.",
+    );
+} else {
+    $np = Nagios::Plugin->new(
+        shortname => 'check_cororings',
+        version   => '0.2',
+        usage     => "Usage: %s <ARGS>\n\t\t--help for help\n",
+        license   => "License - GPL v3 see code for more details",
+        url       => "http://www.sysnix.com",
+        blurb =>
+        "\tNagios plugin that checks the status of corosync rings, requires Perl         \t5.8+ and CPAN modules Nagios::Plugin.",
+    );
+}
 
 #Args
 $np->add_arg(
@@ -71,29 +101,29 @@ my $rings = $np->opts->rings;
 # Run cfgtools spin through output and get info needed
 
 open( $fh, "$sudo $cfgtool |" )
-  or $np->nagios_exit( CRITICAL, "Running corosync-cfgtool failed" );
+  or $np->nagios_exit("CRITICAL", "Running corosync-cfgtool failed" );
 
 foreach my $line (<$fh>) {
     if ( $line =~ m/status\s*=\s*(\S.+)/ ) {
         my $status = $1;
         if ( $status =~ m/^ring (\d+) active with no faults/ ) {
-            $np->add_message( OK, "ring $1 OK" );
+            $np->add_message("OK", "ring $1 OK" );
         }
         else {
-            $np->add_message( CRITICAL, $status );
+            $np->add_message("CRITICAL", $status );
         }
         $found++;
     }
 }
 
-close($fh) or $np->nagios_exit( CRITICAL, "Running corosync-cfgtool failed" );
+close($fh) or $np->nagios_exit("CRITICAL", "Running corosync-cfgtool failed" );
 
 # Check we found some rings and apply -r arg if needed
 if ( $found == 0 ) {
-    $np->nagios_exit( CRITICAL, "No Rings Found" );
+    $np->nagios_exit("CRITICAL", "No Rings Found" );
 }
 elsif ( defined $rings && $rings != $found ) {
-    $np->nagios_exit( CRITICAL, "Expected $rings rings but found $found" );
+    $np->nagios_exit("CRITICAL", "Expected $rings rings but found $found" );
 }
 
 $np->nagios_exit( $np->check_messages() );
