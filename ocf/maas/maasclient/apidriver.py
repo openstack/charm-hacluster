@@ -89,10 +89,11 @@ class APIDriver(MAASDriver):
         log.debug("Request %s results: [%s] %s", path, response.getcode(),
                   payload)
 
-        if response.getcode() == OK:
-            return Response(True, yaml.load(payload))
+        code = response.getcode()
+        if code == OK:
+            return Response(True, yaml.load(payload), code)
         else:
-            return Response(False, payload)
+            return Response(False, payload, code)
 
     def _post(self, path, op='update', **kwargs):
         """
@@ -104,17 +105,18 @@ class APIDriver(MAASDriver):
             log.debug("Request %s results: [%s] %s", path, response.getcode(),
                       payload)
 
-            if response.getcode() == OK:
-                return Response(True, yaml.load(payload))
+            code = response.getcode()
+            if code == OK:
+                return Response(True, yaml.load(payload), code)
             else:
-                return Response(False, payload)
+                return Response(False, payload, code)
         except HTTPError as e:
             log.error("Error encountered: %s for %s with params %s",
                       str(e), path, str(kwargs))
-            return Response(False, None)
+            return Response(False, None, None)
         except Exception as e:
             log.error("Post request raised exception: %s", e)
-            return Response(False, None)
+            return Response(False, None, None)
 
     def _put(self, path, **kwargs):
         """
@@ -125,17 +127,18 @@ class APIDriver(MAASDriver):
             payload = response.read()
             log.debug("Request %s results: [%s] %s", path, response.getcode(),
                       payload)
-            if response.getcode() == OK:
-                return Response(True, payload)
+            code = response.getcode()
+            if code == OK:
+                return Response(True, payload, code)
             else:
-                return Response(False, payload)
+                return Response(False, payload, code)
         except HTTPError as e:
             log.error("Error encountered: %s with details: %s for %s with "
                       "params %s", e, e.read(), path, str(kwargs))
-            return Response(False, None)
+            return Response(False, None, None)
         except Exception as e:
             log.error("Put request raised exception: %s", e)
-            return Response(False, None)
+            return Response(False, None, None)
 
     ###########################################################################
     #  DNS API - http://maas.ubuntu.com/docs2.0/api.html#dnsresource
