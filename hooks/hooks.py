@@ -229,6 +229,8 @@ def hanode_relation_joined(relid=None):
 
 @hooks.hook('ha-relation-joined',
             'ha-relation-changed',
+            'peer-availability-relation-joined',
+            'peer-availability-relation-changed',
             'hanode-relation-changed')
 def ha_relation_changed():
     # Check that we are related to a principle and that
@@ -253,7 +255,7 @@ def ha_relation_changed():
             level=INFO)
         return
 
-    relids = relation_ids('ha')
+    relids = relation_ids('ha') or relation_ids('juju-info')
     if len(relids) == 1:  # Should only ever be one of these
         # Obtain relation information
         relid = relids[0]
