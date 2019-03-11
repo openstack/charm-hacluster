@@ -18,12 +18,15 @@ log = logging.getLogger('vmaas.main')
 
 
 class Response(object):
+    """Response for the API calls to use internally
+
+    The status_code member is to make it look a bit like a requests Response
+    object so that it can be used in the retry decorator.
     """
-    Response for the API calls to use internally
-    """
-    def __init__(self, ok=False, data=None):
+    def __init__(self, ok=False, data=None, status_code=None):
         self.ok = ok
         self.data = data
+        self.status_code = status_code
 
     def __nonzero__(self):
         """Allow boolean comparison"""

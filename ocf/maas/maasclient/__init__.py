@@ -57,7 +57,6 @@ class MAASClient(object):
         """
         Get a listing of DNS resources which are currently defined.
 
-        :returns: a list of DNS objects
         DNS object is a dictionary of the form:
         {'fqdn': 'keystone.maas',
          'resource_records': [],
@@ -65,6 +64,9 @@ class MAASClient(object):
          'resource_uri': '/MAAS/api/2.0/dnsresources/1/',
          'ip_addresses': [],
          'id': 1}
+
+        :returns: a list of DNS objects
+        :rtype: List[Dict[str, Any]]
         """
         resp = self.driver.get_dnsresources()
         if resp.ok:
@@ -79,12 +81,10 @@ class MAASClient(object):
                     /api/2.0/dnsresources/{dnsresource_id}/
         :param fqdn: The fqdn address to update
         :param ip_address: The ip address to update the A record to point to
-        :returns: True if the DNS object was updated, False otherwise.
+        :returns: the response from the requests method
+        :rtype: maasclient.driver.Response
         """
-        resp = self.driver.update_dnsresource(rid, fqdn, ip_address)
-        if resp.ok:
-            return True
-        return False
+        return self.driver.update_dnsresource(rid, fqdn, ip_address)
 
     def create_dnsresource(self, fqdn, ip_address, address_ttl=None):
         """
@@ -93,12 +93,10 @@ class MAASClient(object):
         :param fqdn: The fqdn address to update
         :param ip_address: The ip address to update the A record to point to
         :param adress_ttl: DNS time to live
-        :returns: True if the DNS object was updated, False otherwise.
+        :returns: the response from the requests method
+        :rtype: maasclient.driver.Response
         """
-        resp = self.driver.create_dnsresource(fqdn, ip_address, address_ttl)
-        if resp.ok:
-            return True
-        return False
+        return self.driver.create_dnsresource(fqdn, ip_address, address_ttl)
 
     ###########################################################################
     #  IP API - http://maas.ubuntu.com/docs2.0/api.html#ip-address
@@ -108,6 +106,7 @@ class MAASClient(object):
         Get a list of ip addresses
 
         :returns: a list of ip address dictionaries
+        :rtype: List[str]
         """
         resp = self.driver.get_ipaddresses()
         if resp.ok:
@@ -120,9 +119,7 @@ class MAASClient(object):
 
         :param ip_address: The ip address to register
         :param hostname: the hostname to register at the same time
-        :returns: True if the DNS object was updated, False otherwise.
+        :returns: the response from the requests method
+        :rtype: maasclient.driver.Response
         """
-        resp = self.driver.create_ipaddress(ip_address, hostname)
-        if resp.ok:
-            return True
-        return False
+        return self.driver.create_ipaddress(ip_address, hostname)
