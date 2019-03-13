@@ -82,25 +82,25 @@ class TestPcmk(unittest.TestCase):
     def tearDown(self):
         os.remove(self.tmpfile.name)
 
-    @mock.patch('commands.getstatusoutput')
+    @mock.patch('subprocess.getstatusoutput')
     def test_crm_res_running_true(self, getstatusoutput):
         getstatusoutput.return_value = (0, ("resource res_nova_consoleauth is "
                                             "running on: juju-xxx-machine-6"))
         self.assertTrue(pcmk.crm_res_running('res_nova_consoleauth'))
 
-    @mock.patch('commands.getstatusoutput')
+    @mock.patch('subprocess.getstatusoutput')
     def test_crm_res_running_stopped(self, getstatusoutput):
         getstatusoutput.return_value = (0, ("resource res_nova_consoleauth is "
                                             "NOT running"))
         self.assertFalse(pcmk.crm_res_running('res_nova_consoleauth'))
 
-    @mock.patch('commands.getstatusoutput')
+    @mock.patch('subprocess.getstatusoutput')
     def test_crm_res_running_undefined(self, getstatusoutput):
         getstatusoutput.return_value = (1, "foobar")
         self.assertFalse(pcmk.crm_res_running('res_nova_consoleauth'))
 
     @mock.patch('socket.gethostname')
-    @mock.patch('commands.getstatusoutput')
+    @mock.patch('subprocess.getstatusoutput')
     def test_wait_for_pcmk(self, getstatusoutput, gethostname):
         # Pacemaker is down
         gethostname.return_value = 'hanode-1'
@@ -124,8 +124,8 @@ class TestPcmk(unittest.TestCase):
 
         # trusty
         mock_check_output.mock_reset()
-        mock_check_output.return_value = ("1.2.5 (Build f2f315daf6a5fd7ddea8e5"
-                                          "64cd289aa04218427d)\n")
+        mock_check_output.return_value = (
+            "1.2.5 (Build f2f315daf6a5fd7ddea8e564cd289aa04218427d)\n")
         ret = pcmk.crm_version()
         self.assertEqual(StrictVersion('1.2.5'), ret)
         mock_check_output.assert_called_with(['crm', '--version'],
@@ -170,7 +170,7 @@ class TestPcmk(unittest.TestCase):
                                               'show', 'xml'],
                                              universal_newlines=True)
 
-    @mock.patch('subprocess.check_output')
+    @mock.patch('subprocess.check_call')
     def test_set_property(self, mock_check_output):
         pcmk.set_property('maintenance-mode', 'false')
         mock_check_output.assert_called_with(['crm', 'configure', 'property',
@@ -189,7 +189,7 @@ class TestPcmk(unittest.TestCase):
 
         mock_call.assert_any_call(['crm', 'configure', 'load',
                                    'update', self.tmpfile.name])
-        with open(self.tmpfile.name, 'r') as f:
+        with open(self.tmpfile.name, 'rt') as f:
             self.assertEqual(f.read(),
                              ('primitive res_test IPaddr2 \\\n'
                               '\tparams ip=1.2.3.4 cidr_netmask=255.255.0.0'))

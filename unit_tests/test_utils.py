@@ -51,7 +51,7 @@ def get_default_config():
     '''
     default_config = {}
     config = load_config()
-    for k, v in config.iteritems():
+    for k, v in config.items():
         if 'default' in v:
             default_config[k] = v['default']
         else:
@@ -148,5 +148,5 @@ def patch_open():
         mock_open(*args, **kwargs)
         yield mock_file
 
-    with patch('__builtin__.open', stub_open):
+    with patch('builtins.open', stub_open):
         yield mock_open, mock_file

@@ -124,7 +124,7 @@ class MAASConfigIncomplete(Exception):
 
 def disable_upstart_services(*services):
     for service in services:
-        with open("/etc/init/{}.override".format(service), "w") as override:
+        with open("/etc/init/{}.override".format(service), "wt") as override:
             override.write("manual")
 
 
@@ -214,7 +214,7 @@ def get_corosync_id(unit_name):
 
 def nulls(data):
     """Returns keys of values that are null (but not bool)"""
-    return [k for k in data.iterkeys()
+    return [k for k in data.keys()
             if not isinstance(data[k], bool) and not data[k]]
 
 
@@ -295,7 +295,7 @@ def get_corosync_conf():
 
             return conf
 
-    missing = [k for k, v in conf.iteritems() if v is None]
+    missing = [k for k, v in conf.items() if v is None]
     log('Missing required configuration: %s' % missing)
     return None
 
@@ -404,12 +404,12 @@ def get_ipv6_addr():
     for rid in relation_ids('ha'):
         for unit in related_units(rid):
             resources = parse_data(rid, unit, 'resources')
-            for res in resources.itervalues():
+            for res in resources.values():
                 if 'ocf:heartbeat:IPv6addr' in res:
                     res_params = parse_data(rid, unit, 'resource_params')
                     res_p = res_params.get(res)
                     if res_p:
-                        for k, v in res_p.itervalues():
+                        for k, v in res_p.values():
                             if utils.is_ipv6(v):
                                 log("Excluding '%s' from address list" % v,
                                     level=DEBUG)
@@ -766,7 +766,9 @@ def is_in_standby_mode(node_name):
     @param node_name: The name of the node to check
     @returns boolean - True if node_name is in standby mode
     """
-    out = subprocess.check_output(['crm', 'node', 'status', node_name])
+    out = (subprocess
+           .check_output(['crm', 'node', 'status', node_name])
+           .decode('utf-8'))
     root = ET.fromstring(out)
 
     standby_mode = False
@@ -807,7 +809,7 @@ def node_has_resources(node_name):
     @param node_name: The name of the node to check
     @returns boolean - True if node_name has resources
     """
-    out = subprocess.check_output(['crm_mon', '-X'])
+    out = subprocess.check_output(['crm_mon', '-X']).decode('utf-8')
     root = ET.fromstring(out)
     has_resources = False
     for resource in root.iter('resource'):
@@ -936,7 +938,7 @@ def ocf_file_exists(res_name, resources,
     @return: boolean - True if the ocf resource exists
     """
     res_type = None
-    for key, val in resources.iteritems():
+    for key, val in resources.items():
         if res_name == key:
             if len(val.split(':')) > 2:
                 res_type = val.split(':')[1]
@@ -955,7 +957,7 @@ def kill_legacy_ocf_daemon_process(res_name):
     ocf_name = res_name.replace('res_', '').replace('_', '-')
     reg_expr = '([0-9]+)\s+[^0-9]+{}'.format(ocf_name)
     cmd = ['ps', '-eo', 'pid,cmd']
-    ps = subprocess.check_output(cmd)
+    ps = subprocess.check_output(cmd).decode('utf-8')
     res = re.search(reg_expr, ps, re.MULTILINE)
     if res:
         pid = res.group(1)

@@ -26,7 +26,7 @@ import pcmk
 
 
 def write_file(path, content, *args, **kwargs):
-    with open(path, 'w') as f:
+    with open(path, 'wt') as f:
         f.write(content)
         f.flush()
 
@@ -74,7 +74,7 @@ class UtilsTestCaseWriteTmp(unittest.TestCase):
 
         self.assertTrue(utils.emit_corosync_conf())
 
-        with open(utils.COROSYNC_CONF) as fd:
+        with open(utils.COROSYNC_CONF, 'rt') as fd:
             content = fd.read()
             if enabled:
                 pattern = 'debug: on\n'
@@ -216,7 +216,7 @@ class UtilsTestCase(unittest.TestCase):
     @mock.patch.object(subprocess, 'call')
     def test_kill_legacy_ocf_daemon_process(self, call_mock,
                                             check_output_mock):
-        ps_output = '''
+        ps_output = b'''
           PID CMD
           6863 sshd: ubuntu@pts/7
           11109 /usr/bin/python /usr/bin/ceilometer-agent-central --config

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Copyright 2016 Canonical Ltd
 #
@@ -14,11 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import os
 import subprocess
+import sys
 import traceback
+
 sys.path.append('hooks/')
+
+_path = os.path.dirname(os.path.realpath(__file__))
+_hooks = os.path.abspath(os.path.join(_path, '../hooks'))
+_root = os.path.abspath(os.path.join(_path, '..'))
+
+
+def _add_path(path):
+    if path not in sys.path:
+        sys.path.insert(1, path)
+
+_add_path(_hooks)
+_add_path(_root)
+
+
 from charmhelpers.core.hookenv import (
     action_fail,
     action_get,
@@ -50,7 +65,7 @@ def status(args):
     cmd = ['crm', 'status', '--inactive']
 
     try:
-        result = subprocess.check_output(cmd)
+        result = subprocess.check_output(cmd).decode('utf-8')
         action_set({'result': result})
     except subprocess.CalledProcessError as e:
         log("ERROR: Failed call to crm resource status. "

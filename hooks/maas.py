@@ -72,7 +72,7 @@ class MAASHelper(object):
 
         try:
             cmd = ['maas-cli', MAAS_PROFILE_NAME, 'nodes', 'list']
-            out = subprocess.check_output(cmd)
+            out = subprocess.check_output(cmd).decode('utf-8')
         except subprocess.CalledProcessError:
             log('Could not get node inventory from MAAS.', ERROR)
             return False

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Copyright 2016 Canonical Ltd
 #
@@ -19,6 +19,18 @@ import os
 import shutil
 import socket
 import sys
+
+_path = os.path.dirname(os.path.realpath(__file__))
+_root = os.path.abspath(os.path.join(_path, '..'))
+
+
+def _add_path(path):
+    if path not in sys.path:
+        sys.path.insert(1, path)
+
+
+_add_path(_root)
+
 
 import pcmk
 
@@ -200,7 +212,7 @@ def migrate_maas_dns():
                         write_maas_dns_address(resource, res_ipaddr)
 
 
-@hooks.hook()
+@hooks.hook('upgrade-charm.real')
 def upgrade_charm():
     install()
     migrate_maas_dns()
@@ -269,10 +281,10 @@ def ha_relation_changed():
         return
 
     if True in [ra.startswith('ocf:openstack')
-                for ra in resources.itervalues()]:
+                for ra in resources.values()]:
         apt_install('openstack-resource-agents')
     if True in [ra.startswith('ocf:ceph')
-                for ra in resources.itervalues()]:
+                for ra in resources.values()]:
         apt_install('ceph-resource-agents')
 
     if True in [ra.startswith('ocf:maas')
@@ -328,7 +340,7 @@ def ha_relation_changed():
                 pcmk.commit('crm -w -F configure delete %s' % res_name)
 
         log('Configuring Resources: %s' % (resources), level=DEBUG)
-        for res_name, res_type in resources.iteritems():
+        for res_name, res_type in resources.items():
             # disable the service we are going to put in HA
             if res_type.split(':')[0] == "lsb":
                 disable_lsb_services(res_type.split(':')[1])
@@ -367,7 +379,7 @@ def ha_relation_changed():
                     raise Exception(msg)
 
         log('Configuring Groups: %s' % (groups), level=DEBUG)
-        for grp_name, grp_params in groups.iteritems():
+        for grp_name, grp_params in groups.items():
             if not pcmk.crm_opt_exists(grp_name):
                 cmd = ('crm -w -F configure group %s %s' %
                        (grp_name, grp_params))
@@ -375,14 +387,14 @@ def ha_relation_changed():
                 log('%s' % cmd, level=DEBUG)
 
         log('Configuring Master/Slave (ms): %s' % (ms), level=DEBUG)
-        for ms_name, ms_params in ms.iteritems():
+        for ms_name, ms_params in ms.items():
             if not pcmk.crm_opt_exists(ms_name):
                 cmd = 'crm -w -F configure ms %s %s' % (ms_name, ms_params)
                 pcmk.commit(cmd)
                 log('%s' % cmd, level=DEBUG)
 
         log('Configuring Orders: %s' % (orders), level=DEBUG)
-        for ord_name, ord_params in orders.iteritems():
+        for ord_name, ord_params in orders.items():
             if not pcmk.crm_opt_exists(ord_name):
                 cmd = 'crm -w -F configure order %s %s' % (ord_name,
                                                            ord_params)
@@ -390,7 +402,7 @@ def ha_relation_changed():
                 log('%s' % cmd, level=DEBUG)
 
         log('Configuring Clones: %s' % clones, level=DEBUG)
-        for cln_name, cln_params in clones.iteritems():
+        for cln_name, cln_params in clones.items():
             if not pcmk.crm_opt_exists(cln_name):
                 cmd = 'crm -w -F configure clone %s %s' % (cln_name,
                                                            cln_params)
@@ -402,7 +414,7 @@ def ha_relation_changed():
         # need to exist otherwise constraint creation will fail.
 
         log('Configuring Colocations: %s' % colocations, level=DEBUG)
-        for col_name, col_params in colocations.iteritems():
+        for col_name, col_params in colocations.items():
             if not pcmk.crm_opt_exists(col_name):
                 cmd = 'crm -w -F configure colocation %s %s' % (col_name,
                                                                 col_params)
@@ -410,14 +422,14 @@ def ha_relation_changed():
                 log('%s' % cmd, level=DEBUG)
 
         log('Configuring Locations: %s' % locations, level=DEBUG)
-        for loc_name, loc_params in locations.iteritems():
+        for loc_name, loc_params in locations.items():
             if not pcmk.crm_opt_exists(loc_name):
                 cmd = 'crm -w -F configure location %s %s' % (loc_name,
                                                               loc_params)
                 pcmk.commit(cmd)
                 log('%s' % cmd, level=DEBUG)
 
-        for res_name, res_type in resources.iteritems():
+        for res_name, res_type in resources.items():
             if len(init_services) != 0 and res_name in init_services:
                 # Checks that the resources are running and started.
                 # Ensure that clones are excluded as the resource is
