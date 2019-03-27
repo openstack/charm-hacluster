@@ -586,6 +586,36 @@ def configure_cluster_global():
     pcmk.commit(cmd)
 
 
+def configure_maas_stonith_resource(stonith_hostname):
+    """Create stonith resource for the given hostname.
+
+    :param stonith_hostname: The hostname that the stonith management system
+                             refers to the remote node as.
+    :type stonith_hostname: str
+    """
+    log('Checking for existing stonith resource', level=DEBUG)
+    stonith_res_name = 'st-{}'.format(stonith_hostname.split('.')[0])
+    if not pcmk.is_resource_present(stonith_res_name):
+        ctxt = {
+            'url': config('maas_url'),
+            'apikey': config('maas_credentials'),
+            'hostnames': stonith_hostname,
+            'stonith_resource_name': stonith_res_name}
+        if all(ctxt.values()):
+            cmd = (
+                "crm configure primitive {stonith_resource_name} "
+                "stonith:external/maas "
+                "params url='{url}' apikey='{apikey}' hostnames={hostnames} "
+                "op monitor interval=25 start-delay=25 "
+                "timeout=25").format(**ctxt)
+            pcmk.commit(cmd, failure_is_fatal=True)
+        else:
+            raise ValueError("Missing configuration: {}".format(ctxt))
+        pcmk.commit(
+            "crm configure property stonith-enabled=true",
+            failure_is_fatal=True)
+
+
 def get_ip_addr_from_resource_params(params):
     """Returns the IP address in the resource params provided
 
@@ -744,6 +774,9 @@ def setup_ocf_files():
     rsync('ocf/maas/dns', '/usr/lib/ocf/resource.d/maas/dns')
     rsync('ocf/maas/maas_dns.py', '/usr/lib/heartbeat/maas_dns.py')
     rsync('ocf/maas/maasclient/', '/usr/lib/heartbeat/maasclient/')
+    rsync(
+        'ocf/maas/maas_stonith_plugin.py',
+        '/usr/lib/stonith/plugins/external/maas')
 
 
 def write_maas_dns_address(resource_name, resource_addr):
