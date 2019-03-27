@@ -75,24 +75,9 @@ from charmhelpers.contrib.hahelpers.cluster import (
 )
 from charmhelpers.contrib.network import ip as utils
 
-try:
-    import netifaces
-except ImportError:
-    apt_install('python-netifaces')
-    import netifaces
-
-try:
-    from netaddr import IPNetwork
-except ImportError:
-    apt_install('python-netaddr', fatal=True)
-    from netaddr import IPNetwork
-
-
-try:
-    import jinja2
-except ImportError:
-    apt_install('python-jinja2', fatal=True)
-    import jinja2
+import netifaces
+from netaddr import IPNetwork
+import jinja2
 
 
 TEMPLATES_DIR = 'templates'
