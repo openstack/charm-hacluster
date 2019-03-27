@@ -74,6 +74,14 @@ CRM_CONFIGURE_SHOW_XML_MAINT_MODE_TRUE = '''<?xml version="1.0" ?>
 
 '''  # noqa
 
+CRM_NODE_STATUS_XML = b'''
+<nodes>
+  <node id="1000" uname="juju-982848-zaza-ce47c58f6c88-10"/>
+  <node id="1001" uname="juju-982848-zaza-ce47c58f6c88-9"/>
+  <node id="1002" uname="juju-982848-zaza-ce47c58f6c88-11"/>
+</nodes>
+'''
+
 
 class TestPcmk(unittest.TestCase):
     def setUp(self):
@@ -226,3 +234,13 @@ class TestPcmk(unittest.TestCase):
         r = pcmk.resource_checksum('res_test', 'IPaddr2',
                                    'params ip=1.2.3.4 cidr_netmask=255.0.0.0')
         self.assertEqual(r, 'ef395293b1b7c29c5bf1c99774f75cf4')
+
+    @mock.patch('subprocess.check_output', return_value=CRM_NODE_STATUS_XML)
+    def test_list_nodes(self, mock_check_output):
+        self.assertSequenceEqual(
+            pcmk.list_nodes(),
+            [
+                'juju-982848-zaza-ce47c58f6c88-10',
+                'juju-982848-zaza-ce47c58f6c88-11',
+                'juju-982848-zaza-ce47c58f6c88-9'])
+        mock_check_output.assert_called_once_with(['crm', 'node', 'status'])
