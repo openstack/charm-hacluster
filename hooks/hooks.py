@@ -77,11 +77,16 @@ from utils import (
     get_corosync_conf,
     assert_charm_supports_ipv6,
     get_cluster_nodes,
+    get_member_ready_nodes,
+    get_pcmkr_key,
     parse_data,
     configure_corosync,
     configure_stonith,
     configure_monitor_host,
     configure_cluster_global,
+    configure_pacemaker_remote_resources,
+    configure_pacemaker_remote_stonith_resource,
+    configure_resources_on_remotes,
     enable_lsb_services,
     disable_lsb_services,
     disable_upstart_services,
@@ -90,6 +95,7 @@ from utils import (
     setup_maas_api,
     setup_ocf_files,
     set_unit_status,
+    set_cluster_symmetry,
     ocf_file_exists,
     kill_legacy_ocf_daemon_process,
     try_pcmk_wait,
@@ -231,6 +237,7 @@ def hanode_relation_joined(relid=None):
             'ha-relation-changed',
             'peer-availability-relation-joined',
             'peer-availability-relation-changed',
+            'pacemaker-remote-relation-changed',
             'hanode-relation-changed')
 def ha_relation_changed():
     # Check that we are related to a principle and that
@@ -325,6 +332,8 @@ def ha_relation_changed():
     # Only configure the cluster resources
     # from the oldest peer unit.
     if is_leader():
+        log('Setting cluster symmetry', level=INFO)
+        set_cluster_symmetry()
         log('Deleting Resources' % (delete_resources), level=DEBUG)
         for res_name in delete_resources:
             if pcmk.crm_opt_exists(res_name):
@@ -456,6 +465,21 @@ def ha_relation_changed():
             cmd = 'crm resource cleanup %s' % grp_name
             pcmk.commit(cmd)
 
+        # All members of the cluster need to be registered before resources
+        # that reference them can be created.
+        if len(get_member_ready_nodes()) >= int(config('cluster_count')):
+            log('Configuring any remote nodes', level=INFO)
+            remote_resources = configure_pacemaker_remote_resources()
+            stonith_resource = configure_pacemaker_remote_stonith_resource()
+            resources.update(remote_resources)
+            resources.update(stonith_resource)
+            configure_resources_on_remotes(
+                resources=resources,
+                clones=clones,
+                groups=groups)
+        else:
+            log('Deferring configuration of any remote nodes', level=INFO)
+
     for rel_id in relation_ids('ha'):
         relation_set(relation_id=rel_id, clustered="yes")
 
@@ -540,6 +564,16 @@ def series_upgrade_complete():
     clear_unit_upgrading()
     config_changed()
     resume_unit()
+
+
+@hooks.hook('pacemaker-remote-relation-joined')
+def send_auth_key():
+    key = get_pcmkr_key()
+    if key:
+        for rel_id in relation_ids('pacemaker-remote'):
+            relation_set(
+                relation_id=rel_id,
+                **{'pacemaker-key': key})
 
 
 if __name__ == '__main__':
