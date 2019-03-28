@@ -459,6 +459,11 @@ def ha_relation_changed():
     for rel_id in relation_ids('ha'):
         relation_set(relation_id=rel_id, clustered="yes")
 
+    # Inform peers that local configuration is complete and this member
+    # is ready
+    for rel_id in relation_ids('hanode'):
+        relation_set(relation_id=rel_id, member_ready=True)
+
 
 @hooks.hook()
 def stop():
