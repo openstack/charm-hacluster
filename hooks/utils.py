@@ -443,7 +443,14 @@ def get_ha_nodes():
     return ha_nodes
 
 
-def get_cluster_nodes():
+def get_node_flags(flag):
+    """Nodes which have advertised the given flag.
+
+    :param flag: Flag to check peers relation data for.
+    :type flag: str
+    :returns: List of IPs of nodes that are ready to join the cluster
+    :rtype: List
+    """
     hosts = []
     if config('prefer-ipv6'):
         hosts.append(get_ipv6_addr())
@@ -452,11 +459,31 @@ def get_cluster_nodes():
 
     for relid in relation_ids('hanode'):
         for unit in related_units(relid):
-            if relation_get('ready', rid=relid, unit=unit):
-                hosts.append(relation_get('private-address', unit, relid))
+            if relation_get(flag, rid=relid, unit=unit):
+                hosts.append(relation_get('private-address',
+                                          rid=relid,
+                                          unit=unit))
 
     hosts.sort()
     return hosts
+
+
+def get_cluster_nodes():
+    """Nodes which have advertised that they are ready to join the cluster.
+
+    :returns: List of IPs of nodes that are ready to join the cluster
+    :rtype: List
+    """
+    return get_node_flags('ready')
+
+
+def get_member_ready_nodes():
+    """List of nodes which have advertised that they have joined the cluster.
+
+    :returns: List of IPs of nodes that have joined thcluster.
+    :rtype: List
+    """
+    return get_node_flags('member_ready')
 
 
 def parse_data(relid, unit, key):

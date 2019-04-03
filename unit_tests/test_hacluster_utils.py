@@ -629,3 +629,49 @@ class UtilsTestCase(unittest.TestCase):
         config.side_effect = lambda x: cfg.get(x)
         with self.assertRaises(ValueError):
             utils.configure_maas_stonith_resource('node1')
+
+    @mock.patch.object(utils, 'unit_get')
+    @mock.patch.object(utils, 'get_ipv6_addr')
+    @mock.patch.object(utils, 'relation_get')
+    @mock.patch.object(utils, 'related_units')
+    @mock.patch.object(utils, 'relation_ids')
+    @mock.patch.object(utils, 'config')
+    def test_get_node_flags(self, config, relation_ids, related_units,
+                            relation_get, get_ipv6_addr, unit_get):
+        cfg = {}
+        config.side_effect = lambda x: cfg.get(x)
+        unit_get.return_value = '10.0.0.41'
+        relation_ids.return_value = ['relid1']
+        related_units.return_value = ['unit1', 'unit2', 'unit3']
+        rdata = {
+            'unit1': {
+                'random_flag': True,
+                'private-address': '10.0.0.10'},
+            'unit2': {
+                'random_flag': True,
+                'private-address': '10.0.0.34'},
+            'unit3': {
+                'random_flag': True,
+                'private-address': '10.0.0.16'}}
+        relation_get.side_effect = lambda v, rid, unit: rdata[unit].get(v)
+        rget_calls = [
+            mock.call('random_flag', rid='relid1', unit='unit1'),
+            mock.call('private-address', rid='relid1', unit='unit1'),
+            mock.call('random_flag', rid='relid1', unit='unit2'),
+            mock.call('private-address', rid='relid1', unit='unit2'),
+            mock.call('random_flag', rid='relid1', unit='unit3'),
+            mock.call('private-address', rid='relid1', unit='unit3')]
+        self.assertSequenceEqual(
+            utils.get_node_flags('random_flag'),
+            ['10.0.0.10', '10.0.0.16', '10.0.0.34', '10.0.0.41'])
+        relation_get.assert_has_calls(rget_calls)
+
+    @mock.patch.object(utils, 'get_node_flags')
+    def test_get_cluster_nodes(self, get_node_flags):
+        utils.get_cluster_nodes()
+        get_node_flags.assert_called_once_with('ready')
+
+    @mock.patch.object(utils, 'get_node_flags')
+    def test_get_member_ready_nodes(self, get_node_flags):
+        utils.get_member_ready_nodes()
+        get_node_flags.assert_called_once_with('member_ready')
