@@ -487,10 +487,14 @@ class UtilsTestCase(unittest.TestCase):
                 'hacluster.acl',
                 {})
         ]
+        mkdir_calls = [
+            mock.call('/etc/corosync/uidgid.d'),
+            mock.call('/etc/pacemaker'),
+        ]
         self.assertTrue(utils.emit_base_conf())
         write_file.assert_has_calls(expect_write_calls)
         render_template.assert_has_calls(expect_render_calls)
-        mkdir.assert_called_once_with('/etc/corosync/uidgid.d')
+        mkdir.assert_has_calls(mkdir_calls)
 
     @mock.patch.object(utils, 'render_template')
     @mock.patch.object(utils.os.path, 'isdir')
@@ -535,10 +539,14 @@ class UtilsTestCase(unittest.TestCase):
                 'hacluster.acl',
                 {})
         ]
+        mkdir_calls = [
+            mock.call('/etc/corosync/uidgid.d'),
+            mock.call('/etc/pacemaker'),
+        ]
         self.assertTrue(utils.emit_base_conf())
         write_file.assert_has_calls(expect_write_calls)
         render_template.assert_has_calls(expect_render_calls)
-        mkdir.assert_called_once_with('/etc/corosync/uidgid.d')
+        mkdir.assert_has_calls(mkdir_calls)
 
     @mock.patch.object(utils, 'render_template')
     @mock.patch.object(utils.os.path, 'isdir')
@@ -572,10 +580,14 @@ class UtilsTestCase(unittest.TestCase):
                 'hacluster.acl',
                 {})
         ]
+        mkdir_calls = [
+            mock.call('/etc/corosync/uidgid.d'),
+            mock.call('/etc/pacemaker'),
+        ]
         self.assertFalse(utils.emit_base_conf())
         write_file.assert_has_calls(expect_write_calls)
         render_template.assert_has_calls(expect_render_calls)
-        mkdir.assert_called_once_with('/etc/corosync/uidgid.d')
+        mkdir.assert_has_calls(mkdir_calls)
 
     @mock.patch.object(utils, 'relation_get')
     @mock.patch.object(utils, 'related_units')
