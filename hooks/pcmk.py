@@ -103,14 +103,12 @@ def crm_res_running(opt_name):
 
 
 def list_nodes():
-    cmd = ['crm', 'node', 'list']
+    """List member nodes."""
+    cmd = ['crm', 'node', 'status']
     out = subprocess.check_output(cmd).decode('utf-8')
-    nodes = []
-    for line in str(out).split('\n'):
-        if line != '':
-            nodes.append(line.split(':')[0])
-
-    return nodes
+    tree = etree.fromstring(out)
+    nodes = [n.attrib['uname'] for n in tree.iter('node')]
+    return sorted(nodes)
 
 
 def _maas_ipmi_stonith_resource(node, power_params):
