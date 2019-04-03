@@ -55,8 +55,19 @@ def wait_for_pcmk(retries=12, sleep=10):
                             "".format(retries, output))
 
 
-def commit(cmd):
-    return subprocess.call(cmd.split())
+def commit(cmd, failure_is_fatal=False):
+    """Run the given command.
+
+    :param cmd: Command to run
+    :type cmd: str
+    :param failure_is_fatal: Whether to raise exception if command fails.
+    :type failure_is_fatal: bool
+    :raises: subprocess.CalledProcessError
+    """
+    if failure_is_fatal:
+        return subprocess.check_call(cmd.split())
+    else:
+        return subprocess.call(cmd.split())
 
 
 def is_resource_present(resource):

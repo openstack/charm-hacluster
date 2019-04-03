@@ -576,3 +576,56 @@ class UtilsTestCase(unittest.TestCase):
         write_file.assert_has_calls(expect_write_calls)
         render_template.assert_has_calls(expect_render_calls)
         mkdir.assert_called_once_with('/etc/corosync/uidgid.d')
+
+    @mock.patch.object(utils, 'config')
+    @mock.patch('pcmk.commit')
+    @mock.patch('pcmk.is_resource_present')
+    def test_configure_maas_stonith_resource(self, is_resource_present,
+                                             commit, config):
+        cfg = {
+            'maas_url': 'http://maas/2.0',
+            'maas_credentials': 'apikey'}
+        is_resource_present.return_value = False
+        config.side_effect = lambda x: cfg.get(x)
+        utils.configure_maas_stonith_resource('node1')
+        cmd = (
+            "crm configure primitive st-node1 "
+            "stonith:external/maas "
+            "params url='http://maas/2.0' apikey='apikey' "
+            "hostnames=node1 "
+            "op monitor interval=25 start-delay=25 "
+            "timeout=25")
+        commit_calls = [
+            mock.call(cmd, failure_is_fatal=True),
+            mock.call(
+                'crm configure property stonith-enabled=true',
+                failure_is_fatal=True),
+        ]
+        commit.assert_has_calls(commit_calls)
+
+    @mock.patch.object(utils, 'config')
+    @mock.patch('pcmk.commit')
+    @mock.patch('pcmk.is_resource_present')
+    def test_configure_maas_stonith_resource_duplicate(self,
+                                                       is_resource_present,
+                                                       commit, config):
+        cfg = {
+            'maas_url': 'http://maas/2.0',
+            'maas_credentials': 'apikey'}
+        is_resource_present.return_value = True
+        config.side_effect = lambda x: cfg.get(x)
+        utils.configure_maas_stonith_resource('node1')
+        self.assertFalse(commit.called)
+
+    @mock.patch.object(utils, 'config')
+    @mock.patch('pcmk.commit')
+    @mock.patch('pcmk.is_resource_present')
+    def test_configure_maas_stonith_resource_no_url(self,
+                                                    is_resource_present,
+                                                    commit, config):
+        cfg = {
+            'maas_credentials': 'apikey'}
+        is_resource_present.return_value = False
+        config.side_effect = lambda x: cfg.get(x)
+        with self.assertRaises(ValueError):
+            utils.configure_maas_stonith_resource('node1')
