@@ -93,6 +93,8 @@ COROSYNC_CONF_FILES = [
     COROSYNC_HACLUSTER_ACL,
 ]
 SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
+
+PCMKR_AUTHKEY = '/etc/pacemaker/authkey'
 PCMKR_MAX_RETRIES = 3
 PCMKR_SLEEP_SECS = 5
 
@@ -331,6 +333,11 @@ def emit_corosync_conf():
     return False
 
 
+def get_pcmkr_key():
+    """Return the pacemaker auth key"""
+    return config('pacemaker_key') or config('corosync_key')
+
+
 def emit_base_conf():
     if not os.path.isdir(COROSYNC_HACLUSTER_ACL_DIR):
         os.mkdir(COROSYNC_HACLUSTER_ACL_DIR)
@@ -347,6 +354,12 @@ def emit_base_conf():
         write_file(path=COROSYNC_AUTHKEY,
                    content=b64decode(corosync_key),
                    perms=0o400)
+        pcmkr_key = get_pcmkr_key()
+        write_file(path=PCMKR_AUTHKEY,
+                   owner='root',
+                   group='haclient',
+                   content=b64decode(pcmkr_key),
+                   perms=0o440)
         return True
 
     return False

@@ -53,6 +53,18 @@ options:
       .
       This configuration element is mandatory and the service will fail on
       install if it is not provided.  The value must be base64 encoded.
+  pacemaker_key:
+    type: string
+    default:
+    description: |
+      This value will become the Pacemaker authentication key. To generate
+      a suitable value use:
+      .
+        dd if=/dev/urandom of=/tmp/authkey bs=2048 count=1
+        cat /tmp/authkey |  base64 -w 0
+      .
+      If this configuration element is not set then the corosync key will be
+      reused as the pacemaker key.
   maintenance-mode:
     type: boolean
     default: false

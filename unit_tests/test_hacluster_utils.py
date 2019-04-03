@@ -442,3 +442,137 @@ class UtilsTestCase(unittest.TestCase):
         relation_get.assert_has_calls([
             mock.call('json_testkey', 'neutron-api/0', 'hacluster:1'),
         ])
+
+    @mock.patch.object(utils, 'render_template')
+    @mock.patch.object(utils.os.path, 'isdir')
+    @mock.patch.object(utils.os, 'mkdir')
+    @mock.patch.object(utils, 'write_file')
+    @mock.patch.object(utils, 'config')
+    def test_emit_base_conf(self, config, write_file, mkdir, isdir,
+                            render_template):
+        cfg = {
+            'corosync_key': 'Y29yb3N5bmNrZXkK',
+            'pacemaker_key': 'cGFjZW1ha2Vya2V5Cg==',
+        }
+        config.side_effect = lambda x: cfg.get(x)
+        isdir.return_value = False
+        render = {
+            'corosync': 'corosync etc default config',
+            'hacluster.acl': 'hacluster acl file',
+        }
+        render_template.side_effect = lambda x, y: render[x]
+        expect_write_calls = [
+            mock.call(
+                content='corosync etc default config',
+                path='/etc/default/corosync'),
+            mock.call(
+                content='hacluster acl file',
+                path='/etc/corosync/uidgid.d/hacluster'),
+            mock.call(
+                content=b'corosynckey\n',
+                path='/etc/corosync/authkey',
+                perms=256),
+            mock.call(
+                content=b'pacemakerkey\n',
+                path='/etc/pacemaker/authkey',
+                perms=288,
+                group='haclient',
+                owner='root')
+        ]
+        expect_render_calls = [
+            mock.call(
+                'corosync',
+                {'corosync_enabled': 'yes'}),
+            mock.call(
+                'hacluster.acl',
+                {})
+        ]
+        self.assertTrue(utils.emit_base_conf())
+        write_file.assert_has_calls(expect_write_calls)
+        render_template.assert_has_calls(expect_render_calls)
+        mkdir.assert_called_once_with('/etc/corosync/uidgid.d')
+
+    @mock.patch.object(utils, 'render_template')
+    @mock.patch.object(utils.os.path, 'isdir')
+    @mock.patch.object(utils.os, 'mkdir')
+    @mock.patch.object(utils, 'write_file')
+    @mock.patch.object(utils, 'config')
+    def test_emit_base_conf_no_pcmkr_key(self, config, write_file, mkdir,
+                                         isdir, render_template):
+        cfg = {
+            'corosync_key': 'Y29yb3N5bmNrZXkK',
+        }
+        config.side_effect = lambda x: cfg.get(x)
+        isdir.return_value = False
+        render = {
+            'corosync': 'corosync etc default config',
+            'hacluster.acl': 'hacluster acl file',
+        }
+        render_template.side_effect = lambda x, y: render[x]
+        expect_write_calls = [
+            mock.call(
+                content='corosync etc default config',
+                path='/etc/default/corosync'),
+            mock.call(
+                content='hacluster acl file',
+                path='/etc/corosync/uidgid.d/hacluster'),
+            mock.call(
+                content=b'corosynckey\n',
+                path='/etc/corosync/authkey',
+                perms=256),
+            mock.call(
+                content=b'corosynckey\n',
+                path='/etc/pacemaker/authkey',
+                perms=288,
+                group='haclient',
+                owner='root')
+        ]
+        expect_render_calls = [
+            mock.call(
+                'corosync',
+                {'corosync_enabled': 'yes'}),
+            mock.call(
+                'hacluster.acl',
+                {})
+        ]
+        self.assertTrue(utils.emit_base_conf())
+        write_file.assert_has_calls(expect_write_calls)
+        render_template.assert_has_calls(expect_render_calls)
+        mkdir.assert_called_once_with('/etc/corosync/uidgid.d')
+
+    @mock.patch.object(utils, 'render_template')
+    @mock.patch.object(utils.os.path, 'isdir')
+    @mock.patch.object(utils.os, 'mkdir')
+    @mock.patch.object(utils, 'write_file')
+    @mock.patch.object(utils, 'config')
+    def test_emit_base_conf_no_coro_key(self, config, write_file, mkdir,
+                                        isdir, render_template):
+        cfg = {
+        }
+        config.side_effect = lambda x: cfg.get(x)
+        isdir.return_value = False
+        render = {
+            'corosync': 'corosync etc default config',
+            'hacluster.acl': 'hacluster acl file',
+        }
+        render_template.side_effect = lambda x, y: render[x]
+        expect_write_calls = [
+            mock.call(
+                content='corosync etc default config',
+                path='/etc/default/corosync'),
+            mock.call(
+                content='hacluster acl file',
+                path='/etc/corosync/uidgid.d/hacluster'),
+        ]
+        expect_render_calls = [
+            mock.call(
+                'corosync',
+                {'corosync_enabled': 'yes'}),
+            mock.call(
+                'hacluster.acl',
+                {})
+        ]
+        self.assertFalse(utils.emit_base_conf())
+        write_file.assert_has_calls(expect_write_calls)
+        render_template.assert_has_calls(expect_render_calls)
+        mkdir.assert_called_once_with('/etc/corosync/uidgid.d')
