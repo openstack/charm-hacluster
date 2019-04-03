@@ -15,6 +15,9 @@ requires:
   juju-info:
     interface: juju-info
     scope: container
+  peer-availability:
+    interface: juju-info
+    scope: container
 provides:
   ha:
     interface: hacluster
