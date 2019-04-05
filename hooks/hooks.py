@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import glob
 import os
 import shutil
@@ -131,15 +132,18 @@ DEPRECATED_TRANSPORT_VALUES = {"multicast": "udp", "unicast": "udpu"}
 
 @hooks.hook('install.real')
 def install():
+    pkgs = copy.deepcopy(PACKAGES)
     ubuntu_release = lsb_release()['DISTRIB_CODENAME'].lower()
     # use libnagios on anything older than Xenial
     if CompareHostReleases(ubuntu_release) < 'xenial':
-        PACKAGES.remove('libmonitoring-plugin-perl')
-        PACKAGES.append('libnagios-plugin-perl')
+        pkgs.remove('libmonitoring-plugin-perl')
+        pkgs.append('libnagios-plugin-perl')
+    elif CompareHostReleases(ubuntu_release) >= 'bionic':
+        pkgs.append('python3-libmaas')
     # NOTE(dosaboy): we currently disallow upgrades due to bug #1382842. This
     # should be removed once the pacemaker package is fixed.
     status_set('maintenance', 'Installing apt packages')
-    apt_install(filter_installed_packages(PACKAGES), fatal=True)
+    apt_install(filter_installed_packages(pkgs), fatal=True)
     setup_ocf_files()
 
 

@@ -94,7 +94,8 @@ COROSYNC_CONF_FILES = [
 ]
 SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
 
-PCMKR_AUTHKEY = '/etc/pacemaker/authkey'
+PCMKR_CONFIG_DIR = '/etc/pacemaker'
+PCMKR_AUTHKEY = PCMKR_CONFIG_DIR + '/authkey'
 PCMKR_MAX_RETRIES = 3
 PCMKR_SLEEP_SECS = 5
 
@@ -341,6 +342,8 @@ def get_pcmkr_key():
 def emit_base_conf():
     if not os.path.isdir(COROSYNC_HACLUSTER_ACL_DIR):
         os.mkdir(COROSYNC_HACLUSTER_ACL_DIR)
+    if not os.path.isdir(PCMKR_CONFIG_DIR):
+        os.mkdir(PCMKR_CONFIG_DIR)
     corosync_default_context = {'corosync_enabled': 'yes'}
     write_file(path=COROSYNC_DEFAULT,
                content=render_template('corosync',

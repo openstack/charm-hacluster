@@ -296,6 +296,49 @@ class TestHooks(test_utils.CharmTestCase):
         super(TestHooks, self).setUp(hooks, self.TO_PATCH)
         self.config.side_effect = self.test_config.get
 
+    @mock.patch.object(hooks, 'filter_installed_packages')
+    @mock.patch.object(hooks, 'setup_ocf_files')
+    @mock.patch.object(hooks, 'apt_install')
+    @mock.patch.object(hooks, 'status_set')
+    @mock.patch.object(hooks, 'lsb_release')
+    def test_install_xenial(self, lsb_release, status_set, apt_install,
+                            setup_ocf_files, filter_installed_packages):
+        lsb_release.return_value = {
+            'DISTRIB_CODENAME': 'xenial'}
+        filter_installed_packages.side_effect = lambda x: x
+        expected_pkgs = [
+            'crmsh', 'corosync', 'pacemaker', 'python-netaddr', 'ipmitool',
+            'libmonitoring-plugin-perl', 'python3-requests-oauthlib']
+        hooks.install()
+        status_set.assert_called_once_with(
+            'maintenance',
+            'Installing apt packages')
+        filter_installed_packages.assert_called_once_with(expected_pkgs)
+        apt_install.assert_called_once_with(expected_pkgs, fatal=True)
+        setup_ocf_files.assert_called_once_with()
+
+    @mock.patch.object(hooks, 'filter_installed_packages')
+    @mock.patch.object(hooks, 'setup_ocf_files')
+    @mock.patch.object(hooks, 'apt_install')
+    @mock.patch.object(hooks, 'status_set')
+    @mock.patch.object(hooks, 'lsb_release')
+    def test_install_bionic(self, lsb_release, status_set, apt_install,
+                            setup_ocf_files, filter_installed_packages):
+        lsb_release.return_value = {
+            'DISTRIB_CODENAME': 'bionic'}
+        filter_installed_packages.side_effect = lambda x: x
+        expected_pkgs = [
+            'crmsh', 'corosync', 'pacemaker', 'python-netaddr', 'ipmitool',
+            'libmonitoring-plugin-perl', 'python3-requests-oauthlib',
+            'python3-libmaas']
+        hooks.install()
+        status_set.assert_called_once_with(
+            'maintenance',
+            'Installing apt packages')
+        filter_installed_packages.assert_called_once_with(expected_pkgs)
+        apt_install.assert_called_once_with(expected_pkgs, fatal=True)
+        setup_ocf_files.assert_called_once_with()
+
     @mock.patch.object(hooks, 'relation_ids')
     @mock.patch.object(hooks, 'hanode_relation_joined')
     @mock.patch.object(hooks, 'maintenance_mode')
