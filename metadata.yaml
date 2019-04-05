@@ -10,6 +10,7 @@ series:
   - xenial
   - bionic
   - cosmic
+  - disco
   - trusty
 requires:
   juju-info:
