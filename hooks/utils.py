@@ -726,11 +726,13 @@ def add_location_rules_for_local_nodes(res_name):
             log('%s' % cmd, level=DEBUG)
 
 
-def configure_pacemaker_remote(remote_hostname):
+def configure_pacemaker_remote(remote_hostname, remote_ip):
     """Create a resource corresponding to the pacemaker remote node.
 
     :param remote_hostname: Remote hostname used for registering remote node.
     :type remote_hostname: str
+    :param remote_ip: Remote IP used for registering remote node.
+    :type remote_ip: str
     :returns: Name of resource for pacemaker remote node.
     :rtype: str
     """
@@ -740,7 +742,7 @@ def configure_pacemaker_remote(remote_hostname):
             "crm configure primitive {} ocf:pacemaker:remote "
             "params server={} reconnect_interval=60 "
             "op monitor interval=30s").format(resource_name,
-                                              remote_hostname)
+                                              remote_ip)
         pcmk.commit(cmd, failure_is_fatal=True)
     return resource_name
 
@@ -800,8 +802,11 @@ def configure_pacemaker_remote_resources():
     for relid in relation_ids('pacemaker-remote'):
         for unit in related_units(relid):
             remote_hostname = parse_data(relid, unit, 'remote-hostname')
+            remote_ip = parse_data(relid, unit, 'remote-ip')
             if remote_hostname:
-                resource_name = configure_pacemaker_remote(remote_hostname)
+                resource_name = configure_pacemaker_remote(
+                    remote_hostname,
+                    remote_ip)
                 resources.append(resource_name)
     cleanup_remote_nodes(resources)
     return {name: 'ocf:pacemaker:remote' for name in resources}

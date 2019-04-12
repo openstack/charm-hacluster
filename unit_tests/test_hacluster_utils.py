@@ -704,12 +704,13 @@ class UtilsTestCase(unittest.TestCase):
         is_resource_present.return_value = False
         self.assertEqual(
             utils.configure_pacemaker_remote(
-                'juju-aa0ba5-zaza-ed2ce6f303f0-10'),
+                'juju-aa0ba5-zaza-ed2ce6f303f0-10',
+                '10.0.0.10'),
             'juju-aa0ba5-zaza-ed2ce6f303f0-10')
         commit.assert_called_once_with(
             'crm configure primitive juju-aa0ba5-zaza-ed2ce6f303f0-10 '
             'ocf:pacemaker:remote params '
-            'server=juju-aa0ba5-zaza-ed2ce6f303f0-10 '
+            'server=10.0.0.10 '
             'reconnect_interval=60 op monitor interval=30s',
             failure_is_fatal=True)
 
@@ -720,12 +721,13 @@ class UtilsTestCase(unittest.TestCase):
         is_resource_present.return_value = False
         self.assertEqual(
             utils.configure_pacemaker_remote(
-                'juju-aa0ba5-zaza-ed2ce6f303f0-10.maas'),
+                'juju-aa0ba5-zaza-ed2ce6f303f0-10.maas',
+                '10.0.0.10'),
             'juju-aa0ba5-zaza-ed2ce6f303f0-10')
         commit.assert_called_once_with(
             'crm configure primitive juju-aa0ba5-zaza-ed2ce6f303f0-10 '
             'ocf:pacemaker:remote params '
-            'server=juju-aa0ba5-zaza-ed2ce6f303f0-10.maas '
+            'server=10.0.0.10 '
             'reconnect_interval=60 op monitor interval=30s',
             failure_is_fatal=True)
 
@@ -736,7 +738,8 @@ class UtilsTestCase(unittest.TestCase):
         is_resource_present.return_value = True
         self.assertEqual(
             utils.configure_pacemaker_remote(
-                'juju-aa0ba5-zaza-ed2ce6f303f0-10.maas'),
+                'juju-aa0ba5-zaza-ed2ce6f303f0-10.maas',
+                '10.0.0.10'),
             'juju-aa0ba5-zaza-ed2ce6f303f0-10')
         self.assertFalse(commit.called)
 
@@ -773,19 +776,22 @@ class UtilsTestCase(unittest.TestCase):
             'pacemaker-remote:49': {
                 'pacemaker-remote/0': {
                     'remote-hostname': '"node1"',
+                    'remote-ip': '"10.0.0.10"',
                     'stonith-hostname': '"st-node1"'},
                 'pacemaker-remote/1': {
+                    'remote-ip': '"10.0.0.11"',
                     'remote-hostname': '"node2"'},
                 'pacemaker-remote/2': {
                     'stonith-hostname': '"st-node3"'}}}
         relation_ids.side_effect = lambda x: rdata.keys()
         related_units.side_effect = lambda x: sorted(rdata[x].keys())
         relation_get.side_effect = lambda x, y, z: rdata[z][y].get(x, None)
-        configure_pacemaker_remote.side_effect = lambda x: 'res-{}'.format(x)
+        configure_pacemaker_remote.side_effect = \
+            lambda x, y: 'res-{}'.format(x)
         utils.configure_pacemaker_remote_resources()
         remote_calls = [
-            mock.call('node1'),
-            mock.call('node2')]
+            mock.call('node1', '10.0.0.10'),
+            mock.call('node2', '10.0.0.11')]
         configure_pacemaker_remote.assert_has_calls(
             remote_calls,
             any_order=True)
