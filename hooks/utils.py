@@ -504,9 +504,13 @@ def parse_data(relid, unit, key):
 
 def configure_stonith():
     if config('stonith_enabled') not in ['true', 'True', True]:
-        log('Disabling STONITH', level=INFO)
-        cmd = "crm configure property stonith-enabled=false"
-        pcmk.commit(cmd)
+        if configure_pacemaker_remote_stonith_resource():
+            log('Not disabling STONITH as pacemaker remotes are present',
+                level=INFO)
+        else:
+            log('Disabling STONITH', level=INFO)
+            cmd = "crm configure property stonith-enabled=false"
+            pcmk.commit(cmd)
     else:
         log('Enabling STONITH for all nodes in cluster.', level=INFO)
         # configure stontih resources for all nodes in cluster.

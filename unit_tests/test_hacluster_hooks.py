@@ -339,6 +339,7 @@ class TestHooks(test_utils.CharmTestCase):
         apt_install.assert_called_once_with(expected_pkgs, fatal=True)
         setup_ocf_files.assert_called_once_with()
 
+    @mock.patch.object(hooks, 'configure_stonith')
     @mock.patch.object(hooks, 'relation_ids')
     @mock.patch.object(hooks, 'hanode_relation_joined')
     @mock.patch.object(hooks, 'maintenance_mode')
@@ -357,7 +358,8 @@ class TestHooks(test_utils.CharmTestCase):
                             mock_update_nrpe_config, mock_is_leader,
                             mock_maintenance_mode,
                             mock_hanode_relation_joined,
-                            mock_relation_ids):
+                            mock_relation_ids,
+                            mock_configure_stonith):
 
         mock_config.side_effect = self.test_config.get
         mock_relation_ids.return_value = ['hanode:1']
@@ -379,6 +381,7 @@ class TestHooks(test_utils.CharmTestCase):
         self.test_config.set('maintenance-mode', False)
         hooks.config_changed()
         mock_maintenance_mode.assert_called_with(False)
+        mock_configure_stonith.assert_called_with()
 
     @mock.patch.object(hooks, 'needs_maas_dns_migration')
     @mock.patch.object(hooks, 'relation_ids')

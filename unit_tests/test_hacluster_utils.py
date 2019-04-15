@@ -426,6 +426,37 @@ class UtilsTestCase(unittest.TestCase):
             mock.call('testkey', 'neutron-api/0', 'hacluster:1'),
         ])
 
+    @mock.patch('pcmk.commit')
+    @mock.patch.object(utils, 'config')
+    @mock.patch.object(utils, 'configure_pacemaker_remote_stonith_resource')
+    def test_configure_stonith_stonith_enabled_false(
+            self,
+            mock_cfg_pcmkr_rstonith_res,
+            mock_config,
+            mock_commit):
+        cfg = {
+            'stonith_enabled': 'false'}
+        mock_config.side_effect = lambda key: cfg.get(key)
+        mock_cfg_pcmkr_rstonith_res.return_value = []
+        utils.configure_stonith()
+        mock_commit.assert_called_once_with(
+            'crm configure property stonith-enabled=false')
+
+    @mock.patch('pcmk.commit')
+    @mock.patch.object(utils, 'config')
+    @mock.patch.object(utils, 'configure_pacemaker_remote_stonith_resource')
+    def test_configure_stonith_stonith_enabled_false_pcmkr_remote(
+            self,
+            mock_cfg_pcmkr_rstonith_res,
+            mock_config,
+            mock_commit):
+        cfg = {
+            'stonith_enabled': 'false'}
+        mock_config.side_effect = lambda key: cfg.get(key)
+        mock_cfg_pcmkr_rstonith_res.return_value = ['st-res']
+        utils.configure_stonith()
+        self.assertFalse(mock_commit.called)
+
     @mock.patch.object(utils, 'relation_get')
     def test_parse_data_json(self, relation_get):
         _rel_data = {
