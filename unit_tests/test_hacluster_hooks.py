@@ -441,3 +441,81 @@ class TestHooks(test_utils.CharmTestCase):
         relation_set.assert_called_once_with(
             relation_id='relid1',
             **{'pacemaker-key': 'pcmkrkey'})
+
+    @mock.patch.object(hooks, 'apt_install')
+    @mock.patch('hooks.nrpe', autospec=True)
+    @mock.patch('hooks.os')
+    @mock.patch('hooks.glob')
+    @mock.patch.object(hooks, 'status_set')
+    @mock.patch.object(hooks, 'config')
+    def test_update_nrpe_config(self, config, status_set, mock_glob, mock_os,
+                                nrpe, apt_install):
+
+        cfg = {'failed_actions_alert_type': 'ignore',
+               'failed_actions_threshold': 5}
+        config.side_effect = lambda key: cfg.get(key)
+
+        # Set up valid values to try for 'failed_actions_alert_type'
+        alert_type_params = ["IGNore", "warning", "CRITICAL"]
+
+        for alert_type in alert_type_params:
+            cfg['failed_actions_alert_type'] = alert_type
+            nrpe.get_nagios_hostname.return_value = 'localhost'
+            nrpe.get_nagios_unit_name.return_value = 'nagios/1'
+            mock_nrpe_setup = mock.MagicMock()
+            nrpe.NRPE.return_value = mock_nrpe_setup
+
+            hooks.update_nrpe_config()
+
+            nrpe.NRPE.assert_called_once_with(hostname='localhost')
+            apt_install.assert_called_once_with('python-dbus')
+
+            if alert_type.lower() == 'ignore':
+                check_crm_cmd = 'check_crm --failedactions=ignore'
+            else:
+                check_crm_cmd = ('check_crm --failcounts={} '
+                                 '--failedactions={}'.format(
+                                     cfg['failed_actions_threshold'],
+                                     cfg['failed_actions_alert_type'].lower()))
+
+            mock_nrpe_setup.add_check.assert_any_call(
+                shortname='corosync_rings',
+                description='Check Corosync rings nagios/1',
+                check_cmd='check_corosync_rings')
+            mock_nrpe_setup.add_check.assert_any_call(
+                shortname='crm_status',
+                description='Check crm status nagios/1',
+                check_cmd=check_crm_cmd)
+
+            mock_nrpe_setup.add_check.assert_any_call(
+                shortname='corosync_proc',
+                description='Check Corosync process nagios/1',
+                check_cmd='check_procs -c 1:1 -C corosync')
+            mock_nrpe_setup.add_check.assert_any_call(
+                shortname='pacemakerd_proc',
+                description='Check Pacemakerd process nagios/1',
+                check_cmd='check_procs -c 1:1 -C pacemakerd')
+            mock_nrpe_setup.write.assert_called_once()
+
+            nrpe.reset_mock()
+            apt_install.reset_mock()
+
+        # Check unsupported case for failed_actions_alert_type
+        cfg['failed_actions_alert_type'] = 'unsupported'
+        cfg['failed_actions_threshold'] = 1
+        hooks.update_nrpe_config()
+        valid_alerts = ['ignore', 'warning', 'critical']
+        status_set.assert_called_once_with('blocked',
+                                           'The value of option '
+                                           'failed_actions_alert_type must be '
+                                           'among {}'.format(valid_alerts))
+        status_set.reset_mock()
+
+        # Check unsupported case for failed_actions_threshold
+        cfg['failed_actions_alert_type'] = 'ignore'
+        cfg['failed_actions_threshold'] = 0
+        hooks.update_nrpe_config()
+        status_set.assert_called_once_with('blocked',
+                                           'The value of option failed_'
+                                           'actions_threshold must be a '
+                                           'positive integer')

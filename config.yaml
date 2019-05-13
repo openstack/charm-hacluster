@@ -171,3 +171,17 @@ options:
     description: |
       A comma-separated list of nagios servicegroups. If left empty, the
       nagios_context will be used as the servicegroup.
+  failed_actions_alert_type:
+    type: string
+    default: 'critical'
+    description: |
+      If the CRM status has recorded failed actions in any of the registered
+      resource agents, check_crm can optionally generate an alert.
+      Valid options: ignore/warning/critical
+  failed_actions_threshold:
+    type: int
+    default: 1
+    description: |
+      check_crm will not generate an alert unless enough failed actions have
+      been recorded. Has no effect if failed_actions_alert_type is set to
+      'ignore'

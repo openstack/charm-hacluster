@@ -505,6 +505,19 @@ def stop():
 @hooks.hook('nrpe-external-master-relation-joined',
             'nrpe-external-master-relation-changed')
 def update_nrpe_config():
+    # Validate options
+    valid_alerts = ['ignore', 'warning', 'critical']
+    if config('failed_actions_alert_type').lower() not in valid_alerts:
+        status_set('blocked',
+                   'The value of option failed_actions_alert_type must be '
+                   'among {}'.format(valid_alerts))
+        return
+    if config('failed_actions_threshold') <= 0:
+        status_set('blocked',
+                   'The value of option failed_actions_threshold must be a '
+                   'positive integer')
+        return
+
     scripts_src = os.path.join(os.environ["CHARM_DIR"], "files",
                                "nrpe")
 
@@ -531,25 +544,32 @@ def update_nrpe_config():
 
     apt_install('python-dbus')
 
+    if config('failed_actions_alert_type').lower() == 'ignore':
+        check_crm_cmd = 'check_crm --failedactions=ignore'
+    else:
+        check_crm_cmd = ('check_crm --failcounts={} --failedactions={}'.format(
+                         config('failed_actions_threshold'),
+                         config('failed_actions_alert_type').lower()))
+
     # corosync/crm checks
     nrpe_setup.add_check(
         shortname='corosync_rings',
-        description='Check Corosync rings {%s}' % current_unit,
+        description='Check Corosync rings {}'.format(current_unit),
         check_cmd='check_corosync_rings')
     nrpe_setup.add_check(
         shortname='crm_status',
-        description='Check crm status {%s}' % current_unit,
-        check_cmd='check_crm')
+        description='Check crm status {}'.format(current_unit),
+        check_cmd=check_crm_cmd)
 
     # process checks
     nrpe_setup.add_check(
         shortname='corosync_proc',
-        description='Check Corosync process {%s}' % current_unit,
+        description='Check Corosync process {}'.format(current_unit),
         check_cmd='check_procs -c 1:1 -C corosync'
     )
     nrpe_setup.add_check(
         shortname='pacemakerd_proc',
-        description='Check Pacemakerd process {%s}' % current_unit,
+        description='Check Pacemakerd process {}'.format(current_unit),
         check_cmd='check_procs -c 1:1 -C pacemakerd'
     )
 
