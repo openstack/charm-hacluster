@@ -113,6 +113,37 @@ def crm_res_running(opt_name):
     return False
 
 
+def crm_res_running_on_node(resource, node):
+    """Determine if the resource is running on the given node.
+
+    If the resource is active/passive check if it is running on any node.
+    If the resources is active/active check it is running on the given node.
+
+    :param resource: str name of resource
+    :param node: str name of node
+    :returns: boolean
+    """
+
+    (_, output) = subprocess.getstatusoutput(
+        "crm resource status {}".format(resource))
+    lines = output.split("\n")
+
+    if len(lines) > 1:
+        # Multi line is a clone list like haproxy and should run on all nodes
+        # check if it is running on this node
+        for line in lines:
+            if node in line:
+                if line.startswith("resource {} is running".format(resource)):
+                    return True
+    else:
+        # Single line is for active/passive like a VIP, may not be on this node
+        # but check it is running somewhere
+        if output.startswith("resource {} is running".format(resource)):
+            return True
+
+    return False
+
+
 def list_nodes():
     """List member nodes."""
     cmd = ['crm', 'node', 'status']

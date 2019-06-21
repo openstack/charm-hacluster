@@ -107,6 +107,50 @@ class TestPcmk(unittest.TestCase):
         getstatusoutput.return_value = (1, "foobar")
         self.assertFalse(pcmk.crm_res_running('res_nova_consoleauth'))
 
+    @mock.patch('subprocess.getstatusoutput')
+    def test_crm_res_running_on_node(self, getstatusoutput):
+        _resource = "res_nova_consoleauth"
+        _this_node = "node1"
+        _another_node = "node5"
+
+        # Not running
+        getstatusoutput.return_value = (1, "foobar")
+        self.assertFalse(
+            pcmk.crm_res_running_on_node(_resource, _this_node))
+
+        # Running active/passive on some other node
+        getstatusoutput.return_value = (
+            0, "resource {} is running: {}".format(_resource, _another_node))
+        self.assertTrue(
+            pcmk.crm_res_running_on_node('res_nova_consoleauth', _this_node))
+
+        # Running active/passive on this node
+        getstatusoutput.return_value = (
+            0, "resource {} is running: {}".format(_resource, _this_node))
+        self.assertTrue(
+            pcmk.crm_res_running_on_node('res_nova_consoleauth', _this_node))
+
+        # Running on some but not this node
+        getstatusoutput.return_value = (
+            0, ("resource {} is running: {}\nresource {} is NOT running"
+                .format(_resource, _another_node, _resource)))
+        self.assertFalse(
+            pcmk.crm_res_running_on_node('res_nova_consoleauth', _this_node))
+
+        # Running on this node and not others
+        getstatusoutput.return_value = (
+            0, ("resource {} is running: {}\nresource {} is NOT running"
+                .format(_resource, _this_node, _resource)))
+        self.assertTrue(
+            pcmk.crm_res_running_on_node('res_nova_consoleauth', _this_node))
+
+        # Running on more than one and this node
+        getstatusoutput.return_value = (
+            0, ("resource {} is running: {}\nresource {} is running: {}"
+                .format(_resource, _another_node, _resource, _this_node)))
+        self.assertTrue(
+            pcmk.crm_res_running_on_node('res_nova_consoleauth', _this_node))
+
     @mock.patch('socket.gethostname')
     @mock.patch('subprocess.getstatusoutput')
     def test_wait_for_pcmk(self, getstatusoutput, gethostname):

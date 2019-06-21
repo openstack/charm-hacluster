@@ -1157,7 +1157,8 @@ def pause_unit():
     if has_resources:
         messages.append("Resources still running on unit")
     status, message = assess_status_helper()
-    if status != 'active':
+    # New status message will indicate the resource is not running
+    if status != 'active' and 'not running' not in message:
         messages.append(message)
     if messages and not is_unit_upgrading_set():
         raise Exception("Couldn't pause: {}".format("; ".join(messages)))
@@ -1209,6 +1210,14 @@ def assess_status_helper():
         # maintenance mode enabled in pacemaker
         status = 'maintenance'
         message = 'Pacemaker in maintenance mode'
+
+    for resource in get_resources().keys():
+        if not pcmk.is_resource_present(resource):
+            return ("waiting",
+                    "Resource: {} not yet configured".format(resource))
+        if not pcmk.crm_res_running_on_node(resource, get_hostname()):
+            return ("blocked",
+                    "Resource: {} not running".format(resource))
 
     return status, message
 
@@ -1266,3 +1275,15 @@ def maintenance_mode(enable):
         pcmk.set_property('maintenance-mode', str(enable).lower())
     else:
         log('Desired value for maintenance-mode is already set', level=DEBUG)
+
+
+def get_resources():
+    """Get resources from the HA relation
+
+    :returns: dict of resources
+    """
+    resources = {}
+    for rid in relation_ids("ha"):
+        for unit in related_units(rid):
+            resources = parse_data(rid, unit, 'resources')
+    return resources
