@@ -77,7 +77,7 @@ class HAClusterBasicDeployment(OpenStackAmuletDeployment):
     def _add_services(self):
         this_service = {'name': 'hacluster'}
         other_services = [
-            {'name': 'percona-cluster', 'constraints': {'mem': '3072M'}},
+            self.get_percona_service_entry(),
             {'name': 'keystone', 'units': NUM_UNITS},
         ]
         super(HAClusterBasicDeployment, self)._add_services(this_service,
