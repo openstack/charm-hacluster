@@ -110,6 +110,7 @@ def crm_res_running(opt_name):
     if output.startswith("resource %s is running" % opt_name):
         return True
 
+    log('CRM Resource not running - Status: {}'.format(output), WARNING)
     return False
 
 
@@ -141,6 +142,7 @@ def crm_res_running_on_node(resource, node):
         if output.startswith("resource {} is running".format(resource)):
             return True
 
+    log('CRM Resource not running - Status: {}'.format(output), WARNING)
     return False
 
 
