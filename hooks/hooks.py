@@ -602,6 +602,15 @@ def send_auth_key():
                 **{'pacemaker-key': key})
 
 
+@hooks.hook('update-status')
+def dummy_update_status():
+    """Provide implementation to silence missing hook handler error
+
+    See bug/1837639
+    """
+    pass
+
+
 if __name__ == '__main__':
     try:
         hooks.execute(sys.argv)
