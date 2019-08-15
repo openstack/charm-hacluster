@@ -9,8 +9,8 @@ tags:
 series:
   - xenial
   - bionic
-  - cosmic
   - disco
+  - eoan
   - trusty
 requires:
   juju-info:
