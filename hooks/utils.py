@@ -1009,12 +1009,12 @@ def setup_ocf_files():
     # Xenial corosync is not creating this directory
     mkdir('/etc/corosync/uidgid.d')
 
-    rsync('ocf/ceph/rbd', '/usr/lib/ocf/resource.d/ceph/rbd')
-    rsync('ocf/maas/dns', '/usr/lib/ocf/resource.d/maas/dns')
-    rsync('ocf/maas/maas_dns.py', '/usr/lib/heartbeat/maas_dns.py')
-    rsync('ocf/maas/maasclient/', '/usr/lib/heartbeat/maasclient/')
+    rsync('files/ocf/ceph/rbd', '/usr/lib/ocf/resource.d/ceph/rbd')
+    rsync('files/ocf/maas/dns', '/usr/lib/ocf/resource.d/maas/dns')
+    rsync('files/ocf/maas/maas_dns.py', '/usr/lib/heartbeat/maas_dns.py')
+    rsync('files/ocf/maas/maasclient/', '/usr/lib/heartbeat/maasclient/')
     rsync(
-        'ocf/maas/maas_stonith_plugin.py',
+        'files/ocf/maas/maas_stonith_plugin.py',
         '/usr/lib/stonith/plugins/external/maas')
 
 
