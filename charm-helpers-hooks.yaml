@@ -15,3 +15,4 @@ include:
     - contrib.openstack.ha.utils
     - contrib.python
     - contrib.charmsupport
+    - contrib.openstack.policyd
