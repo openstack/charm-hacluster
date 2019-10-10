@@ -75,7 +75,8 @@ class TestCorosyncConf(unittest.TestCase):
 
         def fake_crm_opt_exists(res_name):
             # res_ubuntu will take the "update resource" route
-            return res_name == "res_ubuntu"
+            # res_nova_eth0_vip will take the delete resource route
+            return res_name in ["res_ubuntu", "res_nova_eth0_vip"]
 
         crm_opt_exists.side_effect = fake_crm_opt_exists
         commit.return_value = 0
@@ -105,7 +106,8 @@ class TestCorosyncConf(unittest.TestCase):
                         'resource_params': {'res_foo': 'params bar',
                                             'res_ubuntu': 'params ubuntu=42'},
                         'ms': {'ms_foo': 'res_foo meta notify=true'},
-                        'orders': {'foo_after': 'inf: res_foo ms_foo'}}
+                        'orders': {'foo_after': 'inf: res_foo ms_foo'},
+                        'delete_resources': ['res_nova_eth0_vip']}
 
         def fake_parse_data(relid, unit, key):
             return rel_get_data.get(key, {})
@@ -124,6 +126,12 @@ class TestCorosyncConf(unittest.TestCase):
         set_cluster_symmetry.assert_called_with()
         configure_pacemaker_remote_resources.assert_called_with()
         write_maas_dns_address.assert_not_called()
+
+        # verify deletion of resources.
+        crm_opt_exists.assert_any_call('res_nova_eth0_vip')
+        commit.assert_any_call('crm resource cleanup res_nova_eth0_vip')
+        commit.assert_any_call('crm -w -F resource stop res_nova_eth0_vip')
+        commit.assert_any_call('crm -w -F configure delete res_nova_eth0_vip')
 
         for kw, key in [('location', 'locations'),
                         ('clone', 'clones'),

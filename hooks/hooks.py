@@ -354,6 +354,11 @@ def ha_relation_changed():
                     pcmk.commit('crm resource cleanup %s' % res_name)
                 # Daemon process may still be running after the upgrade.
                 kill_legacy_ocf_daemon_process(res_name)
+
+                # Stop the resource before the deletion (LP: #1838528)
+                log('Stopping %s' % res_name, level=INFO)
+                pcmk.commit('crm -w -F resource stop %s' % res_name)
+                log('Deleting %s' % res_name, level=INFO)
                 pcmk.commit('crm -w -F configure delete %s' % res_name)
 
         log('Configuring Resources: %s' % (resources), level=DEBUG)
