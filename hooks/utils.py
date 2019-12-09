@@ -1177,7 +1177,7 @@ def assess_status_helper():
 
     if is_unit_upgrading_set():
         return ("blocked",
-                "Ready for do-release-upgrde. Set complete when finished")
+                "Ready for do-release-upgrade. Set complete when finished")
     if is_unit_paused_set():
         return ("maintenance",
                 "Paused. Use 'resume' action to resume normal service.")
