@@ -1,0 +1,32 @@
+series: xenial
+
+machines:
+  '0':
+  '1':
+  '2':
+  '3':
+
+relations:
+  - ['keystone:shared-db', 'percona-cluster:shared-db']
+  - ['hacluster:ha', 'keystone:ha']
+
+applications:
+  percona-cluster:
+    charm: cs:~openstack-charmers-next/percona-cluster
+    num_units: 1
+    to:
+      - '0'
+  keystone:
+    charm: cs:~openstack-charmers-next/keystone
+    num_units: 3
+    options:
+      openstack-origin: cloud:xenial-queens
+      token-expiration: 60
+    to:
+      - '1'
+      - '2'
+      - '3'
+  hacluster:
+    charm: ../../../hacluster
+    subordinate-to:
+      - keystone
