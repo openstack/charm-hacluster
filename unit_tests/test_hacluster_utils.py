@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import json
 import mock
 import os
@@ -1030,3 +1031,144 @@ class UtilsTestCase(unittest.TestCase):
                                     '$id="rsc-options" '
                                     'resource-stickiness="100" '
                                     'failure-timeout=240')
+
+    class MockHookData(object):
+        class MockDB(object):
+
+            def __init__(self):
+                self.kv = {}
+
+            def set(self, key, value):
+                self.kv[key] = value
+
+            def get(self, key):
+                return self.kv.get(key)
+
+        def __init__(self):
+            self.kv = self.MockDB()
+
+        @contextlib.contextmanager
+        def __call__(self):
+            yield [self.kv]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            return
+
+    @mock.patch.object(utils.unitdata, 'HookData')
+    def test_set_waiting_unit_series_upgrade(self, HookData):
+        hook_data = self.MockHookData()
+        HookData.return_value = hook_data
+        utils.set_waiting_unit_series_upgrade()
+        self.assertTrue(hook_data.kv.get('waiting-unit-series-upgrade'))
+
+    @mock.patch.object(utils.unitdata, 'HookData')
+    def test_clear_waiting_unit_series_upgrade(self, HookData):
+        hook_data = self.MockHookData()
+        HookData.return_value = hook_data
+        utils.set_waiting_unit_series_upgrade()
+        self.assertTrue(hook_data.kv.get('waiting-unit-series-upgrade'))
+        utils.clear_waiting_unit_series_upgrade()
+        self.assertFalse(hook_data.kv.get('waiting-unit-series-upgrade'))
+
+    @mock.patch.object(utils.unitdata, 'HookData')
+    def test_is_waiting_unit_series_upgrade_set(self, hookdata):
+        hook_data = self.MockHookData()
+        hookdata.return_value = hook_data
+        # false if key is absent
+        self.assertFalse(utils.is_waiting_unit_series_upgrade_set())
+
+        # True if waiting-unit-upgrade het been set
+        utils.set_waiting_unit_series_upgrade()
+        self.assertTrue(utils.is_waiting_unit_series_upgrade_set())
+
+        # False if waiting-unit-upgrade has been cleared
+        utils.clear_waiting_unit_series_upgrade()
+        self.assertFalse(utils.is_waiting_unit_series_upgrade_set())
+
+    @mock.patch.object(utils, 'relation_get')
+    @mock.patch.object(utils, 'related_units')
+    def test_get_series_upgrade_notifications(self, related_units,
+                                              relation_get):
+        related_units.return_value = ['unit1', 'unit2']
+        rdata = {
+            'unit1': {
+                'series_upgrade_of_unit1': 'trusty'},
+            'unit2': {}}
+        relation_get.side_effect = lambda rid, unit: rdata[unit]
+        self.assertEqual(
+            utils.get_series_upgrade_notifications('rid1'),
+            {'unit1': 'trusty'})
+
+    @mock.patch.object(utils, 'service_stop')
+    @mock.patch.object(utils, 'service_running')
+    @mock.patch.object(utils, 'disable_lsb_services')
+    def test_disable_ha_services(self, disable_lsb_services, service_running,
+                                 service_stop):
+        disable_calls = [
+            mock.call('corosync'),
+            mock.call('pacemaker')
+        ]
+        stop_calls = [
+            mock.call('corosync'),
+            mock.call('pacemaker')
+        ]
+        service_running.return_value = True
+        utils.disable_ha_services()
+        disable_lsb_services.assert_has_calls(disable_calls)
+        service_stop.assert_has_calls(stop_calls)
+
+    @mock.patch.object(utils, 'service_start')
+    @mock.patch.object(utils, 'service_running')
+    @mock.patch.object(utils, 'enable_lsb_services')
+    def test_enable_ha_services(self, enable_lsb_services, service_running,
+                                service_start):
+        enable_calls = [
+            mock.call('pacemaker'),
+            mock.call('corosync')
+        ]
+        start_calls = [
+            mock.call('pacemaker'),
+            mock.call('corosync')
+        ]
+        service_running.return_value = False
+        utils.enable_ha_services()
+        enable_lsb_services.assert_has_calls(enable_calls)
+        service_start.assert_has_calls(start_calls)
+
+    @mock.patch.object(utils, 'local_unit')
+    def test_get_series_upgrade_key(self, local_unit):
+        local_unit.return_value = 'nova-cloud-controller/2'
+        self.assertEqual(
+            utils.get_series_upgrade_key(),
+            'series_upgrade_of_nova_cloud_controller_2'
+        )
+
+    @mock.patch.object(utils, 'relation_set')
+    @mock.patch.object(utils, 'relation_ids')
+    @mock.patch.object(utils, 'local_unit')
+    @mock.patch.object(utils, 'lsb_release')
+    def test_notify_peers_of_series_upgrade(self, lsb_release, local_unit,
+                                            relation_ids, relation_set):
+        lsb_release.return_value = {
+            'DISTRIB_CODENAME': 'trusty'}
+        local_unit.return_value = 'nova-compute/2'
+        relation_ids.return_value = ['rid1']
+        utils.notify_peers_of_series_upgrade()
+        relation_set.assert_called_once_with(
+            relation_id='rid1',
+            relation_settings={'series_upgrade_of_nova_compute_2': 'trusty'})
+
+    @mock.patch.object(utils, 'relation_set')
+    @mock.patch.object(utils, 'relation_ids')
+    @mock.patch.object(utils, 'local_unit')
+    def test_clear_series_upgrade_notification(self, local_unit, relation_ids,
+                                               relation_set):
+        local_unit.return_value = 'nova-compute/2'
+        relation_ids.return_value = ['rid1']
+        utils.clear_series_upgrade_notification()
+        relation_set.assert_called_once_with(
+            relation_id='rid1',
+            relation_settings={'series_upgrade_of_nova_compute_2': None})

@@ -106,6 +106,14 @@ from utils import (
     MAASConfigIncomplete,
     pause_unit,
     resume_unit,
+    set_waiting_unit_series_upgrade,
+    clear_waiting_unit_series_upgrade,
+    is_waiting_unit_series_upgrade_set,
+    get_series_upgrade_notifications,
+    disable_ha_services,
+    enable_ha_services,
+    notify_peers_of_series_upgrade,
+    clear_series_upgrade_notification,
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
@@ -238,12 +246,35 @@ def hanode_relation_joined(relid=None):
     )
 
 
+@hooks.hook('hanode-relation-changed')
+def hanode_relation_changed(relid=None):
+    ubuntu_rel = lsb_release()['DISTRIB_CODENAME'].lower()
+    log("Checking if any units have notified about a series upgrade", INFO)
+    series_notifications = get_series_upgrade_notifications(relid)
+    for unit, from_release in series_notifications.items():
+        # from_release is the release that the peer is currently on and is
+        # therefore upgrading from.
+        if CompareHostReleases(ubuntu_rel) <= from_release:
+            log("Shutting down services for peer upgrade", INFO)
+            disable_ha_services()
+            log("Setting waiting-unit-upgrade to True", INFO)
+            set_waiting_unit_series_upgrade()
+        else:
+            log(
+                "Already series ahead of peer, no shutdown needed",
+                INFO)
+    if is_waiting_unit_series_upgrade_set():
+        log("Unit is waiting for upgrade", INFO)
+    else:
+        log("No units have notified a series upgrade", INFO)
+        ha_relation_changed()
+
+
 @hooks.hook('ha-relation-joined',
             'ha-relation-changed',
             'peer-availability-relation-joined',
             'peer-availability-relation-changed',
-            'pacemaker-remote-relation-changed',
-            'hanode-relation-changed')
+            'pacemaker-remote-relation-changed')
 def ha_relation_changed():
     # Check that we are related to a principle and that
     # it has already provided the required corosync configuration
@@ -586,6 +617,7 @@ def series_upgrade_prepare():
     set_unit_upgrading()
     if not is_unit_paused_set():
         pause_unit()
+    notify_peers_of_series_upgrade()
 
 
 @hooks.hook('post-series-upgrade')
@@ -594,7 +626,12 @@ def series_upgrade_complete():
     clear_unit_paused()
     clear_unit_upgrading()
     config_changed()
+    enable_ha_services()
+    log("Resuming unit")
     resume_unit()
+    clear_series_upgrade_notification()
+    log("Setting waiting-unit-upgrade to False", INFO)
+    clear_waiting_unit_series_upgrade()
 
 
 @hooks.hook('pacemaker-remote-relation-joined')

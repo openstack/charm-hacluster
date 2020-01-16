@@ -439,6 +439,81 @@ class TestHooks(test_utils.CharmTestCase):
             relation_settings={'private-address': '10.10.10.2'}
         )
 
+    @mock.patch.object(hooks, 'ha_relation_changed')
+    @mock.patch.object(hooks, 'is_waiting_unit_series_upgrade_set')
+    @mock.patch.object(hooks, 'set_waiting_unit_series_upgrade')
+    @mock.patch.object(hooks, 'disable_ha_services')
+    @mock.patch.object(hooks, 'get_series_upgrade_notifications')
+    @mock.patch.object(hooks, 'lsb_release')
+    def test_hanode_relation_changed(self, lsb_release,
+                                     get_series_upgrade_notifications,
+                                     disable_ha_services,
+                                     set_waiting_unit_series_upgrade,
+                                     is_waiting_unit_series_upgrade_set,
+                                     ha_relation_changed):
+        lsb_release.return_value = {
+            'DISTRIB_CODENAME': 'trusty'}
+        get_series_upgrade_notifications.return_value = {
+            'unit1': 'xenial'}
+        is_waiting_unit_series_upgrade_set.return_value = True
+        hooks.hanode_relation_changed()
+        disable_ha_services.assert_called_once_with()
+        set_waiting_unit_series_upgrade.assert_called_once_with()
+        self.assertFalse(ha_relation_changed.called)
+
+    @mock.patch.object(hooks, 'ha_relation_changed')
+    @mock.patch.object(hooks, 'is_waiting_unit_series_upgrade_set')
+    @mock.patch.object(hooks, 'set_waiting_unit_series_upgrade')
+    @mock.patch.object(hooks, 'disable_ha_services')
+    @mock.patch.object(hooks, 'get_series_upgrade_notifications')
+    @mock.patch.object(hooks, 'lsb_release')
+    def test_hanode_relation_changed_no_up(self, lsb_release,
+                                           get_series_upgrade_notifications,
+                                           disable_ha_services,
+                                           set_waiting_unit_series_upgrade,
+                                           is_waiting_unit_series_upgrade_set,
+                                           ha_relation_changed):
+        lsb_release.return_value = {
+            'DISTRIB_CODENAME': 'trusty'}
+        get_series_upgrade_notifications.return_value = {}
+        is_waiting_unit_series_upgrade_set.return_value = False
+        hooks.hanode_relation_changed()
+        ha_relation_changed.assert_called_once_with()
+
+    @mock.patch.object(hooks, 'set_unit_upgrading')
+    @mock.patch.object(hooks, 'is_unit_paused_set')
+    @mock.patch.object(hooks, 'pause_unit')
+    @mock.patch.object(hooks, 'notify_peers_of_series_upgrade')
+    def test_series_upgrade_prepare(self, notify_peers_of_series_upgrade,
+                                    pause_unit, is_unit_paused_set,
+                                    set_unit_upgrading):
+        is_unit_paused_set.return_value = False
+        hooks.series_upgrade_prepare()
+        set_unit_upgrading.assert_called_once_with()
+        pause_unit.assert_called_once_with()
+        notify_peers_of_series_upgrade.assert_called_once_with()
+
+    @mock.patch.object(hooks, 'clear_unit_paused')
+    @mock.patch.object(hooks, 'clear_unit_upgrading')
+    @mock.patch.object(hooks, 'config_changed')
+    @mock.patch.object(hooks, 'enable_ha_services')
+    @mock.patch.object(hooks, 'resume_unit')
+    @mock.patch.object(hooks, 'clear_series_upgrade_notification')
+    @mock.patch.object(hooks, 'clear_waiting_unit_series_upgrade')
+    def test_series_upgrade_complete(self, clear_waiting_unit_series_upgrade,
+                                     clear_series_upgrade_notification,
+                                     resume_unit, enable_ha_services,
+                                     config_changed, clear_unit_upgrading,
+                                     clear_unit_paused):
+        hooks.series_upgrade_complete()
+        clear_waiting_unit_series_upgrade.assert_called_once_with()
+        clear_series_upgrade_notification.assert_called_once_with()
+        resume_unit.assert_called_once_with()
+        enable_ha_services.assert_called_once_with()
+        config_changed.assert_called_once_with()
+        clear_unit_upgrading.assert_called_once_with()
+        clear_unit_paused.assert_called_once_with()
+
     @mock.patch.object(hooks, 'get_pcmkr_key')
     @mock.patch.object(hooks, 'relation_ids')
     @mock.patch.object(hooks, 'relation_set')

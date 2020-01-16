@@ -37,12 +37,14 @@ from charmhelpers.core.hookenv import (
     INFO,
     WARNING,
     relation_get,
+    relation_set,
     related_units,
     relation_ids,
     config,
     unit_get,
     status_set,
 )
+from charmhelpers.core import unitdata
 from charmhelpers.contrib.openstack.utils import (
     get_host_ip,
     set_unit_paused,
@@ -1287,3 +1289,101 @@ def get_resources():
         for unit in related_units(rid):
             resources = parse_data(rid, unit, 'resources')
     return resources
+
+
+def set_waiting_unit_series_upgrade():
+    """Set the unit to a waiting upgrade state in the local kv() store.
+    """
+    log("Setting waiting-unit-series-upgrade=true in local kv", DEBUG)
+    with unitdata.HookData()() as t:
+        kv = t[0]
+        kv.set('waiting-unit-series-upgrade', True)
+
+
+def clear_waiting_unit_series_upgrade():
+    """Clear the unit from a waiting upgrade state in the local kv() store.
+    """
+    log("Setting waiting-unit-series-upgrade=false in local kv", DEBUG)
+    with unitdata.HookData()() as t:
+        kv = t[0]
+        kv.set('waiting-unit-series-upgrade', False)
+
+
+def is_waiting_unit_series_upgrade_set():
+    """Return the state of the kv().get('waiting-unit-series-upgrade').
+
+    To help with units that don't have HookData() (testing)
+    if it excepts, return False
+    """
+    with unitdata.HookData()() as t:
+        kv = t[0]
+        if not kv.get('waiting-unit-series-upgrade'):
+            return False
+        return kv.get('waiting-unit-series-upgrade')
+
+
+def get_series_upgrade_notifications(relid):
+    """Check peers for notifications that they are upgrading their series.
+
+    Returns a dict of the form {unit_name: target_series, ...}
+
+    :param relid: Relation id to check for notifications.
+    :type relid: str
+    :returns: dict
+    """
+    notifications = {}
+    for unit in related_units(relid):
+        relation_data = relation_get(rid=relid, unit=unit)
+        for key, value in relation_data.items():
+            if key.startswith('series_upgrade_of_'):
+                notifications[unit] = value
+    log("Found series upgrade notifications: {}".format(notifications), DEBUG)
+    return notifications
+
+
+def disable_ha_services():
+    """Shutdown and disable HA services."""
+    log("Disabling HA services", INFO)
+    for svc in ['corosync', 'pacemaker']:
+        disable_lsb_services(svc)
+        if service_running(svc):
+            service_stop(svc)
+
+
+def enable_ha_services():
+    """Startup and enable HA services."""
+    log("Enabling HA services", INFO)
+    for svc in ['pacemaker', 'corosync']:
+        enable_lsb_services(svc)
+        if not service_running(svc):
+            service_start(svc)
+
+
+def get_series_upgrade_key():
+    series_upgrade_key = 'series_upgrade_of_{}'.format(
+        local_unit().replace('/', '_'))
+    return series_upgrade_key.replace('-', '_')
+
+
+def notify_peers_of_series_upgrade():
+    """Notify peers which release this unit is upgrading from."""
+    ubuntu_rel = lsb_release()['DISTRIB_CODENAME'].lower()
+    series_upgrade_key = get_series_upgrade_key()
+    relation_data = {
+        series_upgrade_key: ubuntu_rel}
+    for rel_id in relation_ids('hanode'):
+        relation_set(
+            relation_id=rel_id,
+            relation_settings=relation_data)
+
+
+def clear_series_upgrade_notification():
+    """Remove from series upgrade notification from peers."""
+    log("Removing upgrade notification from peers")
+    series_upgrade_key = get_series_upgrade_key()
+    relation_data = {
+        series_upgrade_key: None}
+    for rel_id in relation_ids('hanode'):
+        relation_set(
+            relation_id=rel_id,
+            relation_settings=relation_data)
