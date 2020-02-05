@@ -111,6 +111,13 @@ options:
       .
       The last option should be used in conjunction with the key configuration
       option. Used when service_dns is set on the primary charm for DNS HA.
+  maas_source_key:
+    type: string
+    default:
+    description: |
+      PPA key for python3-maas-client:
+      PPA Key configuration option. Used when nodes are offline to specify
+      the ppa public key.
   cluster_count:
     type: int
     default: 3
