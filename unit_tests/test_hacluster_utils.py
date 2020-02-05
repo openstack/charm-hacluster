@@ -198,11 +198,13 @@ class UtilsTestCase(unittest.TestCase):
     @mock.patch.object(utils, 'add_source')
     @mock.patch.object(utils, 'config')
     def test_setup_maas_api(self, config, add_source, apt_update, apt_install):
-        cfg = {'maas_source': 'ppa:maas/stable'}
+        cfg = {'maas_source': 'ppa:maas/stable',
+               'maas_source_key': None}
         config.side_effect = lambda key: cfg.get(key)
 
         utils.setup_maas_api()
-        add_source.assert_called_with(cfg['maas_source'])
+        add_source.assert_called_with(cfg['maas_source'],
+                                      cfg['maas_source_key'])
         self.assertTrue(apt_install.called)
 
     @mock.patch('os.path.isfile')
