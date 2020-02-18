@@ -28,9 +28,9 @@
 # v0.6 14/03/2013 - Change from \w+ to \S+ in stopped check to cope with
 #                   Servers that have non word charachters in.  Suggested by
 #                   Igal Baevsky.
-# v0.7 01/09/2013 - In testing as still not fully tested.  Adds optional
-#		    constraints check (Boris Wesslowski). Adds fail count
-#		    threshold ( Zoran Bosnjak & Marko Hrastovec )
+# v0.7 01/09/2013 - In testing as still not fully tested. Adds optional
+#                   constraints check (Boris Wesslowski). Adds fail count
+#                   threshold ( Zoran Bosnjak & Marko Hrastovec )
 # v0.8 06/11/2018 - Choose whether to ignore/warn/crit on failed actions
 #
 # NOTE:- Requires Perl 5.8 or higher & either the Perl Module Nagios::Plugin
@@ -92,8 +92,9 @@ if ($plugin_provider eq 'Monitoring') {
 
 $np->add_arg(
     spec => 'warning|w',
-    help =>
-'If failed Nodes, stopped Resources detected or Standby Nodes sends Warning instead of Critical (default) as long as there are no other errors and there is Quorum',
+    help => 'If failed Nodes, stopped Resources detected or Standby Nodes ' .
+            'sends Warning instead of Critical (default) as long as there ' .
+            'are no other errors and there is Quorum',
     required => 0,
 );
 
@@ -105,7 +106,9 @@ $np->add_arg(
 
 $np->add_arg(
     spec => 'constraint|constraints|c',
-    help => 'Also check configuration for location constraints (caused by migrations) and warn if there are any.  Requires additional privileges see notes',
+    help => 'Also check configuration for location constraints ' .
+            '(caused by migrations) and warn if there are any. ' .
+            'Requires additional privileges see notes',
     required => 0,
 );
 
@@ -118,8 +121,10 @@ $np->add_arg(
 
 $np->add_arg(
     spec     => 'failedactions=s',
-    help     => q{What to do if failed actions are detected: ignore/warning/critical [default = critical].
-   Any value that is not 'warning' or 'critical' will be considered equivalent to 'ignore'},
+    help     => "What to do if failed actions are detected: " .
+                "ignore/warning/critical [default = critical].\n   " .
+                "Any value that is not 'warning' or 'critical' will be " .
+                "considered equivalent to 'ignore'",
     required => 0,
     default  => 'CRITICAL',
 );
@@ -171,7 +176,6 @@ foreach my $line (<$fh>) {
         # See later in code for message created from this
         push @standby, $1;
     }
-
     elsif ( $line =~ m/\s*(\S+)\s+\(\S+\)\:\s+Stopped/ ) {
 
         # Check Resources Stopped
@@ -235,4 +239,3 @@ if ($ConstraintsFlag) {
 }
 
 $np->nagios_exit( $np->check_messages() );
-
