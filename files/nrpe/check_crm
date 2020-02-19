@@ -32,6 +32,8 @@
 #                   constraints check (Boris Wesslowski). Adds fail count
 #                   threshold ( Zoran Bosnjak & Marko Hrastovec )
 # v0.8 06/11/2018 - Choose whether to ignore/warn/crit on failed actions
+# v0.9 18/02/2020 - Phase out failed actions check in favor of separate
+#                   failcount thresholds
 #
 # NOTE:- Requires Perl 5.8 or higher & either the Perl Module Nagios::Plugin
 #        or Monitoring::Plugin, whichever is available for your system.
@@ -114,9 +116,25 @@ $np->add_arg(
 
 $np->add_arg(
     spec     => 'failcount|failcounts|f=i',
-    help     => 'resource fail count to start warning on [default = 1].',
+    help     => 'resource fail count to start warning on [default = 1].' .
+                'DEPRECATED: use failcount-warn instead',
     required => 0,
-    default  => 1,
+);
+
+$np->add_arg(
+    spec     => 'failcount-warn=i',
+    help     => 'Resource fail count to start warning on [default = 3]. ' .
+                'Set to 0 to disable',
+    required => 0,
+    default  => 3,
+);
+
+$np->add_arg(
+    spec     => 'failcount-crit=i',
+    help     => 'Resource fail count to start critical alerts on ' .
+                '[default = 10]. Set to 0 to disable',
+    required => 0,
+    default  => 10,
 );
 
 $np->add_arg(
@@ -124,7 +142,8 @@ $np->add_arg(
     help     => "What to do if failed actions are detected: " .
                 "ignore/warning/critical [default = critical].\n   " .
                 "Any value that is not 'warning' or 'critical' will be " .
-                "considered equivalent to 'ignore'",
+                "considered equivalent to 'ignore'" .
+                "DEPRECATED: will be removed in a future release",
     required => 0,
     default  => 'CRITICAL',
 );
@@ -205,9 +224,14 @@ foreach my $line (<$fh>) {
         $np->add_message("CRITICAL", ": $1 not installed" );
     }
     elsif ( $line =~ m/\s*(\S+?):.*fail-count=(\d+)/i ) {
-        if ( $2 >= $np->opts->failcount ) {
 
-            # Check for resource Fail count (suggested by Vadym Chepkov)
+        # Check for resource Fail count (suggested by Vadym Chepkov)
+        my $failcount_crit = $np->opts->{'failcount-crit'};
+        my $failcount_warn = $np->opts->{'failcount'} || $np->opts->{'failcount-warn'};
+
+        if ( $failcount_crit and $2 >= $failcount_crit ) {
+            $np->add_message("CRITICAL", ": $1 failure detected, fail-count=$2" );
+        } elsif ( $failcount_warn and $2 >= $failcount_warn ) {
             $np->add_message("WARNING", ": $1 failure detected, fail-count=$2" );
         }
     }

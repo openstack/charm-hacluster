@@ -554,13 +554,13 @@ class TestHooks(test_utils.CharmTestCase):
     def test_update_nrpe_config(self, config, status_set, mock_glob, mock_os,
                                 nrpe, apt_install):
 
-        cfg = {'failed_actions_alert_type': 'ignore',
-               'failed_actions_threshold': 5}
+        cfg = {'failed_actions_threshold': 0,
+               'res_failcount_warn': 0,
+               'res_failcount_crit': 5}
         config.side_effect = lambda key: cfg.get(key)
 
         # Set up valid values to try for 'failed_actions_alert_type'
         alert_type_params = ["IGNore", "warning", "CRITICAL"]
-
         for alert_type in alert_type_params:
             cfg['failed_actions_alert_type'] = alert_type
             nrpe.get_nagios_hostname.return_value = 'localhost'
@@ -573,13 +573,11 @@ class TestHooks(test_utils.CharmTestCase):
             nrpe.NRPE.assert_called_once_with(hostname='localhost')
             apt_install.assert_called_once_with('python-dbus')
 
-            if alert_type.lower() == 'ignore':
-                check_crm_cmd = 'check_crm --failedactions=ignore'
-            else:
-                check_crm_cmd = ('check_crm --failcounts={} '
-                                 '--failedactions={}'.format(
-                                     cfg['failed_actions_threshold'],
-                                     cfg['failed_actions_alert_type'].lower()))
+            check_crm_cmd = ('check_crm --failedactions={} --failcount-warn={}'
+                             ' --failcount-crit={}'.format(
+                                 cfg['failed_actions_alert_type'].lower(),
+                                 cfg['res_failcount_warn'],
+                                 cfg['res_failcount_crit']))
 
             mock_nrpe_setup.add_check.assert_any_call(
                 shortname='corosync_rings',
@@ -616,7 +614,7 @@ class TestHooks(test_utils.CharmTestCase):
 
         # Check unsupported case for failed_actions_threshold
         cfg['failed_actions_alert_type'] = 'ignore'
-        cfg['failed_actions_threshold'] = 0
+        cfg['failed_actions_threshold'] = -5
         hooks.update_nrpe_config()
         status_set.assert_called_once_with('blocked',
                                            'The value of option failed_'

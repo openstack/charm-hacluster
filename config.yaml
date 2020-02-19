@@ -180,15 +180,28 @@ options:
       nagios_context will be used as the servicegroup.
   failed_actions_alert_type:
     type: string
-    default: 'critical'
+    default: 'ignore'
     description: |
+      DEPRECATED: will be removed in a future release
       If the CRM status has recorded failed actions in any of the registered
       resource agents, check_crm can optionally generate an alert.
       Valid options: ignore/warning/critical
   failed_actions_threshold:
     type: int
-    default: 1
+    default: 0
     description: |
-      check_crm will not generate an alert unless enough failed actions have
-      been recorded. Has no effect if failed_actions_alert_type is set to
-      'ignore'
+      DEPRECATED: will be removed in a future release. Alias for
+      res_failcount_warn. Takes precedence over res_failcount_warn if set to
+      non-zero
+  res_failcount_warn:
+    type: int
+    default: 3
+    description: |
+      check_crm will generate a warning if the failcount of a resource has
+      crossed this threshold. Set to 0 or '' to disable.
+  res_failcount_crit:
+    type: int
+    default: 10
+    description: |
+      check_crm will generate a critical alert if the failcount of a resource
+      has crossed this threshold. Set to 0 or '' to disable.

@@ -562,14 +562,14 @@ def stop():
 @hooks.hook('nrpe-external-master-relation-joined',
             'nrpe-external-master-relation-changed')
 def update_nrpe_config():
-    # Validate options
+    # Validate options (DEPRECATED)
     valid_alerts = ['ignore', 'warning', 'critical']
     if config('failed_actions_alert_type').lower() not in valid_alerts:
         status_set('blocked',
                    'The value of option failed_actions_alert_type must be '
                    'among {}'.format(valid_alerts))
         return
-    if config('failed_actions_threshold') <= 0:
+    if config('failed_actions_threshold') < 0:
         status_set('blocked',
                    'The value of option failed_actions_threshold must be a '
                    'positive integer')
@@ -601,12 +601,18 @@ def update_nrpe_config():
 
     apt_install('python-dbus')
 
-    if config('failed_actions_alert_type').lower() == 'ignore':
-        check_crm_cmd = 'check_crm --failedactions=ignore'
-    else:
-        check_crm_cmd = ('check_crm --failcounts={} --failedactions={}'.format(
-                         config('failed_actions_threshold'),
-                         config('failed_actions_alert_type').lower()))
+    check_crm_cmd = 'check_crm'
+    check_crm_cmd += ' --failedactions={}'.format(
+        config('failed_actions_alert_type').lower()
+    )
+    if config('failed_actions_threshold'):
+        check_crm_cmd += ' --failcount={}'.format(
+            config('failed_actions_threshold')
+        )
+    for err_type in ['warn', 'crit']:
+        check_crm_cmd += ' --failcount-{}={}'.format(
+            err_type,
+            config('res_failcount_{}'.format(err_type)) or 0)
 
     if nrpe.NRPE.does_nrpe_conf_dir_exist():
         # corosync/crm checks
