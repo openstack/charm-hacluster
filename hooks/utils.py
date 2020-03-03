@@ -995,7 +995,7 @@ def validate_dns_ha():
 def setup_maas_api():
     """Install MAAS PPA and packages for accessing the MAAS API.
     """
-    add_source(config('maas_source'))
+    add_source(config('maas_source'), config('maas_source_key'))
     apt_update(fatal=True)
     apt_install('python3-maas-client', fatal=True)
 
