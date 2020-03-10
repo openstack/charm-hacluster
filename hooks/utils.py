@@ -748,7 +748,7 @@ def configure_pacemaker_remote(remote_hostname, remote_ip):
     :returns: Name of resource for pacemaker remote node.
     :rtype: str
     """
-    resource_name = remote_hostname.split('.')[0]
+    resource_name = remote_hostname
     if not pcmk.is_resource_present(resource_name):
         cmd = (
             "crm configure primitive {} ocf:pacemaker:remote "

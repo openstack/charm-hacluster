@@ -757,9 +757,9 @@ class UtilsTestCase(unittest.TestCase):
             utils.configure_pacemaker_remote(
                 'juju-aa0ba5-zaza-ed2ce6f303f0-10.maas',
                 '10.0.0.10'),
-            'juju-aa0ba5-zaza-ed2ce6f303f0-10')
+            'juju-aa0ba5-zaza-ed2ce6f303f0-10.maas')
         commit.assert_called_once_with(
-            'crm configure primitive juju-aa0ba5-zaza-ed2ce6f303f0-10 '
+            'crm configure primitive juju-aa0ba5-zaza-ed2ce6f303f0-10.maas '
             'ocf:pacemaker:remote params '
             'server=10.0.0.10 '
             'reconnect_interval=60 op monitor interval=30s',
@@ -774,7 +774,7 @@ class UtilsTestCase(unittest.TestCase):
             utils.configure_pacemaker_remote(
                 'juju-aa0ba5-zaza-ed2ce6f303f0-10.maas',
                 '10.0.0.10'),
-            'juju-aa0ba5-zaza-ed2ce6f303f0-10')
+            'juju-aa0ba5-zaza-ed2ce6f303f0-10.maas')
         self.assertFalse(commit.called)
 
     @mock.patch('pcmk.commit')
