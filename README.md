@@ -1,144 +1,88 @@
 # Overview
 
-The hacluster subordinate charm provides corosync and pacemaker cluster
-configuration for principle charms which support the hacluster, container
-scoped relation.
+The hacluster charm provides high availability for OpenStack applications that
+lack native (built-in) HA functionality. The clustering solution is based on
+Corosync and Pacemaker.
 
-The charm will only configure for HA once more that one service unit is
-present.
+It is a subordinate charm that works in conjunction with a principle charm that
+supports the 'hacluster' interface. The current list of such charms can be
+obtained from the [Charm Store][charms-requires-hacluster] (the charms
+officially supported by the OpenStack Charms project are published by
+'openstack-charmers').
+
+> **Note**: The hacluster charm is generally intended to be used with
+  MAAS-based clouds.
 
 # Usage
 
-NOTE: The hacluster subordinate charm requires multicast network support, so
-this charm will NOT work in ec2 or in other clouds which block multicast
-traffic.  Its intended for use in MAAS managed environments of physical
-hardware.
+High availability can be configured in two mutually exclusive ways:
 
-To deploy the charm:
+* virtual IP(s)
+* DNS
 
-    juju deploy hacluster mysql-hacluster
+The virtual IP method of implementing HA requires that all units of the
+clustered OpenStack application are on the same subnet.
 
-To enable HA clustering support (for mysql for example):
+The DNS method of implementing HA requires that [MAAS][upstream-maas] is used
+as the backing cloud. The clustered nodes must have static or "reserved" IP
+addresses registered in MAAS. If using a version of MAAS earlier than 2.3 the
+DNS hostname(s) should be pre-registered in MAAS before use with DNS HA.
 
-    juju deploy -n 2 mysql
-    juju deploy -n 3 ceph
-    juju set mysql vip="192.168.21.1"
-    juju add-relation mysql ceph
-    juju add-relation mysql mysql-hacluster
+## Configuration
 
-The principle charm must have explicit support for the hacluster interface
-in order for clustering to occur - otherwise nothing actually get configured.
+This section covers common configuration options. See file `config.yaml` for
+the full list of options, along with their descriptions and default values.
 
-# Settings
+#### `cluster_count`
 
-It is best practice to set cluster_count to the number of expected units in the
-cluster. The charm will build the cluster without this setting, however, race
-conditions may occur in which one node is not yet aware of the total number of
-relations to other hacluster units, leading to failure of the corosync and
-pacemaker services to complete startup.
+The `cluster_count` option sets the number of hacluster units required to form
+the principle application cluster (the default is 3). It is best practice to
+provide a value explicitly as doing so ensures that the hacluster charm will
+wait until all relations are made to the principle application before building
+the Corosync/Pacemaker cluster, thereby avoiding a race condition.
 
-Setting cluster_count helps guarantee the hacluster charm waits until all 
-expected peer relations are available before building the corosync cluster.
+## Deployment
 
-# HA/Clustering
+At deploy time an application name should be set, and be based on the principle
+charm name (for organisational purposes):
 
-There are two mutually exclusive high availability options: using virtual
-IP(s) or DNS.
+    juju deploy hacluster <principle-charm-name>-hacluster
 
-To use virtual IP(s) the clustered nodes must be on the same subnet such that
-the VIP is a valid IP on the subnet for one of the node's interfaces and each
-node has an interface in said subnet. The VIP becomes a highly-available API
-endpoint.
+A relation is then added between the hacluster application and the principle
+application.
 
-To use DNS high availability there are several prerequisites. However, DNS HA
-does not require the clustered nodes to be on the same subnet.
-Currently the DNS HA feature is only available for MAAS 2.0 or greater
-environments. MAAS 2.0 requires Juju 2.0 or greater. The MAAS 2.0 client
-requires Ubuntu 16.04 or greater. The clustered nodes must have static or
-"reserved" IP addresses registered in MAAS. If using a version of MAAS earlier
-than 2.3 the DNS hostname(s) should be pre-registered in MAAS before use with
-DNS HA.
+In the below example the VIP approach is taken. These commands will deploy a
+three-node Keystone HA cluster, with a VIP of 10.246.114.11. Each will reside
+in a container on existing machines 0, 1, and 2:
 
-The charm will throw an exception in the following circumstances:
-If running on a version of Ubuntu less than Xenial 16.04
+    juju deploy -n 3 --to lxd:0,lxd:1,lxd:2 --config vip=10.246.114.11 keystone
+    juju deploy --config cluster_count=3 hacluster keystone-hacluster
+    juju add-relation keystone-hacluster:ha keystone:ha
 
-# Usage for Charm Authors
+## Actions
 
-The hacluster interface supports a number of different cluster configuration
-options.
+This section lists Juju [actions][juju-docs-actions] supported by the charm.
+Actions allow specific operations to be performed on a per-unit basis.
 
-## Mandatory Relation Data (deprecated)
+* `pause`
+* `resume`
+* `status`
+* `cleanup`
 
-Principle charms should provide basic corosync configuration:
+To display action descriptions run `juju actions hacluster`. If the charm is
+not deployed then see file ``actions.yaml``.
 
-    corosync\_bindiface: The network interface to use for cluster messaging.
-    corosync\_mcastport: The multicast port to use for cluster messaging.
+# Bugs
 
-however, these can also be provided via configuration on the hacluster charm
-itself.  If configuration is provided directly to the hacluster charm, this
-will be preferred over these relation options from the principle charm.
+Please report bugs on [Launchpad][lp-bugs-charm-hacluster].
 
-## Resource Configuration
+For general charm questions refer to the [OpenStack Charm Guide][cg].
 
-The hacluster interface provides support for a number of different ways
-of configuring cluster resources. All examples are provided in python.
+<!-- LINKS -->
 
-NOTE: The hacluster charm interprets the data provided as python dicts; so
-it is also possible to provide these as literal strings from charms written
-in other languages.
-
-### init\_services
-
-Services which will be managed by pacemaker once the cluster is created:
-
-    init_services = {
-            'res_mysqld':'mysql',
-        }
-
-These services will be stopped prior to configuring the cluster.
-
-### resources
-
-Resources are the basic cluster resources that will be managed by pacemaker.
-In the mysql charm, this includes a block device, the filesystem, a virtual
-IP address and the mysql service itself:
-
-    resources = {
-        'res_mysql_rbd':'ocf:ceph:rbd',
-        'res_mysql_fs':'ocf:heartbeat:Filesystem',
-        'res_mysql_vip':'ocf:heartbeat:IPaddr2',
-        'res_mysqld':'upstart:mysql',
-        }
-
-### resource\_params
-
-Parameters which should be used when configuring the resources specified:
-
-    resource_params = {
-        'res_mysql_rbd':'params name="%s" pool="images" user="%s" secret="%s"' % \
-                        (config['rbd-name'], SERVICE_NAME, KEYFILE),
-        'res_mysql_fs':'params device="/dev/rbd/images/%s" directory="%s" '
-                       'fstype="ext4" op start start-delay="10s"' % \
-                        (config['rbd-name'], DATA_SRC_DST),
-        'res_mysql_vip':'params ip="%s" cidr_netmask="%s" nic="%s"' %\
-                        (config['vip'], config['vip_cidr'], config['vip_iface']),
-        'res_mysqld':'op start start-delay="5s" op monitor interval="5s"',
-        }
-
-### groups
-
-Resources which should be managed as a single set of resource on the same service
-unit:
-
-    groups = {
-        'grp_mysql':'res_mysql_rbd res_mysql_fs res_mysql_vip res_mysqld',
-        }
-
-
-### clones
-
-Resources which should run on every service unit participating in the cluster:
-
-    clones = {
-        'cl_haproxy': 'res_haproxy_lsb'
-        }
+[cg]: https://docs.openstack.org/charm-guide
+[lp-bugs-charm-hacluster]: https://bugs.launchpad.net/charm-hacluster/+filebug
+[juju-docs-actions]: https://jaas.ai/docs/actions
+[cdg-app-ha]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-ha.html
+[upstream-maas]: https://maas.io
+[charms-requires-hacluster]: https://jaas.ai/search?requires=hacluster
