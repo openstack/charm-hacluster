@@ -1180,6 +1180,9 @@ def assess_status_helper():
     if is_unit_upgrading_set():
         return ("blocked",
                 "Ready for do-release-upgrade. Set complete when finished")
+    if is_waiting_unit_series_upgrade_set():
+        return ("blocked",
+                "HA services shutdown, peers are ready for series upgrade")
     if is_unit_paused_set():
         return ("maintenance",
                 "Paused. Use 'resume' action to resume normal service.")

@@ -615,7 +615,9 @@ def update_nrpe_config():
 @hooks.hook('pre-series-upgrade')
 def series_upgrade_prepare():
     set_unit_upgrading()
-    if not is_unit_paused_set():
+    # HA services are shutdown when the unit receives series upgrade
+    # notifications from peers so cannot pause services.
+    if not is_unit_paused_set() and not is_waiting_unit_series_upgrade_set():
         pause_unit()
     notify_peers_of_series_upgrade()
 
