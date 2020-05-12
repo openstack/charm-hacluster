@@ -20,6 +20,7 @@ import os
 import shutil
 import socket
 import sys
+import traceback
 
 _path = os.path.dirname(os.path.realpath(__file__))
 _root = os.path.abspath(os.path.join(_path, '..'))
@@ -660,4 +661,8 @@ if __name__ == '__main__':
         hooks.execute(sys.argv)
     except UnregisteredHookError as e:
         log('Unknown hook {} - skipping.'.format(e), level=DEBUG)
-    set_unit_status()
+    try:
+        set_unit_status()
+    except:
+        log(traceback.format_exc(), level=ERROR)
+        raise
