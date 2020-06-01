@@ -104,6 +104,20 @@ def crm_opt_exists(opt_name):
     return False
 
 
+def crm_maas_stonith_resource_list():
+    """Returns list of resources of the type stonith:external/maas.
+
+    :returns: List of resource names.
+    :rtype: [str,]
+    """
+    resource_names = []
+    output = subprocess.check_output(['crm_resource', '-L']).decode()
+    for line in output.split('\n'):
+        if 'stonith:external/maas' in line:
+            resource_names.append(line.split()[0])
+    return [n for n in resource_names if n.startswith('st-maas-')]
+
+
 def crm_res_running(opt_name):
     (_, output) = subprocess.getstatusoutput(
         "crm resource status %s" % opt_name)
