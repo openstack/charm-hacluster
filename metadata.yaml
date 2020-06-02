@@ -3,15 +3,16 @@ summary: Corosync Cluster Engine - membership, messaging and quorum
 maintainer: OpenStack Charmers <openstack-charmers@lists.ubuntu.com>
 subordinate: true
 description: |
- Corosync/Pacemaker
+  Corosync/Pacemaker
 tags:
-  - misc
+- misc
 series:
-  - xenial
-  - bionic
-  - eoan
-  - focal
-  - trusty
+- xenial
+- bionic
+- eoan
+- focal
+- trusty
+- groovy
 requires:
   juju-info:
     interface: juju-info
