@@ -10,6 +10,9 @@ obtained from the [Charm Store][charms-requires-hacluster] (the charms
 officially supported by the OpenStack Charms project are published by
 'openstack-charmers').
 
+See [OpenStack high availability][cdg-ha] in the [OpenStack Charms Deployment
+Guide][cdg] for a comprehensive treatment of HA with charmed OpenStack.
+
 > **Note**: The hacluster charm is generally intended to be used with
   MAAS-based clouds.
 
@@ -83,6 +86,7 @@ For general charm questions refer to the [OpenStack Charm Guide][cg].
 [cg]: https://docs.openstack.org/charm-guide
 [lp-bugs-charm-hacluster]: https://bugs.launchpad.net/charm-hacluster/+filebug
 [juju-docs-actions]: https://jaas.ai/docs/actions
-[cdg-app-ha]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-ha.html
+[cdg-ha]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-ha.html
 [upstream-maas]: https://maas.io
 [charms-requires-hacluster]: https://jaas.ai/search?requires=hacluster
+[cdg]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide
