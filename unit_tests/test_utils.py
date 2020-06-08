@@ -20,8 +20,8 @@ import sys
 import yaml
 
 from contextlib import contextmanager
-from mock import patch, MagicMock
 from charmhelpers.core.unitdata import Record
+from unittest.mock import patch, MagicMock
 
 
 def load_config():

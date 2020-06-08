@@ -14,7 +14,7 @@
 
 import contextlib
 import json
-import mock
+from unittest import mock
 import os
 import re
 import shutil
