@@ -833,10 +833,11 @@ class UtilsTestCase(unittest.TestCase):
             ['res-node1', 'res-node2'])
 
     @mock.patch.object(utils, 'config')
+    @mock.patch.object(utils, 'remove_legacy_maas_stonith_resources')
     @mock.patch('pcmk.commit')
     @mock.patch('pcmk.is_resource_present')
     def test_configure_maas_stonith_resource(self, is_resource_present,
-                                             commit, config):
+                                             commit, remove_legacy, config):
         cfg = {
             'maas_url': 'http://maas/2.0',
             'maas_credentials': 'apikey'}
@@ -844,7 +845,7 @@ class UtilsTestCase(unittest.TestCase):
         config.side_effect = lambda x: cfg.get(x)
         utils.configure_maas_stonith_resource(['node1'])
         cmd = (
-            "crm configure primitive st-maas-3975c9d "
+            "crm configure primitive st-maas "
             "stonith:external/maas "
             "params url='http://maas/2.0' apikey='apikey' "
             "hostnames='node1' "
@@ -859,13 +860,15 @@ class UtilsTestCase(unittest.TestCase):
         commit.assert_has_calls(commit_calls)
 
     @mock.patch.object(utils, 'config')
+    @mock.patch.object(utils, 'remove_legacy_maas_stonith_resources')
     @mock.patch('pcmk.commit')
     @mock.patch('pcmk.is_resource_present')
     @mock.patch('pcmk.crm_update_resource')
     def test_configure_maas_stonith_resource_duplicate(self,
                                                        crm_update_resource,
                                                        is_resource_present,
-                                                       commit, config):
+                                                       commit, remove_legacy,
+                                                       config):
         cfg = {
             'maas_url': 'http://maas/2.0',
             'maas_credentials': 'apikey'}
@@ -873,7 +876,7 @@ class UtilsTestCase(unittest.TestCase):
         config.side_effect = lambda x: cfg.get(x)
         utils.configure_maas_stonith_resource(['node1'])
         crm_update_resource.assert_called_once_with(
-            'st-maas-3975c9d',
+            'st-maas',
             'stonith:external/maas',
             ("params url='http://maas/2.0' apikey='apikey' hostnames='node1' "
              "op monitor interval=25 start-delay=25 timeout=25"))
@@ -1174,3 +1177,16 @@ class UtilsTestCase(unittest.TestCase):
         relation_set.assert_called_once_with(
             relation_id='rid1',
             relation_settings={'series_upgrade_of_nova_compute_2': None})
+
+    @mock.patch('pcmk.crm_maas_stonith_resource_list')
+    @mock.patch('pcmk.commit')
+    def test_remove_legacy_maas_stonith_resources(self, mock_commit,
+                                                  mock_resource_list):
+        mock_resource_list.return_value = ['st-maas-abcd', 'st-maas-1234']
+        utils.remove_legacy_maas_stonith_resources()
+        commit_calls = [
+            mock.call('crm -w -F resource stop st-maas-abcd'),
+            mock.call('crm -w -F configure delete st-maas-abcd'),
+            mock.call('crm -w -F resource stop st-maas-1234'),
+            mock.call('crm -w -F configure delete st-maas-1234')]
+        mock_commit.assert_has_calls(commit_calls)

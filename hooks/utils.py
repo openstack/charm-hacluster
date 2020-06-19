@@ -613,6 +613,16 @@ def configure_cluster_global(failure_timeout):
     pcmk.commit(cmd)
 
 
+def remove_legacy_maas_stonith_resources():
+    """Remove maas stoniths resources using the old name."""
+    stonith_resources = pcmk.crm_maas_stonith_resource_list()
+    for resource_name in stonith_resources:
+        pcmk.commit(
+            'crm -w -F resource stop {}'.format(resource_name))
+        pcmk.commit(
+            'crm -w -F configure delete {}'.format(resource_name))
+
+
 def configure_maas_stonith_resource(stonith_hostnames):
     """Create stonith resource for the given hostname.
 
@@ -631,12 +641,8 @@ def configure_maas_stonith_resource(stonith_hostnames):
         'apikey': config('maas_credentials'),
         'hostnames': ' '.join(sorted(hostnames))}
     if all(ctxt.values()):
-        maas_login_params = "url='{url}' apikey='{apikey}'".format(**ctxt)
-        maas_rsc_hash = pcmk.resource_checksum(
-            'st',
-            'stonith:external/maas',
-            res_params=maas_login_params)[:7]
-        ctxt['stonith_resource_name'] = 'st-maas-{}'.format(maas_rsc_hash)
+        ctxt['stonith_resource_name'] = 'st-maas'
+        remove_legacy_maas_stonith_resources()
         ctxt['resource_params'] = (
             "params url='{url}' apikey='{apikey}' hostnames='{hostnames}' "
             "op monitor interval=25 start-delay=25 "
