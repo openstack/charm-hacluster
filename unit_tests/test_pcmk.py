@@ -163,7 +163,8 @@ class TestPcmk(unittest.TestCase):
         # Pacemaker is up
         gethostname.return_value = 'hanode-1'
         getstatusoutput.return_value = (0, 'Hosname: hanode-1')
-        self.assertTrue(pcmk.wait_for_pcmk(retries=2, sleep=0))
+        # Here we are asserting that it doesn't raise anything:
+        pcmk.wait_for_pcmk(retries=2, sleep=0)
 
     @mock.patch('subprocess.check_output')
     def test_crm_version(self, mock_check_output):

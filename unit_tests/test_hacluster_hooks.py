@@ -42,6 +42,9 @@ class TestCorosyncConf(unittest.TestCase):
         os.remove(self.tmpfile.name)
 
     @mock.patch.object(pcmk.unitdata, 'kv')
+    @mock.patch.object(hooks, 'remote_unit')
+    @mock.patch.object(hooks, 'principal_unit')
+    @mock.patch.object(hooks, 'trigger_corosync_update_from_leader')
     @mock.patch.object(hooks, 'is_stonith_configured')
     @mock.patch.object(hooks, 'configure_peer_stonith_resource')
     @mock.patch.object(hooks, 'get_member_ready_nodes')
@@ -78,7 +81,9 @@ class TestCorosyncConf(unittest.TestCase):
                                  configure_resources_on_remotes,
                                  get_member_ready_nodes,
                                  configure_peer_stonith_resource,
-                                 is_stonith_configured, mock_kv):
+                                 is_stonith_configured,
+                                 trigger_corosync_update_from_leader,
+                                 principal_unit, remote_unit, mock_kv):
 
         def fake_crm_opt_exists(res_name):
             # res_ubuntu will take the "update resource" route
@@ -104,6 +109,8 @@ class TestCorosyncConf(unittest.TestCase):
                'cluster_count': 3,
                'failure_timeout': 180,
                'cluster_recheck_interval': 60}
+        trigger_corosync_update_from_leader.return_value = False
+        principal_unit.return_value = remote_unit.return_value = ""
 
         config.side_effect = lambda key: cfg.get(key)
 
@@ -165,6 +172,9 @@ class TestCorosyncConf(unittest.TestCase):
                     commit.assert_any_call(
                         'crm -w -F configure %s %s %s' % (kw, name, params))
 
+    @mock.patch.object(hooks, 'remote_unit')
+    @mock.patch.object(hooks, 'principal_unit')
+    @mock.patch.object(hooks, 'trigger_corosync_update_from_leader')
     @mock.patch.object(hooks, 'is_stonith_configured')
     @mock.patch.object(hooks, 'configure_peer_stonith_resource')
     @mock.patch.object(hooks, 'get_member_ready_nodes')
@@ -200,7 +210,9 @@ class TestCorosyncConf(unittest.TestCase):
             configure_pacemaker_remote_stonith_resource,
             configure_resources_on_remotes, get_member_ready_nodes,
             configure_peer_stonith_resource,
-            is_stonith_configured):
+            is_stonith_configured,
+            trigger_corosync_update_from_leader,
+            principal_unit, remote_unit):
         is_stonith_configured.return_value = False
         validate_dns_ha.return_value = True
         crm_opt_exists.return_value = False
@@ -218,6 +230,8 @@ class TestCorosyncConf(unittest.TestCase):
                'cluster_count': 3,
                'maas_url': 'http://maas/MAAAS/',
                'maas_credentials': 'secret'}
+        trigger_corosync_update_from_leader.return_value = False
+        principal_unit.return_value = remote_unit.return_value = ""
 
         config.side_effect = lambda key: cfg.get(key)
 
@@ -248,6 +262,9 @@ class TestCorosyncConf(unittest.TestCase):
             'params bar ip_address="172.16.0.1" maas_url="http://maas/MAAAS/" '
             'maas_credentials="secret"')
 
+    @mock.patch.object(hooks, 'remote_unit')
+    @mock.patch.object(hooks, 'principal_unit')
+    @mock.patch.object(hooks, 'trigger_corosync_update_from_leader')
     @mock.patch.object(hooks, 'setup_maas_api')
     @mock.patch.object(hooks, 'validate_dns_ha')
     @mock.patch('pcmk.wait_for_pcmk')
@@ -270,7 +287,9 @@ class TestCorosyncConf(unittest.TestCase):
             relation_set, get_cluster_nodes, related_units, configure_stonith,
             configure_monitor_host, configure_cluster_global,
             configure_corosync, is_leader, crm_opt_exists,
-            wait_for_pcmk, validate_dns_ha, setup_maas_api):
+            wait_for_pcmk, validate_dns_ha, setup_maas_api,
+            trigger_corosync_update_from_leader,
+            principal_unit, remote_unit):
 
         def fake_validate():
             raise utils.MAASConfigIncomplete('DNS HA invalid config')
@@ -289,6 +308,8 @@ class TestCorosyncConf(unittest.TestCase):
                'cluster_count': 3,
                'maas_url': 'http://maas/MAAAS/',
                'maas_credentials': None}
+        trigger_corosync_update_from_leader.return_value = False
+        principal_unit.return_value = remote_unit.return_value = ""
 
         config.side_effect = lambda key: cfg.get(key)
 
@@ -391,7 +412,6 @@ class TestHooks(test_utils.CharmTestCase):
         mock_is_stonith_configured.return_value = False
         mock_config.side_effect = self.test_config.get
         mock_relation_ids.return_value = ['hanode:1']
-        mock_wait_for_pcmk.return_value = True
         mock_is_leader.return_value = True
         hooks.config_changed()
         mock_maintenance_mode.assert_not_called()

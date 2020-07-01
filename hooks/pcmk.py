@@ -40,18 +40,41 @@ class PropertyNotFound(Exception):
 
 
 def wait_for_pcmk(retries=12, sleep=10):
-    crm_up = None
-    hostname = socket.gethostname()
+    """Wait for pacemaker/corosync to fully come up.
+
+    :param retries: Number of times to check for crm's output before raising.
+    :type retries: int
+    :param sleep: Number of seconds to sleep between retries.
+    :type sleep: int
+    :raises: ServicesNotUp
+    """
+    expected_hostname = socket.gethostname()
+    last_exit_code = None
+    last_output = None
     for i in range(retries):
-        if crm_up:
-            return True
-        output = subprocess.getstatusoutput("crm node list")[1]
-        crm_up = hostname in output
-        time.sleep(sleep)
-    if not crm_up:
-        raise ServicesNotUp("Pacemaker or Corosync are still down after "
-                            "waiting for {} retries. Last output: {}"
-                            "".format(retries, output))
+        if i > 0:
+            time.sleep(sleep)
+        last_exit_code, last_output = subprocess.getstatusoutput(
+            'crm node list')
+        if expected_hostname in last_output:
+            return
+
+    msg = ('Pacemaker or Corosync are still not fully up after waiting for '
+           '{} retries. '.format(retries))
+    if last_exit_code != 0:
+        msg += 'Last exit code: {}. '.format(last_exit_code)
+    if 'not supported between' in last_output:
+        # NOTE(lourot): transient crmsh bug
+        # https://github.com/ClusterLabs/crmsh/issues/764
+        msg += 'This looks like ClusterLabs/crmsh#764. '
+    elif 'node1' in last_output:
+        # NOTE(lourot): transient bug on deployment. The charm will recover
+        # later but the corosync ring will still show an offline 'node1' node.
+        # The corosync ring can then be cleaned up by running the 'update-ring'
+        # action.
+        msg += 'This looks like lp:1874719. '
+    msg += 'Last output: {}'.format(last_output)
+    raise ServicesNotUp(msg)
 
 
 def commit(cmd, failure_is_fatal=False):
@@ -64,7 +87,7 @@ def commit(cmd, failure_is_fatal=False):
     :raises: subprocess.CalledProcessError
     """
     if failure_is_fatal:
-        return subprocess.check_call(cmd.split())
+        return subprocess.check_output(cmd.split(), stderr=subprocess.STDOUT)
     else:
         return subprocess.call(cmd.split())
 
@@ -75,24 +98,6 @@ def is_resource_present(resource):
         return False
 
     return True
-
-
-def standby(node=None):
-    if node is None:
-        cmd = "crm -F node standby"
-    else:
-        cmd = "crm -F node standby %s" % node
-
-    commit(cmd)
-
-
-def online(node=None):
-    if node is None:
-        cmd = "crm -F node online"
-    else:
-        cmd = "crm -F node online %s" % node
-
-    commit(cmd)
 
 
 def crm_opt_exists(opt_name):
@@ -166,6 +171,53 @@ def list_nodes():
     tree = etree.fromstring(out)
     nodes = [n.attrib['uname'] for n in tree.iter('node')]
     return sorted(nodes)
+
+
+def set_node_status_to_maintenance(node_name):
+    """See https://crmsh.github.io/man-2.0/#cmdhelp_node_maintenance
+
+    :param node_name: Name of the node to set to maintenance.
+    :type node_name: str
+    :raises: subprocess.CalledProcessError
+    """
+    log('Setting node {} to maintenance'.format(node_name))
+    commit('crm -w -F node maintenance {}'.format(node_name),
+           failure_is_fatal=True)
+
+
+def delete_node(node_name, failure_is_fatal=True):
+    """See https://crmsh.github.io/man-2.0/#cmdhelp_node_delete
+
+    :param node_name: Name of the node to be removed from the cluster.
+    :type node_name: str
+    :param failure_is_fatal: Whether to raise exception if command fails.
+    :type failure_is_fatal: bool
+    :raises: subprocess.CalledProcessError
+    """
+    log('Deleting node {} from the cluster'.format(node_name))
+    cmd = 'crm -w -F node delete {}'.format(node_name)
+    for attempt in [2, 1, 0]:
+        try:
+            commit(cmd, failure_is_fatal=failure_is_fatal)
+        except subprocess.CalledProcessError as e:
+            output = e.output.decode('utf-8').strip()
+            log('"{}" failed with "{}"'.format(cmd, output), WARNING)
+            if output == 'ERROR: node {} not found in the CIB'.format(
+                    node_name):
+                # NOTE(lourot): Sometimes seen when called from the
+                # `update-ring` action.
+                log('{} was already removed from the cluster, moving on',
+                    WARNING)
+                return
+            if '/cmdline' in output:
+                # NOTE(lourot): older versions of crmsh may fail with
+                # https://github.com/ClusterLabs/crmsh/issues/283 . If that's
+                # the case let's retry.
+                log('This looks like ClusterLabs/crmsh#283.', WARNING)
+                if attempt > 0:
+                    log('Retrying...', WARNING)
+                    continue
+            raise
 
 
 def get_property_from_xml(name, output):

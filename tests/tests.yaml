@@ -23,7 +23,11 @@ configure:
 
 tests:
   - zaza.openstack.charm_tests.hacluster.tests.HaclusterTest
+  - zaza.openstack.charm_tests.hacluster.tests.HaclusterScaleBackAndForthTest
 
 tests_options:
+  hacluster:
+    principle-app-name: keystone
+    hacluster-charm-name: hacluster
   force_deploy:
     - groovy-victoria

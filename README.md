@@ -67,13 +67,36 @@ in a container on existing machines 0, 1, and 2:
 This section lists Juju [actions][juju-docs-actions] supported by the charm.
 Actions allow specific operations to be performed on a per-unit basis.
 
-* `pause`
-* `resume`
-* `status`
-* `cleanup`
+ * `pause`
+ * `resume`
+ * `status`
+ * `cleanup`
+ * `update-ring`
 
 To display action descriptions run `juju actions hacluster`. If the charm is
 not deployed then see file ``actions.yaml``.
+
+### update-ring action
+
+The `update-ring` action requires a parameter (`i-really-mean-it=true`) to make
+sure tidying up the list of available corosync nodes in the ring is intended.
+
+The operation expects:
+
+1. `juju run-action hacluster/N pause --wait`. This will make sure no Pacemaker
+   resources run on the unit.
+
+2. `juju remove-unit principal-unit/N`. Iterate through this step as many times
+   as units want to be removed (ie. to scale back from 6 to 3 units).
+
+3. `juju run-action hacluster/leader update-ring i-really-mean-it=true --wait`.
+   This step will remove corosync nodes from the ring and update corosync.conf
+   to list an updated number of nodes (min_quorum is recalculated).
+
+In case a unit goes into lost state (ie. caused by hardware failure), the
+initial step (pause a unit) can be skipped. Unit removal may also be replaced
+by `juju remove-machine N --force`, where N is the Juju machine ID where the
+unit to be removed runs.
 
 # Bugs
 

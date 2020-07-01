@@ -93,6 +93,10 @@ class UtilsTestCaseWriteTmp(unittest.TestCase):
 
 
 class UtilsTestCase(unittest.TestCase):
+    def _testdata(self, filename):
+        return os.path.join(os.path.dirname(__file__),
+                            'testdata',
+                            filename)
 
     @mock.patch.object(utils, 'config')
     def test_get_transport(self, mock_config):
@@ -430,20 +434,19 @@ class UtilsTestCase(unittest.TestCase):
         ])
 
     @mock.patch('pcmk.commit')
-    @mock.patch.object(utils, 'config')
     @mock.patch.object(utils, 'configure_pacemaker_remote_stonith_resource')
-    def test_configure_stonith_stonith_enabled_false(
+    def test_configure_stonith_no_maas(
             self,
             mock_cfg_pcmkr_rstonith_res,
-            mock_config,
             mock_commit):
-        cfg = {
-            'stonith_enabled': 'false'}
-        mock_config.side_effect = lambda key: cfg.get(key)
+        # Without MAAS this function will return no resource:
         mock_cfg_pcmkr_rstonith_res.return_value = []
+
         utils.configure_stonith()
+
         mock_commit.assert_called_once_with(
-            'crm configure property stonith-enabled=false')
+            'crm configure property stonith-enabled=false',
+            failure_is_fatal=False)
 
     @mock.patch.object(utils, 'relation_get')
     def test_parse_data_json(self, relation_get):
@@ -1260,3 +1263,57 @@ class UtilsTestCase(unittest.TestCase):
         commit.assert_called_once_with(
             'crm configure property stonith-enabled=false',
             failure_is_fatal=True)
+
+    @mock.patch('subprocess.check_output')
+    def test_node_is_dc(self, mock_subprocess):
+        with open(self._testdata('test_crm_mon.xml'), 'r') as fd:
+            mock_subprocess.return_value = "".join(
+                fd.readlines()).encode("utf-8")
+
+        self.assertTrue(utils.node_is_dc('juju-2eebcf-0'))
+
+    @mock.patch.object(utils.unitdata, 'HookData')
+    def test_is_update_ring_requested(self, HookData):
+        hook_data = self.MockHookData()
+        HookData.return_value = hook_data
+        self.assertTrue(
+            utils.is_update_ring_requested('random-uuid-generated')
+        )
+        self.assertEquals(
+            hook_data.kv.get('corosync-update-uuid'),
+            'random-uuid-generated',
+        )
+        # No change in uuid means no new request has been issued
+        self.assertFalse(
+            utils.is_update_ring_requested('random-uuid-generated')
+        )
+
+    @mock.patch('pcmk.commit')
+    @mock.patch.object(utils, 'emit_corosync_conf')
+    @mock.patch.object(utils, 'is_update_ring_requested')
+    @mock.patch.object(utils, 'relation_get')
+    def test_trigger_corosync_update_from_leader(self, mock_relation_get,
+                                                 mock_is_update_ring_req,
+                                                 mock_emit_corosync_conf,
+                                                 mock_commit):
+        # corosync-update-uuid is set and has changed:
+        mock_relation_get.return_value = 'random-uuid-generated'
+        mock_is_update_ring_req.return_value = True
+
+        mock_emit_corosync_conf.return_value = True
+        self.assertTrue(
+            utils.trigger_corosync_update_from_leader(
+                'hacluster/0',
+                'hanode:0',
+            ),
+        )
+        mock_commit.assert_has_calls([mock.call('corosync-cfgtool -R')])
+
+        # corosync-update-uuid isn't set:
+        mock_relation_get.return_value = None
+        self.assertFalse(
+            utils.trigger_corosync_update_from_leader(
+                'hacluster/0',
+                'hanode:0',
+            ),
+        )

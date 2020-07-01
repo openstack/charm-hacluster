@@ -71,8 +71,8 @@ options:
     description: |
       When enabled pacemaker will be put in maintenance mode, this will allow
       administrators to manipulate cluster resources (e.g. stop daemons, reboot
-      machines, etc). Pacemaker will not monitor the resources while maintence
-      mode is enabled.
+      machines, etc). Pacemaker will not monitor the resources while maintenance
+      mode is enabled and node removals won't be processed.
   service_start_timeout:
     type: int
     default: 180

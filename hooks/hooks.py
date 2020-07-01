@@ -45,6 +45,8 @@ from charmhelpers.core.hookenv import (
     related_units,
     relation_ids,
     relation_set,
+    remote_unit,
+    principal_unit,
     config,
     Hooks,
     UnregisteredHookError,
@@ -122,6 +124,8 @@ from utils import (
     disable_stonith,
     is_stonith_configured,
     emit_systemd_overrides_file,
+    trigger_corosync_update_from_leader,
+    emit_corosync_conf,
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
@@ -293,6 +297,22 @@ def hanode_relation_changed(relid=None):
         ha_relation_changed()
 
 
+@hooks.hook('hanode-relation-departed')
+def hanode_relation_departed(relid=None):
+    if config('maintenance-mode'):
+        log('pcmk is in maintenance mode - skip any action', DEBUG)
+        return
+
+    # Note(aluria): all units will update corosync.conf list of nodes
+    # in the aim of having up to date stored configurations. However,
+    # corosync reloads (or restarts) won't be triggered at this point
+    # (update-ring action will do)
+    if emit_corosync_conf():
+        log('corosync.conf updated')
+    else:
+        log('corosync.conf not updated')
+
+
 @hooks.hook('ha-relation-joined',
             'ha-relation-changed',
             'peer-availability-relation-joined',
@@ -306,9 +326,22 @@ def ha_relation_changed():
             level=INFO)
         return
 
-    if relation_ids('hanode'):
+    relid_hanode = relation_ids('hanode')
+    if relid_hanode:
         log('Ready to form cluster - informing peers', level=DEBUG)
-        relation_set(relation_id=relation_ids('hanode')[0], ready=True)
+        relation_set(relation_id=relid_hanode[0], ready=True)
+
+        # If a trigger-corosync-update attribute exists in the relation,
+        # the Juju leader may have requested all its peers to update
+        # the corosync.conf list of nodes. If it's the case, no other
+        # action will be run (a future hook re: ready=True may trigger
+        # other logic)
+        if (remote_unit() != principal_unit() and
+            trigger_corosync_update_from_leader(
+                remote_unit(), relid_hanode[0]
+        )):
+            return
+
     else:
         log('Ready to form cluster, but not related to peers just yet',
             level=INFO)
@@ -563,8 +596,12 @@ def ha_relation_changed():
 
 @hooks.hook()
 def stop():
-    cmd = 'crm -w -F node delete %s' % socket.gethostname()
-    pcmk.commit(cmd)
+    # NOTE(lourot): This seems to always fail with
+    # 'ERROR: node <node_name> not found in the CIB', which means that the node
+    # has already been removed from the cluster. Thus failure_is_fatal=False.
+    # We might consider getting rid of this call.
+    pcmk.delete_node(socket.gethostname(), failure_is_fatal=False)
+
     apt_purge(['corosync', 'pacemaker'], fatal=True)
 
 

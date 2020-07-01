@@ -118,6 +118,27 @@ class MAASConfigIncomplete(Exception):
     pass
 
 
+class RemoveCorosyncNodeFailed(Exception):
+    def __init__(self, node_name, called_process_error):
+        msg = 'Removing {} from the cluster failed. {} output={}'.format(
+            node_name, called_process_error, called_process_error.output)
+        super(RemoveCorosyncNodeFailed, self).__init__(msg)
+
+
+class EnableStonithFailed(Exception):
+    def __init__(self, called_process_error):
+        msg = 'Enabling STONITH failed. {} output={}'.format(
+            called_process_error, called_process_error.output)
+        super(EnableStonithFailed, self).__init__(msg)
+
+
+class DisableStonithFailed(Exception):
+    def __init__(self, called_process_error):
+        msg = 'Disabling STONITH failed. {} output={}'.format(
+            called_process_error, called_process_error.output)
+        super(DisableStonithFailed, self).__init__(msg)
+
+
 def disable_upstart_services(*services):
     for service in services:
         with open("/etc/init/{}.override".format(service), "wt") as override:
@@ -516,9 +537,13 @@ def configure_stonith():
         enable_stonith()
         set_stonith_configured(True)
     else:
-        log('Disabling STONITH', level=INFO)
-        cmd = "crm configure property stonith-enabled=false"
-        pcmk.commit(cmd)
+        # NOTE(lourot): We enter here when no MAAS STONITH resource could be
+        # created. Disabling STONITH for now. We're not calling
+        # set_stonith_configured(), so that enabling STONITH will be retried
+        # later. (STONITH is now always enabled in this charm.)
+        # Without MAAS, we keep entering here, which isn't really an issue,
+        # except that this fails in rare cases, thus failure_is_fatal=False.
+        disable_stonith(failure_is_fatal=False)
 
 
 def configure_monitor_host():
@@ -661,17 +686,33 @@ def configure_maas_stonith_resource(stonith_hostnames):
 
 
 def enable_stonith():
-    """Enable stonith via the global property stonith-enabled."""
-    pcmk.commit(
-        "crm configure property stonith-enabled=true",
-        failure_is_fatal=True)
+    """Enable stonith via the global property stonith-enabled.
+
+    :raises: EnableStonithFailed
+    """
+    log('Enabling STONITH', level=INFO)
+    try:
+        pcmk.commit(
+            "crm configure property stonith-enabled=true",
+            failure_is_fatal=True)
+    except subprocess.CalledProcessError as e:
+        raise EnableStonithFailed(e)
 
 
-def disable_stonith():
-    """Disable stonith via the global property stonith-enabled."""
-    pcmk.commit(
-        "crm configure property stonith-enabled=false",
-        failure_is_fatal=True)
+def disable_stonith(failure_is_fatal=True):
+    """Disable stonith via the global property stonith-enabled.
+
+    :param failure_is_fatal: Whether to raise exception if command fails.
+    :type failure_is_fatal: bool
+    :raises: DisableStonithFailed
+    """
+    log('Disabling STONITH', level=INFO)
+    try:
+        pcmk.commit(
+            "crm configure property stonith-enabled=false",
+            failure_is_fatal=failure_is_fatal)
+    except subprocess.CalledProcessError as e:
+        raise DisableStonithFailed(e)
 
 
 def get_ip_addr_from_resource_params(params):
@@ -950,13 +991,14 @@ def restart_corosync_on_change():
     def wrap(f):
         def wrapped_f(*args, **kwargs):
             checksums = {}
-            for path in COROSYNC_CONF_FILES:
-                checksums[path] = file_hash(path)
+            if not is_unit_paused_set():
+                for path in COROSYNC_CONF_FILES:
+                    checksums[path] = file_hash(path)
             return_data = f(*args, **kwargs)
             # NOTE: this assumes that this call is always done around
             # configure_corosync, which returns true if configuration
             # files where actually generated
-            if return_data:
+            if return_data and not is_unit_paused_set():
                 for path in COROSYNC_CONF_FILES:
                     if checksums[path] != file_hash(path):
                         validated_restart_corosync()
@@ -974,11 +1016,12 @@ def try_pcmk_wait():
     try:
         pcmk.wait_for_pcmk()
         log("Pacemaker is ready", DEBUG)
-    except pcmk.ServicesNotUp:
-        msg = ("Pacemaker is down. Please manually start it.")
-        log(msg, ERROR)
-        status_set('blocked', msg)
-        raise pcmk.ServicesNotUp(msg)
+    except pcmk.ServicesNotUp as e:
+        status_msg = "Pacemaker is down. Please manually start it."
+        status_set('blocked', status_msg)
+        full_msg = "{} {}".format(status_msg, e)
+        log(full_msg, ERROR)
+        raise pcmk.ServicesNotUp(full_msg)
 
 
 @restart_corosync_on_change()
@@ -1003,9 +1046,10 @@ def services_running():
     if not (pacemaker_status and corosync_status):
         # OS perspective
         return False
-    else:
-        # Functional test of pacemaker
-        return pcmk.wait_for_pcmk()
+    # Functional test of pacemaker. This will raise if pacemaker doesn't get
+    # fully ready in time:
+    pcmk.wait_for_pcmk()
+    return True
 
 
 def validated_restart_corosync(retries=10):
@@ -1182,6 +1226,20 @@ def node_has_resources(node_name):
             if child.tag == 'node' and child.attrib.get('name') == node_name:
                 has_resources = True
     return has_resources
+
+
+def node_is_dc(node_name):
+    """Check if this node is the designated controller.
+
+    @param node_name: The name of the node to check
+    @returns boolean - True if node_name is the DC
+    """
+    out = subprocess.check_output(['crm_mon', '-X']).decode('utf-8')
+    root = ET.fromstring(out)
+    for current_dc in root.iter("current_dc"):
+        if current_dc.attrib.get('name') == node_name:
+            return True
+    return False
 
 
 def set_unit_status():
@@ -1493,3 +1551,58 @@ def is_stonith_configured():
     """
     configured = leader_get(STONITH_CONFIGURED) or 'False'
     return bool_from_string(configured)
+
+
+def update_node_list():
+    """Delete a node from the corosync ring when a Juju unit is removed.
+
+    :returns: Set of pcmk nodes not part of Juju hanode relation
+    :rtype: Set[str]
+    :raises: RemoveCorosyncNodeFailed
+    """
+    pcmk_nodes = set(pcmk.list_nodes())
+    juju_nodes = {socket.gethostname()}
+    juju_hanode_rel = get_ha_nodes()
+    for corosync_id, addr in juju_hanode_rel.items():
+        peer_node_name = utils.get_hostname(addr, fqdn=False)
+        juju_nodes.add(peer_node_name)
+
+    diff_nodes = pcmk_nodes.difference(juju_nodes)
+    log("pcmk_nodes[{}], juju_nodes[{}], diff[{}]"
+        "".format(pcmk_nodes, juju_nodes, diff_nodes),
+        DEBUG)
+
+    for old_node in diff_nodes:
+        try:
+            pcmk.set_node_status_to_maintenance(old_node)
+            pcmk.delete_node(old_node)
+        except subprocess.CalledProcessError as e:
+            raise RemoveCorosyncNodeFailed(old_node, e)
+
+    return diff_nodes
+
+
+def is_update_ring_requested(corosync_update_uuid):
+    log("Setting corosync-update-uuid=<uuid> in local kv", DEBUG)
+    with unitdata.HookData()() as t:
+        kv = t[0]
+        stored_value = kv.get('corosync-update-uuid')
+        if not stored_value or stored_value != corosync_update_uuid:
+            kv.set('corosync-update-uuid', corosync_update_uuid)
+            return True
+    return False
+
+
+def trigger_corosync_update_from_leader(unit, rid):
+    corosync_update_uuid = relation_get(
+        attribute='trigger-corosync-update',
+        unit=unit, rid=rid,
+    )
+    if (corosync_update_uuid and
+        is_update_ring_requested(corosync_update_uuid) and
+            emit_corosync_conf()):
+        cmd = 'corosync-cfgtool -R'
+        pcmk.commit(cmd)
+        return True
+
+    return False

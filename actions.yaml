@@ -12,3 +12,12 @@ cleanup:
       default: "all"
       type: string
       description: Resource name to cleanup
+update-ring:
+  description: Trigger corosync node members cleanup
+  params:
+    i-really-mean-it:
+      type: boolean
+      description: |
+        This must be toggled to enable actually performing this action
+  required:
+    - i-really-mean-it
