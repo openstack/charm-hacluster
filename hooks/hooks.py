@@ -588,29 +588,30 @@ def update_nrpe_config():
                          config('failed_actions_threshold'),
                          config('failed_actions_alert_type').lower()))
 
-    # corosync/crm checks
-    nrpe_setup.add_check(
-        shortname='corosync_rings',
-        description='Check Corosync rings {}'.format(current_unit),
-        check_cmd='check_corosync_rings')
-    nrpe_setup.add_check(
-        shortname='crm_status',
-        description='Check crm status {}'.format(current_unit),
-        check_cmd=check_crm_cmd)
+    if nrpe.NRPE.does_nrpe_conf_dir_exist():
+        # corosync/crm checks
+        nrpe_setup.add_check(
+            shortname='corosync_rings',
+            description='Check Corosync rings {}'.format(current_unit),
+            check_cmd='check_corosync_rings')
+        nrpe_setup.add_check(
+            shortname='crm_status',
+            description='Check crm status {}'.format(current_unit),
+            check_cmd=check_crm_cmd)
 
-    # process checks
-    nrpe_setup.add_check(
-        shortname='corosync_proc',
-        description='Check Corosync process {}'.format(current_unit),
-        check_cmd='check_procs -c 1:1 -C corosync'
-    )
-    nrpe_setup.add_check(
-        shortname='pacemakerd_proc',
-        description='Check Pacemakerd process {}'.format(current_unit),
-        check_cmd='check_procs -c 1:1 -C pacemakerd'
-    )
+        # process checks
+        nrpe_setup.add_check(
+            shortname='corosync_proc',
+            description='Check Corosync process {}'.format(current_unit),
+            check_cmd='check_procs -c 1:1 -C corosync'
+        )
+        nrpe_setup.add_check(
+            shortname='pacemakerd_proc',
+            description='Check Pacemakerd process {}'.format(current_unit),
+            check_cmd='check_procs -c 1:1 -C pacemakerd'
+        )
 
-    nrpe_setup.write()
+        nrpe_setup.write()
 
 
 @hooks.hook('pre-series-upgrade')
