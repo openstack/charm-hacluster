@@ -167,6 +167,14 @@ def get_transport():
     return val
 
 
+def run_initial_steup():
+    """Run global setup."""
+    failure_timeout = config('failure_timeout')
+    configure_cluster_global(failure_timeout)
+    configure_monitor_host()
+    configure_stonith()
+
+
 @hooks.hook('config-changed')
 def config_changed():
 
@@ -195,10 +203,8 @@ def config_changed():
     status_set('maintenance', "Setting up corosync")
     if configure_corosync():
         try_pcmk_wait()
-        failure_timeout = config('failure_timeout')
-        configure_cluster_global(failure_timeout)
-        configure_monitor_host()
-        configure_stonith()
+        if is_leader():
+            run_initial_steup()
 
     update_nrpe_config()
 
@@ -362,14 +368,11 @@ def ha_relation_changed():
     # configuration should be set directly on subordinate
     configure_corosync()
     try_pcmk_wait()
-    failure_timeout = config('failure_timeout')
-    configure_cluster_global(failure_timeout)
-    configure_monitor_host()
-    configure_stonith()
 
     # Only configure the cluster resources
     # from the oldest peer unit.
     if is_leader():
+        run_initial_steup()
         log('Setting cluster symmetry', level=INFO)
         set_cluster_symmetry()
         log('Deleting Resources' % (delete_resources), level=DEBUG)
