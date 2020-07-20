@@ -505,6 +505,16 @@ def parse_data(relid, unit, key):
 
 
 def configure_stonith():
+    if configure_pacemaker_remote_stonith_resource():
+        log('Not disabling STONITH as pacemaker remotes are present',
+            level=INFO)
+    else:
+        log('Disabling STONITH', level=INFO)
+        cmd = "crm configure property stonith-enabled=false"
+        pcmk.commit(cmd)
+
+
+def configure_legacy_stonith():
     if config('stonith_enabled') not in ['true', 'True', True]:
         if configure_pacemaker_remote_stonith_resource():
             log('Not disabling STONITH as pacemaker remotes are present',
@@ -1182,6 +1192,10 @@ def assess_status_helper():
     @returns status, message - status is workload status and message is any
                                corresponding messages
     """
+    if config('stonith_enabled') in ['true', 'True', True]:
+        return(
+            'blocked',
+            'stonith_enabled config option is no longer supported')
 
     if is_unit_upgrading_set():
         return ("blocked",
