@@ -844,6 +844,24 @@ class UtilsTestCase(unittest.TestCase):
         ]
         commit.assert_has_calls(commit_calls)
 
+    @mock.patch.object(utils, 'remove_legacy_maas_stonith_resources')
+    @mock.patch('pcmk.commit')
+    @mock.patch('pcmk.is_resource_present')
+    def test_configure_null_stonith_resource(self, is_resource_present,
+                                             commit, remove_legacy):
+        is_resource_present.return_value = False
+        utils.configure_null_stonith_resource(['node1'])
+        cmd = (
+            "crm configure primitive st-null "
+            "stonith:null "
+            "params hostlist='node1' "
+            "op monitor interval=25 start-delay=25 "
+            "timeout=25")
+        commit_calls = [
+            mock.call(cmd, failure_is_fatal=True),
+        ]
+        commit.assert_has_calls(commit_calls)
+
     @mock.patch.object(utils, 'config')
     @mock.patch.object(utils, 'remove_legacy_maas_stonith_resources')
     @mock.patch('pcmk.commit')

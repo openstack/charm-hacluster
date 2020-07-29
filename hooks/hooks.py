@@ -88,6 +88,7 @@ from utils import (
     configure_cluster_global,
     configure_pacemaker_remote_resources,
     configure_pacemaker_remote_stonith_resource,
+    configure_peer_stonith_resource,
     configure_resources_on_remotes,
     enable_lsb_services,
     disable_lsb_services,
@@ -115,6 +116,7 @@ from utils import (
     enable_ha_services,
     notify_peers_of_series_upgrade,
     clear_series_upgrade_notification,
+    get_hostname,
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
@@ -249,7 +251,9 @@ def upgrade_charm():
 def hanode_relation_joined(relid=None):
     relation_set(
         relation_id=relid,
-        relation_settings={'private-address': get_relation_ip('hanode')}
+        relation_settings={
+            'private-address': get_relation_ip('hanode'),
+            'hostname': get_hostname()}
     )
 
 
@@ -516,9 +520,12 @@ def ha_relation_changed():
         if len(get_member_ready_nodes()) >= int(config('cluster_count')):
             log('Configuring any remote nodes', level=INFO)
             remote_resources = configure_pacemaker_remote_resources()
-            stonith_resource = configure_pacemaker_remote_stonith_resource()
             resources.update(remote_resources)
-            resources.update(stonith_resource)
+            stonith_remote_res = configure_pacemaker_remote_stonith_resource()
+            resources.update(stonith_remote_res)
+            if stonith_remote_res:
+                stonith_peer_res = configure_peer_stonith_resource()
+                resources.update(stonith_peer_res)
             configure_resources_on_remotes(
                 resources=resources,
                 clones=clones,

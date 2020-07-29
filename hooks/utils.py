@@ -506,6 +506,7 @@ def parse_data(relid, unit, key):
 
 def configure_stonith():
     if configure_pacemaker_remote_stonith_resource():
+        configure_peer_stonith_resource()
         log('Not disabling STONITH as pacemaker remotes are present',
             level=INFO)
     else:
@@ -633,46 +634,74 @@ def remove_legacy_maas_stonith_resources():
             'crm -w -F configure delete {}'.format(resource_name))
 
 
-def configure_maas_stonith_resource(stonith_hostnames):
-    """Create stonith resource for the given hostname.
+def _configure_stonith_resource(ctxt):
+    hostnames = []
+    for host in ctxt['stonith_hostnames']:
+        hostnames.append(host)
+        if '.' in host:
+            hostnames.append(host.split('.')[0])
+    ctxt['hostnames'] = ' '.join(sorted(list(set(hostnames))))
+    if all(ctxt.values()):
+        ctxt['resource_params'] = ctxt['resource_params'].format(**ctxt)
+        if pcmk.is_resource_present(ctxt['stonith_resource_name']):
+            pcmk.crm_update_resource(
+                ctxt['stonith_resource_name'],
+                ctxt['stonith_plugin'],
+                ctxt['resource_params'])
+        else:
+            cmd = (
+                "crm configure primitive {stonith_resource_name} "
+                "{stonith_plugin} {resource_params}").format(**ctxt)
+            pcmk.commit(cmd, failure_is_fatal=True)
+    else:
+        raise ValueError("Missing configuration: {}".format(ctxt))
+
+
+def configure_null_stonith_resource(stonith_hostnames):
+    """Create null stonith resource for the given hostname.
 
     :param stonith_hostnames: The hostnames that the stonith management system
                              refers to the remote node as.
     :type stonith_hostname: List
     """
-    hostnames = []
-    for host in stonith_hostnames:
-        hostnames.append(host)
-        if '.' in host:
-            hostnames.append(host.split('.')[0])
-    hostnames = list(set(hostnames))
     ctxt = {
+        'stonith_plugin': 'stonith:null',
+        'stonith_hostnames': stonith_hostnames,
+        'stonith_resource_name': 'st-null',
+        'resource_params': (
+            "params hostlist='{hostnames}' "
+            "op monitor interval=25 start-delay=25 "
+            "timeout=25")}
+    _configure_stonith_resource(ctxt)
+    # NOTE (gnuoy): Not enabling the global stonith-enabled setting as it
+    # does not make sense to have stonith-enabled when the only resources
+    # are null resources, so defer enabling stonith-enabled to the 'real'
+    # stonith resources.
+    return {ctxt['stonith_resource_name']: ctxt['stonith_plugin']}
+
+
+def configure_maas_stonith_resource(stonith_hostnames):
+    """Create maas stonith resource for the given hostname.
+
+    :param stonith_hostnames: The hostnames that the stonith management system
+                             refers to the remote node as.
+    :type stonith_hostname: List
+    """
+    ctxt = {
+        'stonith_plugin': 'stonith:external/maas',
+        'stonith_hostnames': stonith_hostnames,
+        'stonith_resource_name': 'st-maas',
         'url': config('maas_url'),
         'apikey': config('maas_credentials'),
-        'hostnames': ' '.join(sorted(hostnames))}
-    if all(ctxt.values()):
-        ctxt['stonith_resource_name'] = 'st-maas'
-        remove_legacy_maas_stonith_resources()
-        ctxt['resource_params'] = (
+        'resource_params': (
             "params url='{url}' apikey='{apikey}' hostnames='{hostnames}' "
             "op monitor interval=25 start-delay=25 "
-            "timeout=25").format(**ctxt)
-        if pcmk.is_resource_present(ctxt['stonith_resource_name']):
-            pcmk.crm_update_resource(
-                ctxt['stonith_resource_name'],
-                'stonith:external/maas',
-                ctxt['resource_params'])
-        else:
-            cmd = (
-                "crm configure primitive {stonith_resource_name} "
-                "stonith:external/maas {resource_params}").format(**ctxt)
-            pcmk.commit(cmd, failure_is_fatal=True)
-        pcmk.commit(
-            "crm configure property stonith-enabled=true",
-            failure_is_fatal=True)
-    else:
-        raise ValueError("Missing configuration: {}".format(ctxt))
-    return {ctxt['stonith_resource_name']: 'stonith:external/maas'}
+            "timeout=25")}
+    _configure_stonith_resource(ctxt)
+    pcmk.commit(
+        "crm configure property stonith-enabled=true",
+        failure_is_fatal=True)
+    return {ctxt['stonith_resource_name']: ctxt['stonith_plugin']}
 
 
 def get_ip_addr_from_resource_params(params):
@@ -813,6 +842,23 @@ def configure_pacemaker_remote_stonith_resource():
                 hostnames.append(stonith_hostname)
     if hostnames:
         stonith_resource = configure_maas_stonith_resource(hostnames)
+    return stonith_resource
+
+
+def configure_peer_stonith_resource():
+    """Create a null stonith resource for lxd containers.
+
+    :returns: Stonith resource dict {res_name: res_type}
+    :rtype: dict
+    """
+    hostnames = [get_hostname()]
+    stonith_resource = {}
+    for relid in relation_ids('hanode'):
+        for unit in related_units(relid):
+            stonith_hostname = relation_get('hostname', unit, relid)
+            if stonith_hostname:
+                hostnames.append(stonith_hostname)
+    stonith_resource = configure_null_stonith_resource(hostnames)
     return stonith_resource
 
 
