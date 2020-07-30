@@ -704,6 +704,16 @@ class UtilsTestCase(unittest.TestCase):
         utils.set_cluster_symmetry()
         self.assertFalse(commit.called)
 
+    @mock.patch('pcmk.crm_update_location')
+    def test_add_score_location_rule(self, crm_update_location):
+        # Check no update required
+        utils.add_score_location_rule('res1', 'juju-lxd-0', 0)
+        crm_update_location.assert_called_once_with(
+            'loc-res1-juju-lxd-0',
+            'res1',
+            0,
+            'juju-lxd-0')
+
     @mock.patch('pcmk.commit')
     @mock.patch('pcmk.crm_opt_exists')
     @mock.patch('pcmk.list_nodes')
@@ -716,6 +726,35 @@ class UtilsTestCase(unittest.TestCase):
         commit.assert_called_once_with(
             'crm -w -F configure location loc-res1-node2 res1 0: node2',
             failure_is_fatal=True)
+
+    @mock.patch.object(utils, 'add_score_location_rule')
+    @mock.patch('pcmk.list_nodes')
+    def test_add_location_rules_for_pacemaker_remotes(self, list_nodes,
+                                                      add_score_location_rule):
+        list_nodes.return_value = ['node1', 'node2', 'node3']
+        utils.add_location_rules_for_pacemaker_remotes([
+            'res1',
+            'res2',
+            'res3',
+            'res4',
+            'res5'])
+        expect = [
+            mock.call('res1', 'node1', 200),
+            mock.call('res1', 'node2', 0),
+            mock.call('res1', 'node3', 0),
+            mock.call('res2', 'node1', 0),
+            mock.call('res2', 'node2', 200),
+            mock.call('res2', 'node3', 0),
+            mock.call('res3', 'node1', 0),
+            mock.call('res3', 'node2', 0),
+            mock.call('res3', 'node3', 200),
+            mock.call('res4', 'node1', 200),
+            mock.call('res4', 'node2', 0),
+            mock.call('res4', 'node3', 0),
+            mock.call('res5', 'node1', 0),
+            mock.call('res5', 'node2', 200),
+            mock.call('res5', 'node3', 0)]
+        add_score_location_rule.assert_has_calls(expect)
 
     @mock.patch('pcmk.is_resource_present')
     @mock.patch('pcmk.commit')

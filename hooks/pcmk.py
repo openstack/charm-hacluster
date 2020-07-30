@@ -283,23 +283,40 @@ def crm_version():
         return StrictVersion(matched.group(1))
 
 
-def crm_update_resource(res_name, res_type, res_params=None, force=False):
-    """Update a resource using `crm configure load update`
+def _crm_update_object(update_template, update_ctxt, hash_keys, unitdata_key,
+                       res_params=None, force=False):
+    """Update a object using `crm configure load update`
 
-    :param res_name: resource name
-    :param res_type: resource type (e.g. IPaddr2)
-    :param res_params: resource's parameters (e.g. "params ip=10.5.250.250")
+    :param update_template: Format string to create object when update_ctxt is
+                            applied.
+    :type update_template: str
+    :param update_ctxt: Context to apply to update_template to generate object
+                        creation directive.
+    :type update_ctxt: dict
+    :param hash_keys: List of keys to use from update_ctxt when generating
+                      objects hash.
+    :type hash_keys: List[str]
+    :param unitdata_key: Key to use when storing objects hash in in unitdata
+                         kv.
+    :type unitdata_key: str
+    :param res_params: Resource's additional parameters
+                       (e.g. "params ip=10.5.250.250")
+    :type res_params: str or None
+    :param force: Whether to force the update irrespective of whats currently
+                  configured.
+    :type force: bool
+    :returns: Return code (0 => success)
+    :rtype: int
     """
     db = unitdata.kv()
-    res_hash = resource_checksum(res_name, res_type, res_params)
-
-    if not force and db.get('{}-{}'.format(res_name, res_type)) == res_hash:
+    res_hash = generate_checksum(update_ctxt[k] for k in hash_keys)
+    if not force and db.get(unitdata_key) == res_hash:
         log("Resource {} already defined and parameters haven't changed"
-            .format(res_name))
+            .format(update_ctxt['object_name']))
         return 0
 
     with tempfile.NamedTemporaryFile() as f:
-        f.write('primitive {} {}'.format(res_name, res_type).encode('ascii'))
+        f.write(update_template.format(**update_ctxt).encode('ascii'))
 
         if res_params:
             f.write(' \\\n\t{}'.format(res_params).encode('ascii'))
@@ -308,7 +325,9 @@ def crm_update_resource(res_name, res_type, res_params=None, force=False):
 
         f.flush()
         f.seek(0)
-        log('Updating resource {}'.format(res_name), level=INFO)
+        log(
+            'Updating resource {}'.format(update_ctxt['object_name']),
+            level=INFO)
         log('File content:\n{}'.format(f.read()), level=DEBUG)
         cmd = "crm configure load update {}".format(f.name)
         log('Update command: {}'.format(cmd))
@@ -321,9 +340,84 @@ def crm_update_resource(res_name, res_type, res_params=None, force=False):
         log('crm command exit code: {}'.format(retcode), level=level)
 
         if retcode == 0:
-            db.set('{}-{}'.format(res_name, res_type), res_hash)
+            db.set(unitdata_key, res_hash)
+            db.flush()
 
         return retcode
+
+
+def crm_update_resource(res_name, res_type, res_params=None, force=False):
+    """Update a resource using `crm configure load update`
+
+    :param res_name: resource name
+    :type res_name: str
+    :param res_type: resource type (e.g. IPaddr2)
+    :type res_type: str
+    :param res_params: resource's parameters (e.g. "params ip=10.5.250.250")
+    :type res_params: str or None
+    :param force: Whether to force the update irrespective of whats currently
+                  configured.
+    :type force: bool
+    :returns: Return code (0 => success)
+    :rtype: int
+    """
+    hash_keys = ['resource_type']
+    if res_params:
+        hash_keys.append('resource_params')
+    return _crm_update_object(
+        'primitive {object_name} {resource_type}',
+        {
+            'object_name': res_name,
+            'resource_params': res_params,
+            'resource_type': res_type},
+        hash_keys,
+        '{}-{}'.format(res_name, res_type),
+        res_params=res_params,
+        force=force)
+
+
+def crm_update_location(location_name, resource_name, score, node,
+                        force=False):
+    """Update a location rule.
+
+    :param location_name: Name of location rule.
+    :type location_name: str
+    :param resource_name: Resource name location rule governs.
+    :type resource_name: str
+    :param score: The score for the resource running on node.
+    :type score: int
+    :param node: Name of the node this rule applies to.
+    :type node: str
+    :param force: Whether to force the update irrespective of whats currently
+                  configured.
+    :type force: bool
+    :returns: Return code (0 => success)
+    :rtype: int
+    """
+    return _crm_update_object(
+        'location {object_name} {resource_name} {score}: {node}',
+        {
+            'object_name': location_name,
+            'resource_name': resource_name,
+            'score': str(score),
+            'node': node},
+        ['resource_name', 'score', 'node'],
+        '{}-{}'.format(location_name, resource_name),
+        force=force)
+
+
+def generate_checksum(check_strings):
+    """Create a md5 checksum using each string in the list.
+
+    :param check_strings: resource name
+    :type check_strings: List[str]
+    :returns: Hash generated from strings.
+    :rtype: str
+    """
+    m = hashlib.md5()
+    for entry in check_strings:
+        m.update(entry.encode('utf-8'))
+    return m.hexdigest()
 
 
 def resource_checksum(res_name, res_type, res_params=None):
@@ -333,9 +427,7 @@ def resource_checksum(res_name, res_type, res_params=None):
     :param res_type: resource type (e.g. IPaddr2)
     :param res_params: resource's parameters (e.g. "params ip=10.5.250.250")
     """
-
-    m = hashlib.md5()
-    m.update(res_type.encode('utf-8'))
+    data = [res_type]
     if res_params is not None:
-        m.update(res_params.encode('utf-8'))
-    return m.hexdigest()
+        data.append(res_params)
+    return generate_checksum(data)

@@ -26,6 +26,7 @@ import fcntl
 import struct
 import time
 import xml.etree.ElementTree as ET
+import itertools
 
 from base64 import b64decode
 
@@ -763,6 +764,24 @@ def set_cluster_symmetry():
     pcmk.commit(cmd, failure_is_fatal=True)
 
 
+def add_score_location_rule(res_name, node, location_score):
+    """Add or update a location rule that uses a score.
+
+    :param res_name: Resource that this location rule controls.
+    :type res_name: str
+    :param node: Node that this location rule relates to.
+    :type node: str
+    :param location_score: The score to give this location.
+    :type location_score: int
+    """
+    loc_constraint_name = 'loc-{}-{}'.format(res_name, node)
+    pcmk.crm_update_location(
+        loc_constraint_name,
+        res_name,
+        location_score,
+        node)
+
+
 def add_location_rules_for_local_nodes(res_name):
     """Add location rules for running resource on local nodes.
 
@@ -781,6 +800,29 @@ def add_location_rules_for_local_nodes(res_name):
                 node)
             pcmk.commit(cmd, failure_is_fatal=True)
             log('%s' % cmd, level=DEBUG)
+
+
+def add_location_rules_for_pacemaker_remotes(res_names):
+    """Add location rules for pacemaker remote resources on local nodes.
+
+    Add location rules allowing the pacemaker remote resource to run on a local
+    node. Use location score rules to spread resources out.
+
+    :param res_names: Pacemaker remote resource names.
+    :type res_names: List[str]
+    """
+    res_names = sorted(res_names)
+    nodes = sorted(pcmk.list_nodes())
+    prefered_nodes = list(zip(res_names, itertools.cycle(nodes)))
+    for res_name in res_names:
+        for node in nodes:
+            location_score = 0
+            if (res_name, node) in prefered_nodes:
+                location_score = 200
+            add_score_location_rule(
+                res_name,
+                node,
+                location_score)
 
 
 def configure_pacemaker_remote(remote_hostname, remote_ip):
@@ -912,9 +954,14 @@ def configure_resources_on_remotes(resources=None, clones=None, groups=None):
                'location constraints')
         log(msg, level=WARNING)
         return
+    pacemaker_remotes = []
     for res_name, res_type in resources.items():
         if res_name not in list(clones.values()) + list(groups.values()):
-            add_location_rules_for_local_nodes(res_name)
+            if res_type == 'ocf:pacemaker:remote':
+                pacemaker_remotes.append(res_name)
+            else:
+                add_location_rules_for_local_nodes(res_name)
+    add_location_rules_for_pacemaker_remotes(pacemaker_remotes)
     for cl_name in clones:
         add_location_rules_for_local_nodes(cl_name)
         # Limit clone resources to only running on X number of nodes where X

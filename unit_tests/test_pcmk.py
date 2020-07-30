@@ -231,6 +231,8 @@ class TestPcmk(unittest.TestCase):
 
     @mock.patch('subprocess.call')
     def test_crm_update_resource(self, mock_call):
+        db = unitdata.kv()
+        db.set('res_test-IPaddr2', '')
         mock_call.return_value = 0
 
         with mock.patch.object(tempfile, "NamedTemporaryFile",

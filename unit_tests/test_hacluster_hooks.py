@@ -34,6 +34,7 @@ class TestCorosyncConf(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
         self.tmpfile = tempfile.NamedTemporaryFile(delete=False)
+        os.environ['UNIT_STATE_DB'] = ':memory:'
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir)
