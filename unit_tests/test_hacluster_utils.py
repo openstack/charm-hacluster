@@ -877,9 +877,6 @@ class UtilsTestCase(unittest.TestCase):
             "timeout=25")
         commit_calls = [
             mock.call(cmd, failure_is_fatal=True),
-            mock.call(
-                'crm configure property stonith-enabled=true',
-                failure_is_fatal=True),
         ]
         commit.assert_has_calls(commit_calls)
 
@@ -922,9 +919,6 @@ class UtilsTestCase(unittest.TestCase):
             'stonith:external/maas',
             ("params url='http://maas/2.0' apikey='apikey' hostnames='node1' "
              "op monitor interval=25 start-delay=25 timeout=25"))
-        commit.assert_called_once_with(
-            'crm configure property stonith-enabled=true',
-            failure_is_fatal=True)
 
     @mock.patch.object(utils, 'config')
     @mock.patch('pcmk.commit')
@@ -1232,3 +1226,35 @@ class UtilsTestCase(unittest.TestCase):
             mock.call('crm -w -F resource stop st-maas-1234'),
             mock.call('crm -w -F configure delete st-maas-1234')]
         mock_commit.assert_has_calls(commit_calls)
+
+    @mock.patch.object(utils, 'leader_set')
+    def test_set_stonith_configured(self, leader_set):
+        utils.set_stonith_configured(True)
+        leader_set.assert_called_once_with(
+            {'stonith-configured': True})
+
+    @mock.patch.object(utils, 'leader_get')
+    def test_is_stonith_configured(self, leader_get):
+        leader_get.return_value = 'True'
+        self.assertTrue(
+            utils.is_stonith_configured())
+        leader_get.return_value = 'False'
+        self.assertFalse(
+            utils.is_stonith_configured())
+        leader_get.return_value = ''
+        self.assertFalse(
+            utils.is_stonith_configured())
+
+    @mock.patch('pcmk.commit')
+    def test_enable_stonith(self, commit):
+        utils.enable_stonith()
+        commit.assert_called_once_with(
+            'crm configure property stonith-enabled=true',
+            failure_is_fatal=True)
+
+    @mock.patch('pcmk.commit')
+    def test_disable_stonith(self, commit):
+        utils.disable_stonith()
+        commit.assert_called_once_with(
+            'crm configure property stonith-enabled=false',
+            failure_is_fatal=True)

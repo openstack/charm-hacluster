@@ -40,6 +40,7 @@ class TestCorosyncConf(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
         os.remove(self.tmpfile.name)
 
+    @mock.patch.object(hooks, 'is_stonith_configured')
     @mock.patch.object(hooks, 'configure_peer_stonith_resource')
     @mock.patch.object(hooks, 'get_member_ready_nodes')
     @mock.patch.object(hooks, 'configure_resources_on_remotes')
@@ -74,7 +75,8 @@ class TestCorosyncConf(unittest.TestCase):
                                  configure_pacemaker_remote_stonith_resource,
                                  configure_resources_on_remotes,
                                  get_member_ready_nodes,
-                                 configure_peer_stonith_resource):
+                                 configure_peer_stonith_resource,
+                                 is_stonith_configured):
 
         def fake_crm_opt_exists(res_name):
             # res_ubuntu will take the "update resource" route
@@ -83,6 +85,7 @@ class TestCorosyncConf(unittest.TestCase):
 
         crm_opt_exists.side_effect = fake_crm_opt_exists
         commit.return_value = 0
+        is_stonith_configured.return_value = False
         is_leader.return_value = True
         related_units.return_value = ['ha/0', 'ha/1', 'ha/2']
         get_cluster_nodes.return_value = ['10.0.3.2', '10.0.3.3', '10.0.3.4']
@@ -157,6 +160,7 @@ class TestCorosyncConf(unittest.TestCase):
                     commit.assert_any_call(
                         'crm -w -F configure %s %s %s' % (kw, name, params))
 
+    @mock.patch.object(hooks, 'is_stonith_configured')
     @mock.patch.object(hooks, 'configure_peer_stonith_resource')
     @mock.patch.object(hooks, 'get_member_ready_nodes')
     @mock.patch.object(hooks, 'configure_resources_on_remotes')
@@ -190,7 +194,9 @@ class TestCorosyncConf(unittest.TestCase):
             set_cluster_symmetry, configure_pacemaker_remote_resources,
             configure_pacemaker_remote_stonith_resource,
             configure_resources_on_remotes, get_member_ready_nodes,
-            configure_peer_stonith_resource):
+            configure_peer_stonith_resource,
+            is_stonith_configured):
+        is_stonith_configured.return_value = False
         validate_dns_ha.return_value = True
         crm_opt_exists.return_value = False
         is_leader.return_value = True
@@ -353,6 +359,7 @@ class TestHooks(test_utils.CharmTestCase):
         apt_install.assert_called_once_with(expected_pkgs, fatal=True)
         setup_ocf_files.assert_called_once_with()
 
+    @mock.patch.object(hooks, 'is_stonith_configured')
     @mock.patch.object(hooks, 'configure_stonith')
     @mock.patch.object(hooks, 'relation_ids')
     @mock.patch.object(hooks, 'hanode_relation_joined')
@@ -373,8 +380,10 @@ class TestHooks(test_utils.CharmTestCase):
                             mock_maintenance_mode,
                             mock_hanode_relation_joined,
                             mock_relation_ids,
-                            mock_configure_stonith):
+                            mock_configure_stonith,
+                            mock_is_stonith_configured):
 
+        mock_is_stonith_configured.return_value = False
         mock_config.side_effect = self.test_config.get
         mock_relation_ids.return_value = ['hanode:1']
         mock_wait_for_pcmk.return_value = True
@@ -395,7 +404,6 @@ class TestHooks(test_utils.CharmTestCase):
         self.test_config.set('maintenance-mode', False)
         hooks.config_changed()
         mock_maintenance_mode.assert_called_with(False)
-        mock_configure_stonith.assert_called_with()
 
     @mock.patch.object(hooks, 'needs_maas_dns_migration')
     @mock.patch.object(hooks, 'relation_ids')

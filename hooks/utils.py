@@ -30,6 +30,9 @@ import itertools
 
 from base64 import b64decode
 
+from charmhelpers.core.strutils import (
+    bool_from_string,
+)
 from charmhelpers.core.hookenv import (
     local_unit,
     log,
@@ -37,6 +40,8 @@ from charmhelpers.core.hookenv import (
     ERROR,
     INFO,
     WARNING,
+    leader_get,
+    leader_set,
     relation_get,
     relation_set,
     related_units,
@@ -107,6 +112,7 @@ SYSTEMD_OVERRIDES_FILE = '{}/overrides.conf'
 
 
 MAAS_DNS_CONF_DIR = '/etc/maas_dns'
+STONITH_CONFIGURED = 'stonith-configured'
 
 
 class MAASConfigIncomplete(Exception):
@@ -508,8 +514,8 @@ def parse_data(relid, unit, key):
 def configure_stonith():
     if configure_pacemaker_remote_stonith_resource():
         configure_peer_stonith_resource()
-        log('Not disabling STONITH as pacemaker remotes are present',
-            level=INFO)
+        enable_stonith()
+        set_stonith_configured(True)
     else:
         log('Disabling STONITH', level=INFO)
         cmd = "crm configure property stonith-enabled=false"
@@ -699,10 +705,21 @@ def configure_maas_stonith_resource(stonith_hostnames):
             "op monitor interval=25 start-delay=25 "
             "timeout=25")}
     _configure_stonith_resource(ctxt)
+    return {ctxt['stonith_resource_name']: ctxt['stonith_plugin']}
+
+
+def enable_stonith():
+    """Enable stonith via the global property stonith-enabled."""
     pcmk.commit(
         "crm configure property stonith-enabled=true",
         failure_is_fatal=True)
-    return {ctxt['stonith_resource_name']: ctxt['stonith_plugin']}
+
+
+def disable_stonith():
+    """Disable stonith via the global property stonith-enabled."""
+    pcmk.commit(
+        "crm configure property stonith-enabled=false",
+        failure_is_fatal=True)
 
 
 def get_ip_addr_from_resource_params(params):
@@ -1503,3 +1520,24 @@ def clear_series_upgrade_notification():
         relation_set(
             relation_id=rel_id,
             relation_settings=relation_data)
+
+
+def set_stonith_configured(is_configured):
+    """Set the STONITH_CONFIGURED state.
+
+    :param is_configured: Flag to check peers relation data for.
+    :type is_configured: bool
+    :returns: List of IPs of nodes that are ready to join the cluster
+    :rtype: List
+    """
+    leader_set({STONITH_CONFIGURED: is_configured})
+
+
+def is_stonith_configured():
+    """Get the STONITH_CONFIGURED state.
+
+    :returns: State of STONITH_CONFIGURED state.
+    :rtype: bool
+    """
+    configured = leader_get(STONITH_CONFIGURED) or 'False'
+    return bool_from_string(configured)

@@ -117,6 +117,8 @@ from utils import (
     notify_peers_of_series_upgrade,
     clear_series_upgrade_notification,
     get_hostname,
+    disable_stonith,
+    is_stonith_configured,
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
@@ -169,12 +171,13 @@ def get_transport():
     return val
 
 
-def run_initial_steup():
+def run_initial_setup():
     """Run global setup."""
     failure_timeout = config('failure_timeout')
     configure_cluster_global(failure_timeout)
     configure_monitor_host()
-    configure_stonith()
+    if not is_stonith_configured():
+        disable_stonith()
 
 
 @hooks.hook('config-changed')
@@ -206,7 +209,7 @@ def config_changed():
     if configure_corosync():
         try_pcmk_wait()
         if is_leader():
-            run_initial_steup()
+            run_initial_setup()
 
     update_nrpe_config()
 
@@ -376,7 +379,7 @@ def ha_relation_changed():
     # Only configure the cluster resources
     # from the oldest peer unit.
     if is_leader():
-        run_initial_steup()
+        run_initial_setup()
         log('Setting cluster symmetry', level=INFO)
         set_cluster_symmetry()
         log('Deleting Resources' % (delete_resources), level=DEBUG)
@@ -521,15 +524,22 @@ def ha_relation_changed():
             log('Configuring any remote nodes', level=INFO)
             remote_resources = configure_pacemaker_remote_resources()
             resources.update(remote_resources)
-            stonith_remote_res = configure_pacemaker_remote_stonith_resource()
-            resources.update(stonith_remote_res)
-            if stonith_remote_res:
-                stonith_peer_res = configure_peer_stonith_resource()
-                resources.update(stonith_peer_res)
             configure_resources_on_remotes(
                 resources=resources,
                 clones=clones,
                 groups=groups)
+
+            stonith_resources = {}
+            stonith_remote_res = configure_pacemaker_remote_stonith_resource()
+            stonith_resources.update(stonith_remote_res)
+            if stonith_remote_res:
+                stonith_peer_res = configure_peer_stonith_resource()
+                stonith_resources.update(stonith_peer_res)
+            configure_resources_on_remotes(
+                resources=stonith_resources,
+                clones=clones,
+                groups=groups)
+            configure_stonith()
         else:
             log('Deferring configuration of any remote nodes', level=INFO)
 
