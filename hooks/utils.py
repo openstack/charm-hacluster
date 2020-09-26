@@ -1384,7 +1384,7 @@ def kill_legacy_ocf_daemon_process(res_name):
     @param res_name: The name of the ocf process to kill
     """
     ocf_name = res_name.replace('res_', '').replace('_', '-')
-    reg_expr = '([0-9]+)\s+[^0-9]+{}'.format(ocf_name)
+    reg_expr = r'([0-9]+)\s+[^0-9]+{}'.format(ocf_name)
     cmd = ['ps', '-eo', 'pid,cmd']
     ps = subprocess.check_output(cmd).decode('utf-8')
     res = re.search(reg_expr, ps, re.MULTILINE)
