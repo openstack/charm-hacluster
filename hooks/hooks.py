@@ -684,6 +684,6 @@ if __name__ == '__main__':
         log('Unknown hook {} - skipping.'.format(e), level=DEBUG)
     try:
         set_unit_status()
-    except:
+    except Exception:
         log(traceback.format_exc(), level=ERROR)
         raise
