@@ -152,7 +152,7 @@ options:
       detailed information on this config option.
   failure_timeout:
     type: int
-    default: 0
+    default: 180
     description: |
       Sets the pacemaker default resource meta-attribute value for
       failure_timeout. This value represents the duration in seconds to wait
