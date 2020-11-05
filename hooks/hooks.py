@@ -126,7 +126,6 @@ from charmhelpers.contrib.charmsupport import nrpe
 
 hooks = Hooks()
 
-PACKAGES = ['corosync', 'pacemaker', 'python-netaddr', 'ipmitool']
 COROSYNC_CONF = '/etc/corosync/corosync.conf'
 COROSYNC_DEFAULT = '/etc/default/corosync'
 COROSYNC_AUTHKEY = '/etc/corosync/authkey'
@@ -137,7 +136,7 @@ COROSYNC_CONF_FILES = [
     COROSYNC_CONF
 ]
 
-PACKAGES = ['crmsh', 'corosync', 'pacemaker', 'python-netaddr', 'ipmitool',
+PACKAGES = ['crmsh', 'corosync', 'pacemaker', 'python3-netaddr', 'ipmitool',
             'libmonitoring-plugin-perl', 'python3-requests-oauthlib']
 
 SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
@@ -148,12 +147,17 @@ DEPRECATED_TRANSPORT_VALUES = {"multicast": "udp", "unicast": "udpu"}
 def install():
     pkgs = copy.deepcopy(PACKAGES)
     ubuntu_release = lsb_release()['DISTRIB_CODENAME'].lower()
-    # use libnagios on anything older than Xenial
     if CompareHostReleases(ubuntu_release) < 'xenial':
+        # use libnagios on anything older than Xenial
         pkgs.remove('libmonitoring-plugin-perl')
         pkgs.append('libnagios-plugin-perl')
+
+        pkgs.remove('python3-netaddr')
+        pkgs.append('python-netaddr')
+
     elif CompareHostReleases(ubuntu_release) >= 'bionic':
         pkgs.append('python3-libmaas')
+
     # NOTE(dosaboy): we currently disallow upgrades due to bug #1382842. This
     # should be removed once the pacemaker package is fixed.
     status_set('maintenance', 'Installing apt packages')

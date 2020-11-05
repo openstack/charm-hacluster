@@ -327,7 +327,7 @@ class TestHooks(test_utils.CharmTestCase):
             'DISTRIB_CODENAME': 'xenial'}
         filter_installed_packages.side_effect = lambda x: x
         expected_pkgs = [
-            'crmsh', 'corosync', 'pacemaker', 'python-netaddr', 'ipmitool',
+            'crmsh', 'corosync', 'pacemaker', 'python3-netaddr', 'ipmitool',
             'libmonitoring-plugin-perl', 'python3-requests-oauthlib']
         hooks.install()
         status_set.assert_called_once_with(
@@ -348,7 +348,7 @@ class TestHooks(test_utils.CharmTestCase):
             'DISTRIB_CODENAME': 'bionic'}
         filter_installed_packages.side_effect = lambda x: x
         expected_pkgs = [
-            'crmsh', 'corosync', 'pacemaker', 'python-netaddr', 'ipmitool',
+            'crmsh', 'corosync', 'pacemaker', 'python3-netaddr', 'ipmitool',
             'libmonitoring-plugin-perl', 'python3-requests-oauthlib',
             'python3-libmaas']
         hooks.install()

@@ -15,7 +15,6 @@ gate_bundles:
   - bionic-ussuri
   - focal-ussuri
   - focal-victoria
-dev_bundles:
   - groovy-victoria
 
 configure:
