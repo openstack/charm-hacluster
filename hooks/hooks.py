@@ -56,6 +56,7 @@ from charmhelpers.core.host import (
     service_running,
     lsb_release,
     CompareHostReleases,
+    get_distrib_codename,
 )
 
 from charmhelpers.contrib.network.ip import (
@@ -616,10 +617,24 @@ def update_nrpe_config():
 
     if nrpe.NRPE.does_nrpe_conf_dir_exist():
         # corosync/crm checks
-        nrpe_setup.add_check(
-            shortname='corosync_rings',
-            description='Check Corosync rings {}'.format(current_unit),
-            check_cmd='check_corosync_rings')
+
+        # LP #1902919 - corosync version 2.99 changed the ring status output
+        # for udp/udpu to hardcode the status to always report 'OK'. This
+        # results in the check providing no value over what is provided by the
+        # crm_status check. A version check on the package would be more ideal,
+        # however populating the apt-cache object is expensive to run on each
+        # config-changed hook, so use the faster check of comparing the
+        # release name.
+        ring_check = {
+            'shortname': 'corosync_rings',
+            'description': 'Check Corosync rings {}'.format(current_unit),
+            'check_cmd': 'check_corosync_rings',
+        }
+        if CompareHostReleases(get_distrib_codename()) < 'eoan':
+            nrpe_setup.add_check(**ring_check)
+        else:
+            nrpe_setup.remove_check(**ring_check)
+
         nrpe_setup.add_check(
             shortname='crm_status',
             description='Check crm status {}'.format(current_unit),
