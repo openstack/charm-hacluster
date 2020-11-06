@@ -545,6 +545,7 @@ class TestHooks(test_utils.CharmTestCase):
             relation_id='relid1',
             **{'pacemaker-key': 'pcmkrkey'})
 
+    @mock.patch.object(hooks, 'get_distrib_codename')
     @mock.patch.object(hooks, 'apt_install')
     @mock.patch('hooks.nrpe', autospec=True)
     @mock.patch('hooks.os')
@@ -552,11 +553,14 @@ class TestHooks(test_utils.CharmTestCase):
     @mock.patch.object(hooks, 'status_set')
     @mock.patch.object(hooks, 'config')
     def test_update_nrpe_config(self, config, status_set, mock_glob, mock_os,
-                                nrpe, apt_install):
+                                nrpe, apt_install, mock_distrib_codename):
 
         cfg = {'failed_actions_alert_type': 'ignore',
                'failed_actions_threshold': 5}
         config.side_effect = lambda key: cfg.get(key)
+
+        mock_distrib_codename.side_effect = ['bionic', 'eoan', 'focal']
+        ring_check_expected = iter([True, False, False])
 
         # Set up valid values to try for 'failed_actions_alert_type'
         alert_type_params = ["IGNore", "warning", "CRITICAL"]
@@ -581,10 +585,16 @@ class TestHooks(test_utils.CharmTestCase):
                                      cfg['failed_actions_threshold'],
                                      cfg['failed_actions_alert_type'].lower()))
 
-            mock_nrpe_setup.add_check.assert_any_call(
-                shortname='corosync_rings',
-                description='Check Corosync rings nagios/1',
-                check_cmd='check_corosync_rings')
+            if next(ring_check_expected):
+                mock_nrpe_setup.add_check.assert_any_call(
+                    shortname='corosync_rings',
+                    description='Check Corosync rings nagios/1',
+                    check_cmd='check_corosync_rings')
+            else:
+                mock_nrpe_setup.remove_check.assert_any_call(
+                    shortname='corosync_rings',
+                    description='Check Corosync rings nagios/1',
+                    check_cmd='check_corosync_rings')
             mock_nrpe_setup.add_check.assert_any_call(
                 shortname='crm_status',
                 description='Check crm status nagios/1',
