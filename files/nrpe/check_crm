@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# check_crm_v0_8
+# check_crm_v0_10
 #
 # Copyright © 2013 Philip Garner, Sysnix Consultants Limited
 #
@@ -19,21 +19,23 @@
 #
 # Authors: Phil Garner - phil@sysnix.com & Peter Mottram - peter@sysnix.com
 #
-# v0.1 09/01/2011
-# v0.2 11/01/2011
-# v0.3 22/08/2011 - bug fix and changes suggested by Vadym Chepkov
-# v0.4 23/08/2011 - update for spelling and anchor regex capture (Vadym Chepkov)
-# v0.5 29/09/2011 - Add standby warn/crit suggested by Sönke Martens & removal
-#                   of 'our' to 'my' to completely avoid problems with ePN
-# v0.6 14/03/2013 - Change from \w+ to \S+ in stopped check to cope with
-#                   Servers that have non word charachters in.  Suggested by
-#                   Igal Baevsky.
-# v0.7 01/09/2013 - In testing as still not fully tested. Adds optional
-#                   constraints check (Boris Wesslowski). Adds fail count
-#                   threshold ( Zoran Bosnjak & Marko Hrastovec )
-# v0.8 06/11/2018 - Choose whether to ignore/warn/crit on failed actions
-# v0.9 18/02/2020 - Phase out failed actions check in favor of separate
-#                   failcount thresholds
+# v0.1  09/01/2011
+# v0.2  11/01/2011
+# v0.3  22/08/2011 - bug fix and changes suggested by Vadym Chepkov
+# v0.4  23/08/2011 - update for spelling and anchor regex capture (Vadym Chepkov)
+# v0.5  29/09/2011 - Add standby warn/crit suggested by Sönke Martens & removal
+#                    of 'our' to 'my' to completely avoid problems with ePN
+# v0.6  14/03/2013 - Change from \w+ to \S+ in stopped check to cope with
+#                    Servers that have non word charachters in.  Suggested by
+#                    Igal Baevsky.
+# v0.7  01/09/2013 - In testing as still not fully tested. Adds optional
+#                    constraints check (Boris Wesslowski). Adds fail count
+#                    threshold ( Zoran Bosnjak & Marko Hrastovec )
+# v0.8  06/11/2018 - Choose whether to ignore/warn/crit on failed actions
+# v0.9  18/02/2020 - Phase out failed actions check in favor of separate
+#                    failcount thresholds
+# v0.10 06/11/2020 - Don't report paused hacluster nodes if 'standbyignore' flag
+#                    (-s) is specified
 #
 # NOTE:- Requires Perl 5.8 or higher & either the Perl Module Nagios::Plugin
 #        or Monitoring::Plugin, whichever is available for your system.
@@ -200,10 +202,24 @@ foreach my $line (<$fh>) {
         # Check Resources Stopped
         $np->add_message( $warn_or_crit, ": $1 Stopped" );
     }
-    elsif ( $line =~ m/\s*stopped\:\s*\[(.*)\]/i ) {
+    elsif ( $line =~ m/\s*stopped\:\s*\[\s(.*)\s\]/i ) {
 
         # Check Master/Slave stopped
-        $np->add_message( $warn_or_crit, ": $1 Stopped" );
+        my @stopped_nodes = split ' ', $1;
+        my $report_nodes = "";
+
+        for my $node (@stopped_nodes) {
+            # Don't report standby nodes if 'standbyignore' is specified
+            if ( $np->opts->standbyignore && grep { $node eq $_ } @standby ) {
+                next
+            }
+            $report_nodes .= "${node} "
+        }
+
+        if ( $report_nodes ne "") {
+            chop $report_nodes;
+            $np->add_message( $warn_or_crit, ": $report_nodes Stopped" );
+        }
     }
     elsif ( $line =~ m/^failed actions\:/i ) {
         if ($np->opts->failedactions =~ /^(warning|critical)$/i) {

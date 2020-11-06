@@ -601,7 +601,7 @@ def update_nrpe_config():
 
     apt_install('python-dbus')
 
-    check_crm_cmd = 'check_crm'
+    check_crm_cmd = 'check_crm -s'
     check_crm_cmd += ' --failedactions={}'.format(
         config('failed_actions_alert_type').lower()
     )
