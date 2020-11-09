@@ -577,8 +577,8 @@ class TestHooks(test_utils.CharmTestCase):
             nrpe.NRPE.assert_called_once_with(hostname='localhost')
             apt_install.assert_called_once_with('python-dbus')
 
-            check_crm_cmd = ('check_crm --failedactions={} --failcount-warn={}'
-                             ' --failcount-crit={}'.format(
+            check_crm_cmd = ('check_crm -s --failedactions={} '
+                             '--failcount-warn={} --failcount-crit={}'.format(
                                  cfg['failed_actions_alert_type'].lower(),
                                  cfg['res_failcount_warn'],
                                  cfg['res_failcount_crit']))
