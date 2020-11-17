@@ -81,10 +81,13 @@ options:
       in seconds. Set value to -1 turn off timeout for the services.
   service_stop_timeout:
     type: int
-    default: 60
+    default: 600
     description: |
       Systemd override value for corosync and pacemaker service stop timeout
-      seconds. Set value to -1 turn off timeout for the services.
+      seconds. The default value will cause systemd to timeout a service stop
+      after 10 minutes. This should provide for sufficient time for resources
+      to migrate away from the current node as part of the stop sequence in
+      most cases. Set value to -1 turn off timeout for the services.
   stonith_enabled:
     type: string
     default: 'False'
