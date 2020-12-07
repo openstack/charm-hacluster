@@ -159,6 +159,15 @@ options:
       before resetting failcount to 0. In practice, this is measured as the
       time elapsed since the most recent failure. Setting this to 0 disables
       the feature.
+  cluster_recheck_interval:
+    type: int
+    default: 60
+    description: |
+      Sets the pacemaker default resource meta-attribute value for
+      'cluster-recheck-interval'. This value represents the polling interval
+      at which the cluster checks for changes in the resource parameters,
+      constraints or other cluster options. Setting this to 0 disables
+      the feature.
   # Monitoring config
   nagios_context:
     type: string

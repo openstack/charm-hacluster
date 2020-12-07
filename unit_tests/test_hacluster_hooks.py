@@ -98,7 +98,8 @@ class TestCorosyncConf(unittest.TestCase):
                'corosync_transport': 'udpu',
                'corosync_mcastaddr': 'corosync_mcastaddr',
                'cluster_count': 3,
-               'failure_timeout': 180}
+               'failure_timeout': 180,
+               'cluster_recheck_interval': 60}
 
         config.side_effect = lambda key: cfg.get(key)
 
@@ -127,7 +128,7 @@ class TestCorosyncConf(unittest.TestCase):
         relation_set.assert_any_call(relation_id='hanode:1', ready=True)
         configure_stonith.assert_called_with()
         configure_monitor_host.assert_called_with()
-        configure_cluster_global.assert_called_with(180)
+        configure_cluster_global.assert_called_with(180, 60)
         configure_corosync.assert_called_with()
         set_cluster_symmetry.assert_called_with()
         configure_pacemaker_remote_resources.assert_called_with()

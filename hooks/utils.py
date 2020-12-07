@@ -605,12 +605,17 @@ def configure_monitor_host():
             pcmk.commit('crm -w -F configure delete ping')
 
 
-def configure_cluster_global(failure_timeout):
+def configure_cluster_global(failure_timeout, cluster_recheck_interval=60):
     """Configure global cluster options
 
     :param failure_timeout: Duration in seconds (measured from the most recent
                              failure) to wait before resetting failcount to 0.
     :type failure_timeout: int
+    :param cluster_recheck_interval: Duration in seconds for the polling
+                                     interval at which the cluster checks for
+                                     changes in the resource parameters,
+                                     constraints or other cluster options.
+    :type cluster_recheck_interval: int
     """
     log('Applying global cluster configuration', level=DEBUG)
     # NOTE(lathiat) quorum in a two-node scenario is handled by
@@ -626,8 +631,10 @@ def configure_cluster_global(failure_timeout):
            'failure-timeout={}'.format(failure_timeout))
     pcmk.commit(cmd)
 
-    log('Configuring cluster-recheck-interval to 60 seconds', level=DEBUG)
-    cmd = "crm configure property cluster-recheck-interval=60"
+    log('Configuring cluster-recheck-interval to {} seconds'.format(
+        cluster_recheck_interval), level=DEBUG)
+    cmd = "crm configure property cluster-recheck-interval={}".format(
+        cluster_recheck_interval)
     pcmk.commit(cmd)
 
 

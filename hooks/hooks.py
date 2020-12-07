@@ -179,7 +179,8 @@ def get_transport():
 def run_initial_setup():
     """Run global setup."""
     failure_timeout = config('failure_timeout')
-    configure_cluster_global(failure_timeout)
+    cluster_recheck_interval = config('cluster_recheck_interval')
+    configure_cluster_global(failure_timeout, cluster_recheck_interval)
     configure_monitor_host()
     if not is_stonith_configured():
         disable_stonith()
