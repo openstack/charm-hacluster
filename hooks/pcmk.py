@@ -100,6 +100,23 @@ def is_resource_present(resource):
     return True
 
 
+def parse_version(cmd_output):
+    """Parse version from cmd output.
+
+    :params cmd_output: output from command line
+    :type cmd_output: str
+    :returns: parsed version
+    :rtype: distutils.version.StrictVersion
+    :raises: ValueError version could not be parsed
+    """
+    r = re.compile(r".*(\d+\.\d+\.\d+).*")
+    matched = r.match(cmd_output)
+    if not matched:
+        raise ValueError("error parsing version: {}".format(cmd_output))
+    else:
+        return StrictVersion(matched.group(1))
+
+
 def crm_opt_exists(opt_name):
     output = subprocess.getstatusoutput("crm configure show")[1]
     if opt_name in output:
@@ -282,17 +299,18 @@ def set_property(name, value):
 
 
 def crm_version():
-    """Parses the output of `crm --version` and returns a
-    distutils.version.StrictVersion instance
+    """Get `crm` version.
+
+    Parses the output of `crm --version`.
+
+    :returns: crm version
+    :rtype: distutils.version.StrictVersion
+    :raises: ValueError version could not be parsed
+    :raises: subprocess.CalledProcessError if the check_output fails
     """
-    ver = subprocess.check_output(['crm', '--version'],
+    ver = subprocess.check_output(["crm", "--version"],
                                   universal_newlines=True)
-    r = re.compile(r'.*(\d\.\d\.\d).*')
-    matched = r.match(ver)
-    if not matched:
-        raise ValueError('error parsin crm version: %s' % ver)
-    else:
-        return StrictVersion(matched.group(1))
+    return parse_version(ver)
 
 
 def _crm_update_object(update_template, update_ctxt, hash_keys, unitdata_key,
@@ -443,3 +461,126 @@ def resource_checksum(res_name, res_type, res_params=None):
     if res_params is not None:
         data.append(res_params)
     return generate_checksum(data)
+
+
+def get_tag(element, name):
+    """Get tag from element.
+
+    :param element: parent element
+    :type element: etree.Element
+    :param name: name of tag
+    :type name: str
+    :returns: element with tag name
+    :rtype: etree.Element
+    """
+    tag = element.find(name)
+    if tag is None:
+        return etree.Element(name)
+
+    return tag
+
+
+def add_key(dictionary, key, value):
+    """Add key to dictionary.
+
+    :param dictionary: dictionary
+    :type dictionary: Dict[Union[str, bytes], Union[str, bytes]]
+    :param key: new key to be inserted
+    :type key: str
+    :param value: new value to be inserted
+    :type value: Any
+    :returns: updated dictionary
+    :rtype: Dict[Union[str, bytes], Any]
+    """
+    if key in dictionary:
+        log('key already exists and will be rewrite: {}'.format(key), WARNING)
+
+    dictionary[key] = value
+    return dictionary
+
+
+def crm_mon_version():
+    """Get `crm_mon` version.
+
+    Parses the output of `crm_mon --version`.
+
+    :returns: crm_mon version
+    :rtype: distutils.version.StrictVersion
+    :raises: ValueError version could not be parsed
+    :raises: subprocess.CalledProcessError if the check_output fails
+    """
+    ver = subprocess.check_output(["crm_mon", "--version"],
+                                  universal_newlines=True)
+    return parse_version(ver)
+
+
+def cluster_status(resources=True, history=False):
+    """Parse the cluster status from `crm_mon`.
+
+    The `crm_mon` provides a summary of cluster's current state in XML format.
+
+    :param resources: flag for parsing resources from status, default is True
+    :type: boolean
+    :param history: flag for parsing history from status, default is False
+    :type: boolean
+    :returns: converted cluster status to the Dict
+    :rtype: Dict[str, Any]]
+    """
+    status = {}
+    crm_mon_ver = crm_mon_version()
+
+    if crm_mon_ver >= StrictVersion("2.0.0"):
+        cmd = ["crm_mon", "--output-as=xml", "--inactive"]
+    else:
+        # NOTE (rgildein): The `--as-xml` option is deprecated.
+        cmd = ["crm_mon", "--as-xml", "--inactive"]
+
+    xml = subprocess.check_output(cmd).decode('utf-8')
+    root = etree.fromstring(xml)
+
+    # version
+    status["crm_mon_version"] = str(crm_mon_ver)
+
+    # summary
+    summary = get_tag(root, "summary")
+    status["summary"] = {element.tag: element.attrib for element in summary}
+
+    # nodes
+    nodes = get_tag(root, "nodes")
+    status["nodes"] = {
+        node.get("name"): node.attrib for node in nodes.findall("node")
+    }
+
+    # resources
+    if resources:
+        cluster_resources = get_tag(root, "resources")
+        resources_groups = {
+            group.get("id"): [
+                add_key(resource.attrib, "nodes",
+                        [node.attrib for node in resource.findall("node")])
+                for resource in group.findall("resource")
+            ] for group in cluster_resources.findall("group")
+        }
+        resources_clones = {
+            clone.get("id"): add_key(clone.attrib, "resources", [
+                add_key(resource.attrib, "nodes",
+                        [node.attrib for node in resource.findall("node")])
+                for resource in clone.findall("resource")
+            ]) for clone in cluster_resources.findall("clone")
+        }
+        status["resources"] = {"groups": resources_groups,
+                               "clones": resources_clones}
+
+    # history
+    if history:
+        node_history = get_tag(root, "node_history")
+        status["history"] = {
+            node.get("name"): {
+                resource.get("id"): [
+                    operation.attrib
+                    for operation in resource.findall("operation_history")
+                ] for resource in node.findall("resource_history")
+            } for node in node_history.findall("node")
+        }
+
+    return status

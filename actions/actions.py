@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 import subprocess
 import sys
@@ -40,6 +41,9 @@ from charmhelpers.core.hookenv import (
     action_fail,
     action_get,
     action_set,
+    function_fail,
+    function_get,
+    function_set,
     is_leader,
     log,
     relation_ids,
@@ -70,19 +74,18 @@ def resume(args):
 
 
 def status(args):
-    """Display status of cluster resources.
-    Includes inactive resources in results."""
-    cmd = ['crm', 'status', '--inactive']
-
+    """Show hacluster status."""
     try:
-        result = subprocess.check_output(cmd).decode('utf-8')
-        action_set({'result': result})
-    except subprocess.CalledProcessError as e:
-        log("ERROR: Failed call to crm resource status. "
-            "output: {}. return-code: {}".format(e.output, e.returncode))
+        health_status = pcmk.cluster_status(
+            resources=bool(function_get("resources")),
+            history=bool(function_get("history")))
+        function_set({"result": json.dumps(health_status)})
+    except subprocess.CalledProcessError as error:
+        log("ERROR: Failed call to crm status. output: {}. return-code: {}"
+            "".format(error.output, error.returncode))
         log(traceback.format_exc())
-        action_set({'result': ''})
-        action_fail("failed to get cluster status")
+        function_set({"result": "failure"})
+        function_fail("failed to get cluster health")
 
 
 def cleanup(args):

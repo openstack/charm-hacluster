@@ -98,6 +98,47 @@ initial step (pause a unit) can be skipped. Unit removal may also be replaced
 by `juju remove-machine N --force`, where N is the Juju machine ID where the
 unit to be removed runs.
 
+## Presenting status information
+
+Here are a few examples of how to present useful information with the `status`
+action and the [jq][jq] utility.
+
+* Querying for `online` and `standby` parameter values:
+
+      juju run-action --wait hacluster/leader status \
+        --format json | jq '.[] | {(.UnitId):.results.result | fromjson \
+        | .nodes | .[] | {unit_name: .name, online: .online, standby: .standby}}'
+
+  output example
+
+      {
+        "hacluster/0": {
+          "unit_name": "juju-a37bc0-3",
+          "online": "true",
+          "standby": "false"
+        }
+      }
+      {
+        "hacluster/0": {
+          "unit_name": "juju-a37bc0-4",
+          "online": "true",
+          "standby": "false"
+        }
+      }
+      {
+        "hacluster/0": {
+          "unit_name": "juju-a37bc0-5",
+          "online": "true",
+          "standby": "false"
+        }
+      }
+
+* Displaying cluster resource information:
+
+      juju run-action --wait hacluster/leader status \
+        --format json | jq '.[] | {(.UnitId):.results.result | fromjson \
+        | .resources.groups}'
+
 # Bugs
 
 Please report bugs on [Launchpad][lp-bugs-charm-hacluster].
@@ -113,3 +154,4 @@ For general charm questions refer to the [OpenStack Charm Guide][cg].
 [upstream-maas]: https://maas.io
 [charms-requires-hacluster]: https://jaas.ai/search?requires=hacluster
 [cdg]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide
+[jq]: https://stedolan.github.io/jq/

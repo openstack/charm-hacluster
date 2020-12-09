@@ -3,8 +3,6 @@ pause:
                from this unit to another unit in the hacluster
 resume:
   descrpition: Take hacluster unit out of standby mode
-status:
-  description: Return cluster and resource status
 cleanup:
   description: Trigger cluster resource cleanup
   params:
@@ -12,6 +10,17 @@ cleanup:
       default: "all"
       type: string
       description: Resource name to cleanup
+status:
+  description: Show cluster status
+  params:
+    resources:
+      default: true
+      type: boolean
+      description: Show cluster resources
+    history:
+      default: false
+      type: boolean
+      description: Show cluster status history
 update-ring:
   description: Trigger corosync node members cleanup
   params:
