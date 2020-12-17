@@ -120,6 +120,7 @@ from utils import (
     get_hostname,
     disable_stonith,
     is_stonith_configured,
+    emit_systemd_overrides_file,
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
@@ -253,6 +254,7 @@ def migrate_maas_dns():
 def upgrade_charm():
     install()
     migrate_maas_dns()
+    emit_systemd_overrides_file()
     update_nrpe_config()
 
 
