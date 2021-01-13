@@ -19,6 +19,7 @@ import sys
 import tempfile
 import unittest
 import test_utils
+import pcmk
 
 mock_apt = mock.MagicMock()
 sys.modules['apt_pkg'] = mock_apt
@@ -40,6 +41,7 @@ class TestCorosyncConf(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
         os.remove(self.tmpfile.name)
 
+    @mock.patch.object(pcmk.unitdata, 'kv')
     @mock.patch.object(hooks, 'is_stonith_configured')
     @mock.patch.object(hooks, 'configure_peer_stonith_resource')
     @mock.patch.object(hooks, 'get_member_ready_nodes')
@@ -76,13 +78,15 @@ class TestCorosyncConf(unittest.TestCase):
                                  configure_resources_on_remotes,
                                  get_member_ready_nodes,
                                  configure_peer_stonith_resource,
-                                 is_stonith_configured):
+                                 is_stonith_configured, mock_kv):
 
         def fake_crm_opt_exists(res_name):
             # res_ubuntu will take the "update resource" route
             # res_nova_eth0_vip will take the delete resource route
             return res_name in ["res_ubuntu", "res_nova_eth0_vip"]
 
+        db = test_utils.FakeKvStore()
+        mock_kv.return_value = db
         crm_opt_exists.side_effect = fake_crm_opt_exists
         commit.return_value = 0
         is_stonith_configured.return_value = False
