@@ -16,9 +16,9 @@ import mock
 import pcmk
 import os
 import tempfile
+import test_utils
 import unittest
 from distutils.version import StrictVersion
-from charmhelpers.core import unitdata
 
 
 CRM_CONFIGURE_SHOW_XML = '''<?xml version="1.0" ?>
@@ -229,9 +229,11 @@ class TestPcmk(unittest.TestCase):
                                               'maintenance-mode=false'],
                                              universal_newlines=True)
 
+    @mock.patch.object(pcmk.unitdata, 'kv')
     @mock.patch('subprocess.call')
-    def test_crm_update_resource(self, mock_call):
-        db = unitdata.kv()
+    def test_crm_update_resource(self, mock_call, mock_kv):
+        db = test_utils.FakeKvStore()
+        mock_kv.return_value = db
         db.set('res_test-IPaddr2', '')
         mock_call.return_value = 0
 
@@ -248,9 +250,11 @@ class TestPcmk(unittest.TestCase):
                              ('primitive res_test IPaddr2 \\\n'
                               '\tparams ip=1.2.3.4 cidr_netmask=255.255.0.0'))
 
+    @mock.patch.object(pcmk.unitdata, 'kv')
     @mock.patch('subprocess.call')
-    def test_crm_update_resource_exists_in_kv(self, mock_call):
-        db = unitdata.kv()
+    def test_crm_update_resource_exists_in_kv(self, mock_call, mock_kv):
+        db = test_utils.FakeKvStore()
+        mock_kv.return_value = db
         db.set('res_test-IPaddr2', 'ef395293b1b7c29c5bf1c99774f75cf4')
 
         pcmk.crm_update_resource('res_test', 'IPaddr2',
@@ -261,9 +265,12 @@ class TestPcmk(unittest.TestCase):
             "Resource res_test already defined and parameters haven't changed"
         ])
 
+    @mock.patch.object(pcmk.unitdata, 'kv')
     @mock.patch('subprocess.call')
-    def test_crm_update_resource_exists_in_kv_force_true(self, mock_call):
-        db = unitdata.kv()
+    def test_crm_update_resource_exists_in_kv_force_true(self, mock_call,
+                                                         mock_kv):
+        db = test_utils.FakeKvStore()
+        mock_kv.return_value = db
         db.set('res_test-IPaddr2', 'ef395293b1b7c29c5bf1c99774f75cf4')
 
         with mock.patch.object(tempfile, "NamedTemporaryFile",
