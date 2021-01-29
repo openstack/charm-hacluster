@@ -502,6 +502,7 @@ class TestHooks(test_utils.CharmTestCase):
         hooks.hanode_relation_changed()
         ha_relation_changed.assert_called_once_with()
 
+    @mock.patch.object(hooks, 'apt_mark')
     @mock.patch.object(hooks, 'is_waiting_unit_series_upgrade_set')
     @mock.patch.object(hooks, 'set_unit_upgrading')
     @mock.patch.object(hooks, 'is_unit_paused_set')
@@ -510,13 +511,15 @@ class TestHooks(test_utils.CharmTestCase):
     def test_series_upgrade_prepare(self, notify_peers_of_series_upgrade,
                                     pause_unit, is_unit_paused_set,
                                     set_unit_upgrading,
-                                    is_waiting_unit_series_upgrade_set):
+                                    is_waiting_unit_series_upgrade_set,
+                                    apt_mark):
         is_unit_paused_set.return_value = False
         is_waiting_unit_series_upgrade_set.return_value = False
         hooks.series_upgrade_prepare()
         set_unit_upgrading.assert_called_once_with()
         pause_unit.assert_called_once_with()
         notify_peers_of_series_upgrade.assert_called_once_with()
+        apt_mark.assert_called_once_with('crmsh', 'manual')
 
     @mock.patch.object(hooks, 'clear_unit_paused')
     @mock.patch.object(hooks, 'clear_unit_upgrading')

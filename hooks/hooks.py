@@ -74,6 +74,7 @@ from charmhelpers.fetch import (
     apt_install,
     apt_purge,
     filter_installed_packages,
+    apt_mark,
 )
 
 from utils import (
@@ -670,6 +671,10 @@ def series_upgrade_prepare():
     if not is_unit_paused_set() and not is_waiting_unit_series_upgrade_set():
         pause_unit()
     notify_peers_of_series_upgrade()
+    # mark crmsh package as manually installed
+    # so it does not get uninstalled on release upgrade
+    # from xenial to bionic
+    apt_mark('crmsh', 'manual')
 
 
 @hooks.hook('post-series-upgrade')
