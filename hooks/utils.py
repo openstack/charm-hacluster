@@ -742,7 +742,7 @@ def get_ip_addr_from_resource_params(params):
 def need_resources_on_remotes():
     """Whether to run resources on remote nodes.
 
-    Check the 'enable-resources' setting accross the remote units. If it is
+    Check the 'enable-resources' setting across the remote units. If it is
     absent or inconsistent then raise a ValueError.
 
     :returns: Whether to run resources on remote nodes
