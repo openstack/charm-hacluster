@@ -10,8 +10,8 @@ series:
 - xenial
 - bionic
 - focal
-- trusty
 - groovy
+- hirsute
 requires:
   juju-info:
     interface: juju-info
