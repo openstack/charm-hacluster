@@ -1,7 +1,8 @@
 charm_name: hacluster
 
 smoke_bundles:
-  - bionic-train
+  - focal-ussuri
+
 gate_bundles:
   - xenial-mitaka
   - bionic-queens
@@ -10,13 +11,16 @@ gate_bundles:
   - bionic-ussuri
   - focal-ussuri
   - focal-victoria
+  - focal-wallaby
   - groovy-victoria
+
 dev_bundles:
   - trusty-mitaka
   - xenial-ocata
   - xenial-pike
   - xenial-queens
   - bionic-rocky
+  - hirsute-wallaby
 
 configure:
   - zaza.openstack.charm_tests.keystone.setup.add_demo_user
@@ -30,4 +34,4 @@ tests_options:
     principle-app-name: keystone
     hacluster-charm-name: hacluster
   force_deploy:
-    - groovy-victoria
+    - hirsute-wallaby
