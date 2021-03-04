@@ -16,7 +16,6 @@
 
 import ast
 import pcmk
-import maas
 import json
 import os
 import re
@@ -520,60 +519,6 @@ def configure_stonith():
         log('Disabling STONITH', level=INFO)
         cmd = "crm configure property stonith-enabled=false"
         pcmk.commit(cmd)
-
-
-def configure_legacy_stonith():
-    if config('stonith_enabled') not in ['true', 'True', True]:
-        if configure_pacemaker_remote_stonith_resource():
-            log('Not disabling STONITH as pacemaker remotes are present',
-                level=INFO)
-        else:
-            log('Disabling STONITH', level=INFO)
-            cmd = "crm configure property stonith-enabled=false"
-            pcmk.commit(cmd)
-    else:
-        log('Enabling STONITH for all nodes in cluster.', level=INFO)
-        # configure stontih resources for all nodes in cluster.
-        # note: this is totally provider dependent and requires
-        # access to the MAAS API endpoint, using endpoint and credentials
-        # set in config.
-        url = config('maas_url')
-        creds = config('maas_credentials')
-        if None in [url, creds]:
-            msg = 'maas_url and maas_credentials must be set ' \
-                  'in config to enable STONITH.'
-            status_set('blocked', msg)
-            raise Exception(msg)
-
-        nodes = maas.MAASHelper(url, creds).list_nodes()
-        if not nodes:
-            msg = 'Could not obtain node inventory from ' \
-                  'MAAS @ %s.' % url
-            status_set('blocked', msg)
-            raise Exception(msg)
-
-        cluster_nodes = pcmk.list_nodes()
-        for node in cluster_nodes:
-            rsc, constraint = pcmk.maas_stonith_primitive(nodes, node)
-            if not rsc:
-                msg = 'Failed to determine STONITH primitive for ' \
-                      'node %s' % node
-                status_set('blocked', msg)
-                raise Exception(msg)
-
-            rsc_name = str(rsc).split(' ')[1]
-            if not pcmk.is_resource_present(rsc_name):
-                log('Creating new STONITH primitive %s.' % rsc_name,
-                    level=DEBUG)
-                cmd = 'crm -F configure %s' % rsc
-                pcmk.commit(cmd)
-                if constraint:
-                    cmd = 'crm -F configure %s' % constraint
-                    pcmk.commit(cmd)
-            else:
-                log('STONITH primitive already exists for node.', level=DEBUG)
-
-        pcmk.commit("crm configure property stonith-enabled=true")
 
 
 def configure_monitor_host():

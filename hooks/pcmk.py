@@ -25,7 +25,6 @@ from io import StringIO
 from charmhelpers.core import unitdata
 from charmhelpers.core.hookenv import (
     log,
-    ERROR,
     INFO,
     DEBUG,
     WARNING,
@@ -167,45 +166,6 @@ def list_nodes():
     tree = etree.fromstring(out)
     nodes = [n.attrib['uname'] for n in tree.iter('node')]
     return sorted(nodes)
-
-
-def _maas_ipmi_stonith_resource(node, power_params):
-    rsc_name = 'res_stonith_%s' % node
-    rsc = ('primitive %s stonith:external/ipmi params hostname=%s ipaddr=%s '
-           'userid=%s passwd=%s interface=lan' %
-           (rsc_name, node, power_params['power_address'],
-            power_params['power_user'], power_params['power_pass']))
-
-    # ensure ipmi stonith agents are not running on the nodes that
-    # they manage.
-    constraint = ('location const_loc_stonith_avoid_%s %s -inf: %s' %
-                  (node, rsc_name, node))
-
-    return rsc, constraint
-
-
-def maas_stonith_primitive(maas_nodes, crm_node):
-    power_type = power_params = None
-    for node in maas_nodes:
-        if node['hostname'].startswith(crm_node):
-            power_type = node['power_type']
-            power_params = node['power_parameters']
-
-    if not power_type or not power_params:
-        return False, False
-
-    rsc = constraint = None
-    # we can extend to support other power flavors in the future?
-    if power_type == 'ipmi':
-        rsc, constraint = _maas_ipmi_stonith_resource(crm_node, power_params)
-    else:
-        log('Unsupported STONITH power_type: %s' % power_type, ERROR)
-        return False, False
-
-    if not rsc or not constraint:
-        return False, False
-
-    return rsc, constraint
 
 
 def get_property_from_xml(name, output):

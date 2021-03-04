@@ -92,9 +92,10 @@ options:
     type: string
     default: 'False'
     description: |
-      Enable resource fencing (aka STONITH) for every node in the cluster.
-      This requires MAAS credentials be provided and each node's power
-      parameters are properly configured in its inventory.
+      DEPRECATED: is now ignored and will be removed in a future release.
+      Resource fencing (aka STONITH) is now always enabled for every node in
+      the cluster. This requires MAAS credentials be provided and each node's
+      power parameters are properly configured in its inventory.
   maas_url:
     type: string
     default:
