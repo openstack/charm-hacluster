@@ -126,6 +126,7 @@ from utils import (
     emit_systemd_overrides_file,
     trigger_corosync_update_from_leader,
     emit_corosync_conf,
+    assess_status_helper,
 )
 
 from charmhelpers.contrib.charmsupport import nrpe
@@ -229,6 +230,15 @@ def config_changed():
     if (is_leader() and
             cfg.previous('maintenance-mode') != cfg['maintenance-mode']):
         maintenance_mode(cfg['maintenance-mode'])
+
+    if config('no_quorum_policy').lower() in ['ignore', 'freeze',
+                                              'stop', 'suicide']:
+        pcmk.set_property("no-quorum-policy",
+                          config('no_quorum_policy').lower())
+    else:
+        message = 'Invalid setting for no_quorum_policy'
+        status_set('blocked', message)
+    status_set(*assess_status_helper())
 
 
 def migrate_maas_dns():

@@ -422,6 +422,7 @@ class TestHooks(test_utils.CharmTestCase):
         apt_install.assert_called_once_with(expected_pkgs, fatal=True)
         setup_ocf_files.assert_called_once_with()
 
+    @mock.patch('pcmk.set_property')
     @mock.patch.object(hooks, 'is_stonith_configured')
     @mock.patch.object(hooks, 'configure_stonith')
     @mock.patch.object(hooks, 'relation_ids')
@@ -429,6 +430,7 @@ class TestHooks(test_utils.CharmTestCase):
     @mock.patch.object(hooks, 'maintenance_mode')
     @mock.patch.object(hooks, 'is_leader')
     @mock.patch.object(hooks, 'update_nrpe_config')
+    @mock.patch.object(hooks, 'assess_status_helper')
     @mock.patch('pcmk.commit')
     @mock.patch('pcmk.wait_for_pcmk')
     @mock.patch.object(hooks, 'configure_corosync')
@@ -439,21 +441,25 @@ class TestHooks(test_utils.CharmTestCase):
     def test_config_changed(self, mock_mkdir, mock_rsync, mock_config,
                             mock_os_mkdir, mock_configure_corosync,
                             mock_wait_for_pcmk, mock_pcmk_commit,
+                            mock_assess_status_helper,
                             mock_update_nrpe_config, mock_is_leader,
                             mock_maintenance_mode,
                             mock_hanode_relation_joined,
                             mock_relation_ids,
                             mock_configure_stonith,
-                            mock_is_stonith_configured):
+                            mock_is_stonith_configured,
+                            mock_set_property):
 
         mock_is_stonith_configured.return_value = False
         mock_config.side_effect = self.test_config.get
         mock_relation_ids.return_value = ['hanode:1']
         mock_is_leader.return_value = True
+        mock_assess_status_helper.return_value = ('active', 'mockmessage')
         hooks.config_changed()
         mock_maintenance_mode.assert_not_called()
         mock_relation_ids.assert_called_with('hanode')
         mock_hanode_relation_joined.assert_called_once_with('hanode:1')
+        mock_set_property.assert_called_with('no-quorum-policy', 'stop')
 
         # enable maintenance
         self.test_config.set_previous('maintenance-mode', False)
@@ -466,6 +472,11 @@ class TestHooks(test_utils.CharmTestCase):
         self.test_config.set('maintenance-mode', False)
         hooks.config_changed()
         mock_maintenance_mode.assert_called_with(False)
+
+        # set no-quorum-policy to ignore
+        self.test_config.set('no_quorum_policy', 'ignore')
+        hooks.config_changed()
+        mock_set_property.assert_called_with('no-quorum-policy', 'ignore')
 
     @mock.patch.object(hooks, 'needs_maas_dns_migration')
     @mock.patch.object(hooks, 'relation_ids')

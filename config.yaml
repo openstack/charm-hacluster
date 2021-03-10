@@ -218,3 +218,12 @@ options:
     description: |
       check_crm will generate a critical alert if the failcount of a resource
       has crossed this threshold. Set to 0 or '' to disable.
+  no_quorum_policy:
+    type: string
+    default: "stop"
+    description: |
+      What to do when the cluster does not have quorum. Allowed values:
+        ignore: continue all resource management,
+        freeze: continue resource management, but don’t recover resources from nodes not in the affected partition,
+        stop: stop all resources in the affected cluster partition,
+        suicide: fence all nodes in the affected cluster partition

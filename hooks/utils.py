@@ -1317,6 +1317,13 @@ def assess_status_helper():
             'blocked',
             'stonith_enabled config option is no longer supported')
 
+    if config('no_quorum_policy'):
+        if config('no_quorum_policy').lower() not in ['ignore', 'freeze',
+                                                      'stop', 'suicide']:
+            return(
+                'blocked',
+                'Invalid no_quorum_policy specified')
+
     if is_unit_upgrading_set():
         return ("blocked",
                 "Ready for do-release-upgrade. Set complete when finished")
