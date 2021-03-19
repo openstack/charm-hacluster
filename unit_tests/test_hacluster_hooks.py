@@ -43,7 +43,7 @@ class TestCorosyncConf(unittest.TestCase):
 
     @mock.patch.object(pcmk.unitdata, 'kv')
     @mock.patch.object(hooks, 'remote_unit')
-    @mock.patch.object(hooks, 'principal_unit')
+    @mock.patch.object(hooks, 'relation_type')
     @mock.patch.object(hooks, 'trigger_corosync_update_from_leader')
     @mock.patch.object(hooks, 'is_stonith_configured')
     @mock.patch.object(hooks, 'configure_peer_stonith_resource')
@@ -83,7 +83,7 @@ class TestCorosyncConf(unittest.TestCase):
                                  configure_peer_stonith_resource,
                                  is_stonith_configured,
                                  trigger_corosync_update_from_leader,
-                                 principal_unit, remote_unit, mock_kv):
+                                 relation_type, remote_unit, mock_kv):
 
         def fake_crm_opt_exists(res_name):
             # res_ubuntu will take the "update resource" route
@@ -110,7 +110,8 @@ class TestCorosyncConf(unittest.TestCase):
                'failure_timeout': 180,
                'cluster_recheck_interval': 60}
         trigger_corosync_update_from_leader.return_value = False
-        principal_unit.return_value = remote_unit.return_value = ""
+        relation_type.return_value = "hanode"
+        remote_unit.return_value = "hacluster/0"
 
         config.side_effect = lambda key: cfg.get(key)
 
@@ -173,7 +174,7 @@ class TestCorosyncConf(unittest.TestCase):
                         'crm -w -F configure %s %s %s' % (kw, name, params))
 
     @mock.patch.object(hooks, 'remote_unit')
-    @mock.patch.object(hooks, 'principal_unit')
+    @mock.patch.object(hooks, 'relation_type')
     @mock.patch.object(hooks, 'trigger_corosync_update_from_leader')
     @mock.patch.object(hooks, 'is_stonith_configured')
     @mock.patch.object(hooks, 'configure_peer_stonith_resource')
@@ -212,7 +213,7 @@ class TestCorosyncConf(unittest.TestCase):
             configure_peer_stonith_resource,
             is_stonith_configured,
             trigger_corosync_update_from_leader,
-            principal_unit, remote_unit):
+            relation_type, remote_unit):
         is_stonith_configured.return_value = False
         validate_dns_ha.return_value = True
         crm_opt_exists.return_value = False
@@ -231,7 +232,8 @@ class TestCorosyncConf(unittest.TestCase):
                'maas_url': 'http://maas/MAAAS/',
                'maas_credentials': 'secret'}
         trigger_corosync_update_from_leader.return_value = False
-        principal_unit.return_value = remote_unit.return_value = ""
+        relation_type.return_value = "hanode"
+        remote_unit.return_value = "hacluster/0"
 
         config.side_effect = lambda key: cfg.get(key)
 
@@ -263,7 +265,7 @@ class TestCorosyncConf(unittest.TestCase):
             'maas_credentials="secret"')
 
     @mock.patch.object(hooks, 'remote_unit')
-    @mock.patch.object(hooks, 'principal_unit')
+    @mock.patch.object(hooks, 'relation_type')
     @mock.patch.object(hooks, 'trigger_corosync_update_from_leader')
     @mock.patch.object(hooks, 'setup_maas_api')
     @mock.patch.object(hooks, 'validate_dns_ha')
@@ -289,7 +291,7 @@ class TestCorosyncConf(unittest.TestCase):
             configure_corosync, is_leader, crm_opt_exists,
             wait_for_pcmk, validate_dns_ha, setup_maas_api,
             trigger_corosync_update_from_leader,
-            principal_unit, remote_unit):
+            relation_type, remote_unit):
 
         def fake_validate():
             raise utils.MAASConfigIncomplete('DNS HA invalid config')
@@ -309,7 +311,8 @@ class TestCorosyncConf(unittest.TestCase):
                'maas_url': 'http://maas/MAAAS/',
                'maas_credentials': None}
         trigger_corosync_update_from_leader.return_value = False
-        principal_unit.return_value = remote_unit.return_value = ""
+        relation_type.return_value = "hanode"
+        remote_unit.return_value = "hacluster/0"
 
         config.side_effect = lambda key: cfg.get(key)
 
@@ -330,6 +333,40 @@ class TestCorosyncConf(unittest.TestCase):
             hooks.ha_relation_changed()
             mock_status_set.assert_called_with('blocked',
                                                'DNS HA invalid config')
+
+    @mock.patch.object(hooks, 'remote_unit')
+    @mock.patch.object(hooks, 'relation_type')
+    @mock.patch.object(hooks, 'trigger_corosync_update_from_leader')
+    @mock.patch.object(hooks, 'get_cluster_nodes')
+    @mock.patch.object(hooks, 'relation_set')
+    @mock.patch.object(hooks, 'relation_ids')
+    @mock.patch.object(hooks, 'get_corosync_conf')
+    @mock.patch.object(hooks, 'config')
+    def test_ha_relation_changed_pacemaker_remote(
+            self, config, get_corosync_conf, relation_ids, relation_set,
+            get_cluster_nodes, trigger_corosync_update_from_leader,
+            relation_type, remote_unit):
+        """Test pacemaker-remote-relation-changed.
+
+        Validates that ha_relation_changed() doesn't call
+        trigger_corosync_update_from_leader() when called from the
+        pacemaker-remote-relation-changed hook. See lp:1920124
+        """
+        cfg = {'cluster_count': 3}
+        config.side_effect = lambda key: cfg.get(key)
+
+        # 2 out of 3 so that the function under test finishes early:
+        get_cluster_nodes.return_value = ['10.0.3.2', '10.0.3.3']
+
+        relation_ids.return_value = ['hanode:1']
+        get_corosync_conf.return_value = True
+        relation_type.return_value = 'pacemaker-remote'
+        remote_unit.return_value = 'pacemaker-remote/0'
+
+        hooks.ha_relation_changed()
+
+        relation_set.assert_any_call(relation_id='hanode:1', ready=True)
+        trigger_corosync_update_from_leader.assert_not_called()
 
 
 class TestHooks(test_utils.CharmTestCase):

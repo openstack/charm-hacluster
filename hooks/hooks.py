@@ -45,8 +45,8 @@ from charmhelpers.core.hookenv import (
     related_units,
     relation_ids,
     relation_set,
+    relation_type,
     remote_unit,
-    principal_unit,
     config,
     Hooks,
     UnregisteredHookError,
@@ -326,20 +326,22 @@ def ha_relation_changed():
             level=INFO)
         return
 
-    relid_hanode = relation_ids('hanode')
-    if relid_hanode:
+    relids_hanode = relation_ids('hanode')
+    if relids_hanode:
         log('Ready to form cluster - informing peers', level=DEBUG)
-        relation_set(relation_id=relid_hanode[0], ready=True)
+        relation_set(relation_id=relids_hanode[0], ready=True)
 
         # If a trigger-corosync-update attribute exists in the relation,
         # the Juju leader may have requested all its peers to update
         # the corosync.conf list of nodes. If it's the case, no other
         # action will be run (a future hook re: ready=True may trigger
         # other logic)
-        if (remote_unit() != principal_unit() and
-            trigger_corosync_update_from_leader(
-                remote_unit(), relid_hanode[0]
-        )):
+        # NOTE(lourot): it's not necessary to test for
+        # `remote_unit() != principal_unit()` here as this is only False (both
+        # units are the same) when the relation type is `ha`.
+        if (relation_type() == 'hanode' and
+            trigger_corosync_update_from_leader(remote_unit(),
+                                                relids_hanode[0])):
             return
 
     else:
@@ -590,7 +592,7 @@ def ha_relation_changed():
 
     # Inform peers that local configuration is complete and this member
     # is ready
-    for rel_id in relation_ids('hanode'):
+    for rel_id in relids_hanode:
         relation_set(relation_id=rel_id, member_ready=True)
 
 
