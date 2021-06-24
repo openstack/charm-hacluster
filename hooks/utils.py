@@ -1553,19 +1553,32 @@ def is_stonith_configured():
     return bool_from_string(configured)
 
 
+def get_hanode_hostnames():
+    """Hostnames of nodes in the hanode relation.
+
+    :returns: List of hostnames of nodes in the hanode relation.
+    :rtype: List
+    """
+    hanode_hostnames = [get_hostname()]
+    for relid in relation_ids('hanode'):
+        for unit in related_units(relid):
+            hostname = relation_get('hostname', rid=relid, unit=unit)
+            if hostname:
+                hanode_hostnames.append(hostname)
+
+    hanode_hostnames.sort()
+    return hanode_hostnames
+
+
 def update_node_list():
-    """Delete a node from the corosync ring when a Juju unit is removed.
+    """Determine and delete unexpected nodes from the corosync ring.
 
     :returns: Set of pcmk nodes not part of Juju hanode relation
     :rtype: Set[str]
     :raises: RemoveCorosyncNodeFailed
     """
     pcmk_nodes = set(pcmk.list_nodes())
-    juju_nodes = {socket.gethostname()}
-    juju_hanode_rel = get_ha_nodes()
-    for corosync_id, addr in juju_hanode_rel.items():
-        peer_node_name = utils.get_hostname(addr, fqdn=False)
-        juju_nodes.add(peer_node_name)
+    juju_nodes = set(get_hanode_hostnames())
 
     diff_nodes = pcmk_nodes.difference(juju_nodes)
     log("pcmk_nodes[{}], juju_nodes[{}], diff[{}]"
