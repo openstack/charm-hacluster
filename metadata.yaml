@@ -12,6 +12,7 @@ series:
 - focal
 - groovy
 - hirsute
+- impish
 requires:
   juju-info:
     interface: juju-info
