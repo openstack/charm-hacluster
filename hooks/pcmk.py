@@ -234,6 +234,13 @@ def delete_node(node_name, failure_is_fatal=True):
                 if attempt > 0:
                     log('Retrying...', WARNING)
                     continue
+            if 'Transport endpoint is not connected' in output:
+                # NOTE(lourot): happens more often with corosync >= 3.1.0
+                # (hirsute), see lp:1931588
+                log('Transport endpoint not connected.', WARNING)
+                if attempt > 0:
+                    log('Retrying...', WARNING)
+                    continue
             raise
 
 
