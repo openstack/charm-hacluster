@@ -110,23 +110,7 @@ def cleanup(args):
                     "'{}'".format(resource_name))
 
 
-def update_ring(args):
-    """Update corosync.conf list of nodes (generally after unit removal)."""
-    if not action_get('i-really-mean-it'):
-        action_fail('i-really-mean-it is a required parameter')
-        return
-
-    if not is_leader():
-        action_fail('only the Juju leader can run this action')
-        return
-
-    diff_nodes = update_node_list()
-    if not diff_nodes:
-        # No differences between discovered Pacemaker nodes and
-        # Juju nodes (ie. no node removal)
-        action_set({'result': 'noop'})
-        return
-
+def _trigger_corosync_update():
     # Trigger emit_corosync_conf() and corosync-cfgtool -R
     # for all the hanode peer units to run
     relid = relation_ids('hanode')
@@ -144,11 +128,66 @@ def update_ring(args):
             emit_corosync_conf()):
         cmd = 'corosync-cfgtool -R'
         pcmk.commit(cmd)
-    action_set({'result': 'success'})
+
+
+def update_ring(args):
+    """Update corosync.conf list of nodes (generally after unit removal)."""
+    if not function_get('i-really-mean-it'):
+        function_fail('i-really-mean-it is a required parameter')
+        return
+
+    if not is_leader():
+        function_fail('only the Juju leader can run this action')
+        return
+
+    diff_nodes = update_node_list()
+    log("Unexpected node(s) found and removed: {}"
+        .format(",".join(list(diff_nodes))))
+    if not diff_nodes:
+        # No differences between discovered Pacemaker nodes and
+        # Juju nodes (ie. no node removal)
+        function_set({'result': 'No changes required.'})
+        return
+
+    # Notify the cluster
+    _trigger_corosync_update()
+
+    function_set(
+        {"result":
+            "Nodes removed: {}"
+            .format(" ".join(list(diff_nodes)))})
+
+
+def delete_node_from_ring(args):
+    """Delete a node from the corosync ring."""
+
+    node = function_get('node')
+    if not node:
+        function_fail('node is a required parameter')
+        return
+
+    if not is_leader():
+        function_fail('only the Juju leader can run this action')
+        return
+
+    # Delete the node from the live corosync env
+    try:
+        pcmk.set_node_status_to_maintenance(node)
+        pcmk.delete_node(node, failure_is_fatal=True)
+    except subprocess.CalledProcessError as e:
+        function_fail(
+            "Removing {} from the cluster failed. {} output={}"
+            .format(node, e, e.output))
+
+    # Notify the cluster
+    _trigger_corosync_update()
+
+    function_set({'result': 'success'})
 
 
 ACTIONS = {"pause": pause, "resume": resume,
            "status": status, "cleanup": cleanup,
+           "delete-node-from-ring": delete_node_from_ring,
            "update-ring": update_ring}
 
 

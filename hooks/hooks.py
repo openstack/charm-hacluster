@@ -18,7 +18,6 @@ import copy
 import glob
 import os
 import shutil
-import socket
 import sys
 import traceback
 
@@ -608,11 +607,11 @@ def ha_relation_changed():
 
 @hooks.hook()
 def stop():
-    # NOTE(lourot): This seems to always fail with
-    # 'ERROR: node <node_name> not found in the CIB', which means that the node
-    # has already been removed from the cluster. Thus failure_is_fatal=False.
-    # We might consider getting rid of this call.
-    pcmk.delete_node(socket.gethostname(), failure_is_fatal=False)
+    # The pcmk.delete_node handles several known failure modes so
+    # failure_is_fatal=True actually helps as it causes retries.
+    node = get_hostname()
+    pcmk.set_node_status_to_maintenance(node)
+    pcmk.delete_node(node, failure_is_fatal=True)
 
     apt_purge(['corosync', 'pacemaker'], fatal=True)
 

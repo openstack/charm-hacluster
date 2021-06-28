@@ -1317,3 +1317,53 @@ class UtilsTestCase(unittest.TestCase):
                 'hanode:0',
             ),
         )
+
+    @mock.patch.object(utils, 'get_hostname')
+    @mock.patch.object(utils, 'relation_get')
+    @mock.patch.object(utils, 'related_units')
+    @mock.patch.object(utils, 'relation_ids')
+    def test_get_hanode_hostnames(
+            self, _relation_ids, _related_units, _relation_get, _get_hostname):
+        _data = {
+            "node/1": {"hostname": "beta"},
+            "node/3": {"hostname": "alpha"},
+        }
+
+        def _rel_data(_param, unit, rid):
+            return _data[unit][_param]
+
+        _relation_ids.return_value = ["hanode:1"]
+        _related_units.return_value = ["node/1", "node/3"]
+        _relation_get.side_effect = _rel_data
+        _get_hostname.return_value = "gamma"
+        _expected = ["alpha", "beta", "gamma"]
+
+        self.assertEqual(
+            utils.get_hanode_hostnames(),
+            _expected)
+
+    @mock.patch.object(utils, 'get_hanode_hostnames')
+    @mock.patch.object(utils, 'pcmk')
+    def test_update_node_list(self, _pcmk, _get_hanode_hostnames):
+        _pcmk.list_nodes.return_value = ["zeta", "beta", "psi"]
+        _get_hanode_hostnames.return_value = ["alpha", "beta", "gamma"]
+        _expected = set(["zeta", "psi"])
+
+        self.assertEqual(
+            utils.update_node_list(),
+            _expected)
+
+        _pcmk.set_node_status_to_maintenance.assert_has_calls(
+            [mock.call('zeta'),
+             mock.call('psi')],
+            any_order=True)
+        _pcmk.delete_node.assert_has_calls(
+            [mock.call('zeta'),
+             mock.call('psi')],
+            any_order=True)
+
+        # Raise RemoveCorosyncNodeFailed
+        _pcmk.delete_node.side_effect = subprocess.CalledProcessError(
+            127, "fake crm command")
+        with self.assertRaises(utils.RemoveCorosyncNodeFailed):
+            utils.update_node_list()
