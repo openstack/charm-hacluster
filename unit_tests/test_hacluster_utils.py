@@ -320,13 +320,13 @@ class UtilsTestCase(unittest.TestCase):
     @mock.patch.object(subprocess, 'check_call')
     @mock.patch.object(utils.os, 'mkdir')
     @mock.patch.object(utils.os.path, 'exists')
-    @mock.patch.object(utils, 'render_template')
+    @mock.patch.object(utils, 'render')
     @mock.patch.object(utils, 'write_file')
     @mock.patch.object(utils, 'is_unit_paused_set')
     @mock.patch.object(utils, 'config')
     def test_emit_systemd_overrides_file(self, mock_config,
                                          mock_is_unit_paused_set,
-                                         mock_write_file, mock_render_template,
+                                         mock_write_file, mock_render,
                                          mock_path_exists,
                                          mock_mkdir, mock_check_call):
 
@@ -339,13 +339,13 @@ class UtilsTestCase(unittest.TestCase):
         mock_path_exists.return_value = True
         utils.emit_systemd_overrides_file()
         self.assertEqual(2, len(mock_write_file.mock_calls))
-        mock_render_template.assert_has_calls(
+        mock_render.assert_has_calls(
             [mock.call('systemd-overrides.conf', cfg),
              mock.call('systemd-overrides.conf', cfg)])
         mock_check_call.assert_has_calls([mock.call(['systemctl',
                                                      'daemon-reload'])])
         mock_write_file.mock_calls = []
-        mock_render_template.mock_calls = []
+        mock_render.mock_calls = []
         mock_check_call.mock_calls = []
 
         # Disable timeout
@@ -358,7 +358,7 @@ class UtilsTestCase(unittest.TestCase):
         mock_path_exists.return_value = True
         utils.emit_systemd_overrides_file()
         self.assertEqual(2, len(mock_write_file.mock_calls))
-        mock_render_template.assert_has_calls(
+        mock_render.assert_has_calls(
             [mock.call('systemd-overrides.conf', expected_cfg),
              mock.call('systemd-overrides.conf', expected_cfg)])
         mock_check_call.assert_has_calls([mock.call(['systemctl',
@@ -465,13 +465,13 @@ class UtilsTestCase(unittest.TestCase):
             mock.call('json_testkey', 'neutron-api/0', 'hacluster:1'),
         ])
 
-    @mock.patch.object(utils, 'render_template')
+    @mock.patch.object(utils, 'render')
     @mock.patch.object(utils.os.path, 'isdir')
     @mock.patch.object(utils.os, 'mkdir')
     @mock.patch.object(utils, 'write_file')
     @mock.patch.object(utils, 'config')
     def test_emit_base_conf(self, config, write_file, mkdir, isdir,
-                            render_template):
+                            mock_render):
         cfg = {
             'corosync_key': 'Y29yb3N5bmNrZXkK',
             'pacemaker_key': 'cGFjZW1ha2Vya2V5Cg==',
@@ -482,7 +482,7 @@ class UtilsTestCase(unittest.TestCase):
             'corosync': 'corosync etc default config',
             'hacluster.acl': 'hacluster acl file',
         }
-        render_template.side_effect = lambda x, y: render[x]
+        mock_render.side_effect = lambda x, y: render[x]
         expect_write_calls = [
             mock.call(
                 content='corosync etc default config',
@@ -515,16 +515,16 @@ class UtilsTestCase(unittest.TestCase):
         ]
         self.assertTrue(utils.emit_base_conf())
         write_file.assert_has_calls(expect_write_calls)
-        render_template.assert_has_calls(expect_render_calls)
+        mock_render.assert_has_calls(expect_render_calls)
         mkdir.assert_has_calls(mkdir_calls)
 
-    @mock.patch.object(utils, 'render_template')
+    @mock.patch.object(utils, 'render')
     @mock.patch.object(utils.os.path, 'isdir')
     @mock.patch.object(utils.os, 'mkdir')
     @mock.patch.object(utils, 'write_file')
     @mock.patch.object(utils, 'config')
     def test_emit_base_conf_no_pcmkr_key(self, config, write_file, mkdir,
-                                         isdir, render_template):
+                                         isdir, mock_render):
         cfg = {
             'corosync_key': 'Y29yb3N5bmNrZXkK',
         }
@@ -534,7 +534,7 @@ class UtilsTestCase(unittest.TestCase):
             'corosync': 'corosync etc default config',
             'hacluster.acl': 'hacluster acl file',
         }
-        render_template.side_effect = lambda x, y: render[x]
+        mock_render.side_effect = lambda x, y: render[x]
         expect_write_calls = [
             mock.call(
                 content='corosync etc default config',
@@ -567,16 +567,16 @@ class UtilsTestCase(unittest.TestCase):
         ]
         self.assertTrue(utils.emit_base_conf())
         write_file.assert_has_calls(expect_write_calls)
-        render_template.assert_has_calls(expect_render_calls)
+        mock_render.assert_has_calls(expect_render_calls)
         mkdir.assert_has_calls(mkdir_calls)
 
-    @mock.patch.object(utils, 'render_template')
+    @mock.patch.object(utils, 'render')
     @mock.patch.object(utils.os.path, 'isdir')
     @mock.patch.object(utils.os, 'mkdir')
     @mock.patch.object(utils, 'write_file')
     @mock.patch.object(utils, 'config')
     def test_emit_base_conf_no_coro_key(self, config, write_file, mkdir,
-                                        isdir, render_template):
+                                        isdir, mock_render):
         cfg = {
         }
         config.side_effect = lambda x: cfg.get(x)
@@ -585,7 +585,7 @@ class UtilsTestCase(unittest.TestCase):
             'corosync': 'corosync etc default config',
             'hacluster.acl': 'hacluster acl file',
         }
-        render_template.side_effect = lambda x, y: render[x]
+        mock_render.side_effect = lambda x, y: render[x]
         expect_write_calls = [
             mock.call(
                 content='corosync etc default config',
@@ -608,7 +608,7 @@ class UtilsTestCase(unittest.TestCase):
         ]
         self.assertFalse(utils.emit_base_conf())
         write_file.assert_has_calls(expect_write_calls)
-        render_template.assert_has_calls(expect_render_calls)
+        mock_render.assert_has_calls(expect_render_calls)
         mkdir.assert_has_calls(mkdir_calls)
 
     @mock.patch.object(utils, 'relation_get')

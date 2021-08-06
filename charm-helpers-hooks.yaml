@@ -20,3 +20,4 @@ include:
     - contrib.python
     - contrib.charmsupport
     - contrib.openstack.policyd
+    - contrib.templating

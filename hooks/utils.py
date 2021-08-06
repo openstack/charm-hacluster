@@ -61,6 +61,7 @@ from charmhelpers.contrib.openstack.utils import (
 from charmhelpers.contrib.openstack.ha.utils import (
     assert_charm_supports_dns_ha
 )
+from charmhelpers.contrib.templating.jinja import render
 from charmhelpers.core.host import (
     mkdir,
     rsync,
@@ -85,10 +86,8 @@ from charmhelpers.contrib.network import ip as utils
 
 import netifaces
 from netaddr import IPNetwork
-import jinja2
 
 
-TEMPLATES_DIR = 'templates'
 COROSYNC_CONF = '/etc/corosync/corosync.conf'
 COROSYNC_DEFAULT = '/etc/default/corosync'
 COROSYNC_AUTHKEY = '/etc/corosync/authkey'
@@ -346,8 +345,8 @@ def emit_systemd_overrides_file():
             os.mkdir(overrides_dir)
 
         write_file(path=overrides_file,
-                   content=render_template('systemd-overrides.conf',
-                                           systemd_overrides_context))
+                   content=render('systemd-overrides.conf',
+                                  systemd_overrides_context))
 
     # Update systemd with the new information
     subprocess.check_call(['systemctl', 'daemon-reload'])
@@ -357,8 +356,7 @@ def emit_corosync_conf():
     corosync_conf_context = get_corosync_conf()
     if corosync_conf_context:
         write_file(path=COROSYNC_CONF,
-                   content=render_template('corosync.conf',
-                                           corosync_conf_context))
+                   content=render('corosync.conf', corosync_conf_context))
         return True
 
     return False
@@ -376,11 +374,10 @@ def emit_base_conf():
         os.mkdir(PCMKR_CONFIG_DIR)
     corosync_default_context = {'corosync_enabled': 'yes'}
     write_file(path=COROSYNC_DEFAULT,
-               content=render_template('corosync',
-                                       corosync_default_context))
+               content=render('corosync', corosync_default_context))
 
     write_file(path=COROSYNC_HACLUSTER_ACL,
-               content=render_template('hacluster.acl', {}))
+               content=render('hacluster.acl', {}))
 
     corosync_key = config('corosync_key')
     if corosync_key:
@@ -396,14 +393,6 @@ def emit_base_conf():
         return True
 
     return False
-
-
-def render_template(template_name, context, template_dir=TEMPLATES_DIR):
-    templates = jinja2.Environment(
-        loader=jinja2.FileSystemLoader(template_dir)
-    )
-    template = templates.get_template(template_name)
-    return template.render(context)
 
 
 def assert_charm_supports_ipv6():
