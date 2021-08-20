@@ -35,6 +35,7 @@ from charmhelpers.core.strutils import (
 from charmhelpers.core.hookenv import (
     local_unit,
     log,
+    TRACE,
     DEBUG,
     ERROR,
     INFO,
@@ -1015,7 +1016,7 @@ def try_pcmk_wait():
     """
     try:
         pcmk.wait_for_pcmk()
-        log("Pacemaker is ready", DEBUG)
+        log("Pacemaker is ready", level=TRACE)
     except pcmk.ServicesNotUp as e:
         status_msg = "Pacemaker is down. Please manually start it."
         status_set('blocked', status_msg)
