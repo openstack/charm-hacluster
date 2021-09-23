@@ -12,7 +12,7 @@ gate_bundles:
   - focal-ussuri
   - focal-victoria
   - focal-wallaby
-  - groovy-victoria
+  - hirsute-wallaby
 
 dev_bundles:
   - trusty-mitaka
@@ -20,7 +20,9 @@ dev_bundles:
   - xenial-pike
   - xenial-queens
   - bionic-rocky
-  - hirsute-wallaby
+  - groovy-victoria
+  - focal-xena
+  - impish-xena
 
 configure:
   - zaza.openstack.charm_tests.keystone.setup.add_demo_user
@@ -34,4 +36,5 @@ tests_options:
     principle-app-name: keystone
     hacluster-charm-name: hacluster
   force_deploy:
-    - hirsute-wallaby
+    - groovy-victoria
+    - impish-xena
