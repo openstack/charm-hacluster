@@ -17,7 +17,7 @@ applications:
     to:
       - '0'
   keystone:
-    charm: cs:~openstack-charmers-next/keystone
+    charm: cs:~openstack-charmers/keystone
     num_units: 3
     options:
       openstack-origin: cloud:trusty-mitaka
@@ -26,6 +26,7 @@ applications:
       - '1'
       - '2'
       - '3'
+    channel: candidate
   hacluster:
     charm: ../../../hacluster
     subordinate-to:
