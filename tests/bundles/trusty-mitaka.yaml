@@ -26,7 +26,6 @@ applications:
       - '1'
       - '2'
       - '3'
-    channel: candidate
   hacluster:
     charm: ../../../hacluster
     subordinate-to:

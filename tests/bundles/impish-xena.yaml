@@ -18,7 +18,6 @@ applications:
 
   keystone-mysql-router:
     charm: cs:~openstack-charmers/mysql-router
-    channel: candidate
 
   mysql-innodb-cluster:
     charm: cs:~openstack-charmers/mysql-innodb-cluster
@@ -29,7 +28,6 @@ applications:
       - '0'
       - '1'
       - '2'
-    channel: candidate
 
   keystone:
     charm: cs:~openstack-charmers/keystone
@@ -41,7 +39,6 @@ applications:
       - '3'
       - '4'
       - '5'
-    channel: candidate
 
   hacluster:
     charm: ../../../hacluster
