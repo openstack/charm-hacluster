@@ -13,6 +13,7 @@ series:
 - groovy
 - hirsute
 - impish
+- jammy
 requires:
   juju-info:
     interface: juju-info
