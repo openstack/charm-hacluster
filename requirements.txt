@@ -22,3 +22,4 @@ dnspython<2.0.0; python_version < '3.6'
 dnspython; python_version >= '3.6'
 
 psutil>=1.1.1,<2.0.0
+cffi==1.14.6; python_version < '3.6'  # cffi 1.15.0 drops support for py35.
