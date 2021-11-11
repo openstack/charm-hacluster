@@ -1,7 +1,7 @@
 variables:
   openstack-origin: &openstack-origin distro
 
-series: groovy
+series: jammy
 
 machines:
   '0':
