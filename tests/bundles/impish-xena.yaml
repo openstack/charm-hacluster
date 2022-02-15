@@ -44,7 +44,7 @@ applications:
     channel: latest/edge
 
   hacluster:
-    charm: ../../../hacluster
+    charm: ../../hacluster.charm
     subordinate-to:
       - keystone
 
