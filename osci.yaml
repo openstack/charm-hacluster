@@ -1,10 +1,16 @@
 - project:
     templates:
-      - charm-unit-jobs
-      - charm-functional-jobs
+      - charm-unit-jobs-py36
+      - charm-unit-jobs-py38
     check:
       jobs:
+        - bionic-ussuri
+        - focal-ussuri
+        - focal-wallaby
+        - focal-victoria
         - focal-xena:
             voting: false
-        - impish-xena:
-            voting: false
+    vars:
+      needs_charm_build: true
+      charm_build_name: hacluster
+      build_type: charmcraft

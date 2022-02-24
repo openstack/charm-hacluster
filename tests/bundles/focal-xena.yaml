@@ -1,3 +1,5 @@
+local_overlay_enabled: true
+
 variables:
   openstack-origin: &openstack-origin cloud:focal-xena
 
@@ -17,10 +19,11 @@ machines:
 applications:
 
   keystone-mysql-router:
-    charm: cs:~openstack-charmers/mysql-router
+    charm: ch:mysql-router
+    channel: 8.0.19/edge
 
   mysql-innodb-cluster:
-    charm: cs:~openstack-charmers/mysql-innodb-cluster
+    charm: ch:mysql-innodb-cluster
     num_units: 3
     options:
       source: *openstack-origin
@@ -28,9 +31,10 @@ applications:
       - '0'
       - '1'
       - '2'
+    channel: 8.0.19/edge
 
   keystone:
-    charm: cs:~openstack-charmers/keystone
+    charm: ch:keystone
     num_units: 3
     options:
       token-expiration: 60
@@ -39,9 +43,10 @@ applications:
       - '3'
       - '4'
       - '5'
+    channel: xena/edge
 
   hacluster:
-    charm: ../../../hacluster
+    charm: ../../hacluster.charm
     subordinate-to:
       - keystone
 

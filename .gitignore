@@ -4,3 +4,4 @@ bin/
 .testrepository
 .coverage
 .stestr
+*.charm

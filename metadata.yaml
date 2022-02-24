@@ -7,12 +7,8 @@ description: |
 tags:
 - misc
 series:
-- xenial
 - bionic
 - focal
-- groovy
-- hirsute
-- impish
 requires:
   juju-info:
     interface: juju-info
