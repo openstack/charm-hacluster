@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import glob
 import os
 import shutil
@@ -143,7 +142,8 @@ COROSYNC_CONF_FILES = [
 ]
 
 PACKAGES = ['crmsh', 'corosync', 'pacemaker', 'python3-netaddr', 'ipmitool',
-            'libmonitoring-plugin-perl', 'python3-requests-oauthlib']
+            'libmonitoring-plugin-perl', 'python3-requests-oauthlib',
+            'python3-libmaas']
 
 SUPPORTED_TRANSPORTS = ['udp', 'udpu', 'multicast', 'unicast']
 DEPRECATED_TRANSPORT_VALUES = {"multicast": "udp", "unicast": "udpu"}
@@ -151,23 +151,20 @@ DEPRECATED_TRANSPORT_VALUES = {"multicast": "udp", "unicast": "udpu"}
 
 @hooks.hook('install.real')
 def install():
-    pkgs = copy.deepcopy(PACKAGES)
-    ubuntu_release = lsb_release()['DISTRIB_CODENAME'].lower()
-    if CompareHostReleases(ubuntu_release) < 'xenial':
-        # use libnagios on anything older than Xenial
-        pkgs.remove('libmonitoring-plugin-perl')
-        pkgs.append('libnagios-plugin-perl')
-
-        pkgs.remove('python3-netaddr')
-        pkgs.append('python-netaddr')
-
-    elif CompareHostReleases(ubuntu_release) >= 'bionic':
-        pkgs.append('python3-libmaas')
+    # LP:1874719 Configure a corosync.conf file to avoid a spurious node1 to
+    # be created in the cluster.
+    os.mkdir('/etc/corosync', mode=0o755)
+    if emit_corosync_conf():
+        log('Installed initial corosync.conf file', level=INFO)
+    else:
+        log('Failed to install initial corosync.conf file. May have an '
+            'extra node1 in cluster members due to default package install.',
+            level=ERROR)
 
     # NOTE(dosaboy): we currently disallow upgrades due to bug #1382842. This
     # should be removed once the pacemaker package is fixed.
     status_set('maintenance', 'Installing apt packages')
-    apt_install(filter_installed_packages(pkgs), fatal=True)
+    apt_install(filter_installed_packages(PACKAGES), fatal=True)
     setup_ocf_files()
 
 
