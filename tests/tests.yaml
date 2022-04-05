@@ -1,14 +1,12 @@
 charm_name: hacluster
 
 smoke_bundles:
-  - focal-xena
+  - focal-yoga
 
 gate_bundles:
-  - focal-xena
-  - impish-xena
+  - focal-yoga
 
 dev_bundles:
-  - focal-yoga
   - jammy-yoga
 
 configure:
@@ -23,5 +21,4 @@ tests_options:
     principle-app-name: keystone
     hacluster-charm-name: hacluster
   force_deploy:
-    - impish-xena
     - jammy-yoga
