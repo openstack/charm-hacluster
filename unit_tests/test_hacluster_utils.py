@@ -119,7 +119,7 @@ class UtilsTestCase(unittest.TestCase):
     @mock.patch.object(utils.utils, 'is_ipv6', lambda *args: None)
     @mock.patch.object(utils, 'get_corosync_id', lambda u: "%s-cid" % (u))
     @mock.patch.object(utils, 'peer_ips', lambda *args, **kwargs:
-                       {'hanode/1': '10.0.0.2'})
+                       {'hanode/1': '10.0.0.2', 'hanode/2': None})
     @mock.patch.object(utils, 'unit_get')
     @mock.patch.object(utils, 'config')
     def test_get_ha_nodes(self, mock_config, mock_unit_get, mock_get_host_ip,
@@ -955,7 +955,7 @@ class UtilsTestCase(unittest.TestCase):
                 'private-address': '10.0.0.10'},
             'unit2': {
                 'random_flag': True,
-                'private-address': '10.0.0.34'},
+                'private-address': None},
             'unit3': {
                 'random_flag': True,
                 'private-address': '10.0.0.16'}}
@@ -969,7 +969,7 @@ class UtilsTestCase(unittest.TestCase):
             mock.call('private-address', rid='relid1', unit='unit3')]
         self.assertSequenceEqual(
             utils.get_node_flags('random_flag'),
-            ['10.0.0.10', '10.0.0.16', '10.0.0.34', '10.0.0.41'])
+            ['10.0.0.10', '10.0.0.16', '10.0.0.41'])
         relation_get.assert_has_calls(rget_calls)
 
     @mock.patch.object(utils, 'get_node_flags')

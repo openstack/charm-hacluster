@@ -451,6 +451,7 @@ def get_ipv6_addr():
 
 def get_ha_nodes():
     ha_units = peer_ips(peer_relation='hanode')
+    ha_units = {k: v for k, v in ha_units.items() if v is not None}
     ha_nodes = {}
     for unit in ha_units:
         corosync_id = get_corosync_id(unit)
@@ -497,6 +498,7 @@ def get_node_flags(flag):
                                           rid=relid,
                                           unit=unit))
 
+    hosts = [x for x in hosts if x is not None]
     hosts.sort()
     return hosts
 
