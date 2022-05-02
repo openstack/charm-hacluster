@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# check_crm_v0_10
+# check_crm_v0_11
 #
 # Copyright © 2013 Philip Garner, Sysnix Consultants Limited
 #
@@ -36,6 +36,7 @@
 #                    failcount thresholds
 # v0.10 06/11/2020 - Don't report paused hacluster nodes if 'standbyignore' flag
 #                    (-s) is specified
+# v0.11 05/02/2022 - Fix standby node regex.
 #
 # NOTE:- Requires Perl 5.8 or higher & either the Perl Module Nagios::Plugin
 #        or Monitoring::Plugin, whichever is available for your system.
@@ -191,7 +192,7 @@ foreach my $line (<$fh>) {
         my $numoffline = scalar @offline;
         $np->add_message( $warn_or_crit, ": $numoffline Nodes Offline" );
     }
-    elsif ( $line =~ m/^node\s+(\S.*):\s*standby/i ) {
+    elsif ( $line =~ m/\s*node\s+(\S.*):\s*standby/i ) {
 
         # Check for standby nodes (suggested by Sönke Martens)
         # See later in code for message created from this
