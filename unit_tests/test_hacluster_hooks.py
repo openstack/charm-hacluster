@@ -402,6 +402,15 @@ class TestHooks(test_utils.CharmTestCase):
         apt_install.assert_called_once_with(expected_pkgs, fatal=True)
         setup_ocf_files.assert_called_once_with()
 
+        mkdir.reset_mock()
+
+        def raise_():
+            raise FileExistsError()
+
+        mkdir.side_effect = lambda p, mode: raise_()
+        hooks.install()
+        mkdir.assert_called_once_with('/etc/corosync', mode=0o755)
+
     @mock.patch('pcmk.set_property')
     @mock.patch.object(hooks, 'is_stonith_configured')
     @mock.patch.object(hooks, 'configure_stonith')
