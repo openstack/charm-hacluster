@@ -71,6 +71,7 @@ from charmhelpers.core.host import (
     file_hash,
     lsb_release,
     init_is_systemd,
+    get_distrib_codename,
     CompareHostReleases,
 )
 from charmhelpers.fetch import (
@@ -1178,16 +1179,26 @@ def is_in_standby_mode(node_name):
     @param node_name: The name of the node to check
     @returns boolean - True if node_name is in standby mode
     """
-    out = (subprocess
-           .check_output(['crm', 'node', 'status', node_name])
-           .decode('utf-8'))
-    root = ET.fromstring(out)
+    if CompareHostReleases(get_distrib_codename()) >= 'jammy':
+        out = (subprocess.check_output(['crm', 'node', 'attribute',
+                                       node_name, 'show', 'standby'])
+               .decode('utf-8'))
+        attrs = {}
+        for item in re.split('[ ]+', out.strip()):
+            tokens = item.split('=')
+            attrs[tokens[0]] = tokens[1]
+        standby_mode = attrs['name'] == 'standby' and attrs['value'] == 'on'
+    else:
+        out = (subprocess
+               .check_output(['crm', 'node', 'status', node_name])
+               .decode('utf-8'))
+        root = ET.fromstring(out)
 
-    standby_mode = False
-    for nvpair in root.iter('nvpair'):
-        if (nvpair.attrib.get('name') == 'standby' and
-                nvpair.attrib.get('value') == 'on'):
-            standby_mode = True
+        standby_mode = False
+        for nvpair in root.iter('nvpair'):
+            if (nvpair.attrib.get('name') == 'standby' and
+                    nvpair.attrib.get('value') == 'on'):
+                standby_mode = True
     return standby_mode
 
 
