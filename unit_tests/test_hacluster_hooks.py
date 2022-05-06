@@ -379,6 +379,7 @@ class TestHooks(test_utils.CharmTestCase):
         super(TestHooks, self).setUp(hooks, self.TO_PATCH)
         self.config.side_effect = self.test_config.get
 
+    @mock.patch.object(hooks, 'get_distrib_codename')
     @mock.patch.object(hooks, 'emit_corosync_conf')
     @mock.patch.object(hooks.os, 'mkdir')
     @mock.patch.object(hooks, 'filter_installed_packages')
@@ -386,7 +387,9 @@ class TestHooks(test_utils.CharmTestCase):
     @mock.patch.object(hooks, 'apt_install')
     @mock.patch.object(hooks, 'status_set')
     def test_install(self, status_set, apt_install, setup_ocf_files,
-                     filter_installed_packages, mkdir, emit_corosync_conf):
+                     filter_installed_packages, mkdir, emit_corosync_conf,
+                     get_distrib_codename):
+        get_distrib_codename.return_value = 'focal'
         filter_installed_packages.side_effect = lambda x: x
         expected_pkgs = [
             'crmsh', 'corosync', 'pacemaker', 'python3-netaddr', 'ipmitool',
@@ -403,6 +406,8 @@ class TestHooks(test_utils.CharmTestCase):
         setup_ocf_files.assert_called_once_with()
 
         mkdir.reset_mock()
+        apt_install.reset_mock()
+        get_distrib_codename.return_value = 'jammy'
 
         def raise_():
             raise FileExistsError()
@@ -410,6 +415,8 @@ class TestHooks(test_utils.CharmTestCase):
         mkdir.side_effect = lambda p, mode: raise_()
         hooks.install()
         mkdir.assert_called_once_with('/etc/corosync', mode=0o755)
+        apt_install.assert_called_once_with(
+            expected_pkgs + ['resource-agents-extra'], fatal=True)
 
     @mock.patch('pcmk.set_property')
     @mock.patch.object(hooks, 'is_stonith_configured')

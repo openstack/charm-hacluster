@@ -167,7 +167,11 @@ def install():
     # NOTE(dosaboy): we currently disallow upgrades due to bug #1382842. This
     # should be removed once the pacemaker package is fixed.
     status_set('maintenance', 'Installing apt packages')
-    apt_install(filter_installed_packages(PACKAGES), fatal=True)
+    if CompareHostReleases(get_distrib_codename()) >= 'jammy':
+        pkgs = PACKAGES + ['resource-agents-extra']
+    else:
+        pkgs = PACKAGES
+    apt_install(filter_installed_packages(pkgs), fatal=True)
     setup_ocf_files()
 
 
