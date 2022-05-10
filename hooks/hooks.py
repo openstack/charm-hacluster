@@ -153,7 +153,10 @@ DEPRECATED_TRANSPORT_VALUES = {"multicast": "udp", "unicast": "udpu"}
 def install():
     # LP:1874719 Configure a corosync.conf file to avoid a spurious node1 to
     # be created in the cluster.
-    os.mkdir('/etc/corosync', mode=0o755)
+    try:
+        os.mkdir('/etc/corosync', mode=0o755)
+    except FileExistsError:
+        pass
     if emit_corosync_conf():
         log('Installed initial corosync.conf file', level=INFO)
     else:
