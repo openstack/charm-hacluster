@@ -9,6 +9,7 @@ gate_bundles:
   - focal-victoria
   - focal-wallaby
   - focal-xena
+  - focal-yoga
 
 dev_bundles: []
 

@@ -8,8 +8,8 @@
         - focal-ussuri
         - focal-wallaby
         - focal-victoria
-        - focal-xena:
-            voting: false
+        - focal-xena
+        - focal-yoga
     vars:
       needs_charm_build: true
       charm_build_name: hacluster
