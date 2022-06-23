@@ -26,6 +26,15 @@ import utils
 import pcmk
 
 
+FOCAL_NODE_STATUS_STANDBY = '''<node id="1000" uname="juju-3ff82c-focal-1">
+  <instance_attributes id="nodes-1000">
+    <nvpair id="nodes-1000-standby" name="standby" value="on"/>
+  </instance_attributes>
+</node>
+'''
+JAMMY_NODE_STATUS_STANDBY = 'scope=nodes  name=standby value=on\n'
+
+
 def write_file(path, content, *args, **kwargs):
     with open(path, 'wt') as f:
         f.write(content)
@@ -1367,3 +1376,23 @@ class UtilsTestCase(unittest.TestCase):
             127, "fake crm command")
         with self.assertRaises(utils.RemoveCorosyncNodeFailed):
             utils.update_node_list()
+
+    @mock.patch('subprocess.check_output', autospec=True)
+    @mock.patch.object(utils, 'get_distrib_codename', autospec=True)
+    def test_is_in_standby_mode(self, get_distrib_codename, check_output):
+        node_name = 'juju-3ff82c-focal-1'
+        get_distrib_codename.return_value = 'focal'
+        check_output.return_value = FOCAL_NODE_STATUS_STANDBY.encode()
+        self.assertTrue(utils.is_in_standby_mode(node_name))
+
+        check_output.assert_called_with(['crm', 'node', 'status', node_name])
+
+        get_distrib_codename.reset_mock()
+        check_output.reset_mock()
+
+        get_distrib_codename.return_value = 'jammy'
+        check_output.return_value = JAMMY_NODE_STATUS_STANDBY.encode()
+        self.assertTrue(utils.is_in_standby_mode(node_name))
+
+        check_output.assert_called_with(['crm', 'node', 'attribute', node_name,
+                                         'show', 'standby'])

@@ -29,6 +29,10 @@ from charmhelpers.core.hookenv import (
     DEBUG,
     WARNING,
 )
+from charmhelpers.core.host import (
+    get_distrib_codename,
+    CompareHostReleases,
+)
 
 
 class ServicesNotUp(Exception):
@@ -183,10 +187,18 @@ def crm_res_running_on_node(resource, node):
 
 def list_nodes():
     """List member nodes."""
-    cmd = ['crm', 'node', 'status']
-    out = subprocess.check_output(cmd).decode('utf-8')
-    tree = etree.fromstring(out)
-    nodes = [n.attrib['uname'] for n in tree.iter('node')]
+    nodes = []
+    if CompareHostReleases(get_distrib_codename()) >= 'jammy':
+        cmd = ['crm', 'node', 'show']
+        out = subprocess.check_output(cmd).decode('utf-8')
+        for line in out.strip().split('\n'):
+            nodes.append(line.split('(')[0])
+    else:
+        cmd = ['crm', 'node', 'status']
+        out = subprocess.check_output(cmd).decode('utf-8')
+        tree = etree.fromstring(out)
+        nodes = [n.attrib['uname'] for n in tree.iter('node')]
+
     return sorted(nodes)
 
 
