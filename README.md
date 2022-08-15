@@ -127,8 +127,8 @@ For general charm questions refer to the [OpenStack Charm Guide][cg].
 
 [cg]: https://docs.openstack.org/charm-guide
 [lp-bugs-charm-hacluster]: https://bugs.launchpad.net/charm-hacluster/+filebug
-[juju-docs-actions]: https://jaas.ai/docs/actions
-[cdg-ha]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-ha.html
+[juju-docs-actions]: https://juju.is/docs/olm/working-with-actions
+[cdg-ha]: https://docs.openstack.org/charm-guide/latest/admin/ha.html
 [upstream-maas]: https://maas.io
 [charms-requires-hacluster]: https://jaas.ai/search?requires=hacluster
 [cdg]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide
