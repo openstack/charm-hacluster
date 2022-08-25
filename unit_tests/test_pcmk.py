@@ -149,6 +149,10 @@ CRM_STATUS_XML = b"""
   <status code="0" message="OK"/>
 </pacemaker-result>
 """  # noqa
+CRM_NODE_SHOW_OUTPUT = b"""juju-c1-zaza-3(1000): member
+        standby=off maintenance=true
+juju-c1-zaza-5(1002): member
+"""
 
 
 class TestPcmk(unittest.TestCase):
@@ -358,7 +362,8 @@ class TestPcmk(unittest.TestCase):
         self.assertEqual(r, 'ef395293b1b7c29c5bf1c99774f75cf4')
 
     @mock.patch('subprocess.check_output', return_value=CRM_NODE_STATUS_XML)
-    def test_list_nodes(self, mock_check_output):
+    @mock.patch.object(pcmk, 'get_distrib_codename', return_value='focal')
+    def test_list_nodes(self, get_distrib_codename, mock_check_output):
         self.assertSequenceEqual(
             pcmk.list_nodes(),
             [
@@ -366,6 +371,16 @@ class TestPcmk(unittest.TestCase):
                 'juju-982848-zaza-ce47c58f6c88-11',
                 'juju-982848-zaza-ce47c58f6c88-9'])
         mock_check_output.assert_called_once_with(['crm', 'node', 'status'])
+
+    @mock.patch('subprocess.check_output', return_value=CRM_NODE_SHOW_OUTPUT)
+    @mock.patch.object(pcmk, 'get_distrib_codename', return_value='jammy')
+    def test_list_nodes_jammy(self, get_distrib_codename, check_output):
+
+        self.assertSequenceEqual(
+            pcmk.list_nodes(),
+            ['juju-c1-zaza-3', 'juju-c1-zaza-5']
+        )
+        check_output.assert_called_with(['crm', 'node', 'show'])
 
     def test_get_tag(self):
         """Test get element by tag if exists else empty element."""
