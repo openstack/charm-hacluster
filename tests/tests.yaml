@@ -1,15 +1,13 @@
 charm_name: hacluster
 
 smoke_bundles:
-  - jammy-yoga
+  - focal-yoga
 
 gate_bundles:
-  - jammy-yoga
+  - focal-yoga
 
 dev_bundles:
   - jammy-yoga
-  - jammy-zed
-  - kinetic-zed
 
 configure:
   - zaza.openstack.charm_tests.keystone.setup.add_demo_user
@@ -23,4 +21,4 @@ tests_options:
     principle-app-name: keystone
     hacluster-charm-name: hacluster
   force_deploy:
-    - kinetic-zed
+    - jammy-yoga

@@ -15,6 +15,7 @@
 import subprocess
 import os
 import time
+import six
 import yum
 
 from tempfile import NamedTemporaryFile
@@ -41,7 +42,7 @@ def install(packages, options=None, fatal=False):
     if options is not None:
         cmd.extend(options)
     cmd.append('install')
-    if isinstance(packages, str):
+    if isinstance(packages, six.string_types):
         cmd.append(packages)
     else:
         cmd.extend(packages)
@@ -70,7 +71,7 @@ def update(fatal=False):
 def purge(packages, fatal=False):
     """Purge one or more packages."""
     cmd = ['yum', '--assumeyes', 'remove']
-    if isinstance(packages, str):
+    if isinstance(packages, six.string_types):
         cmd.append(packages)
     else:
         cmd.extend(packages)
@@ -82,7 +83,7 @@ def yum_search(packages):
     """Search for a package."""
     output = {}
     cmd = ['yum', 'search']
-    if isinstance(packages, str):
+    if isinstance(packages, six.string_types):
         cmd.append(packages)
     else:
         cmd.extend(packages)

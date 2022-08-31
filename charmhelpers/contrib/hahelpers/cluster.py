@@ -32,6 +32,8 @@ import time
 
 from socket import gethostname as get_unit_hostname
 
+import six
+
 from charmhelpers.core.hookenv import (
     log,
     relation_ids,
@@ -123,16 +125,16 @@ def is_crm_dc():
     """
     cmd = ['crm', 'status']
     try:
-        status = subprocess.check_output(
-            cmd, stderr=subprocess.STDOUT).decode('utf-8')
+        status = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        if not isinstance(status, six.text_type):
+            status = six.text_type(status, "utf-8")
     except subprocess.CalledProcessError as ex:
         raise CRMDCNotFound(str(ex))
 
     current_dc = ''
     for line in status.split('\n'):
         if line.startswith('Current DC'):
-            # Current DC: juju-lytrusty-machine-2 (168108163)
-            #  - partition with quorum
+            # Current DC: juju-lytrusty-machine-2 (168108163) - partition with quorum
             current_dc = line.split(':')[1].split()[0]
     if current_dc == get_unit_hostname():
         return True
@@ -156,8 +158,9 @@ def is_crm_leader(resource, retry=False):
         return is_crm_dc()
     cmd = ['crm', 'resource', 'show', resource]
     try:
-        status = subprocess.check_output(
-            cmd, stderr=subprocess.STDOUT).decode('utf-8')
+        status = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        if not isinstance(status, six.text_type):
+            status = six.text_type(status, "utf-8")
     except subprocess.CalledProcessError:
         status = None
 

@@ -19,6 +19,8 @@ from subprocess import (
     check_output,
 )
 
+import six
+
 
 ##################################################
 # loopback device helpers.
@@ -38,7 +40,9 @@ def loopback_devices():
     '''
     loopbacks = {}
     cmd = ['losetup', '-a']
-    output = check_output(cmd).decode('utf-8')
+    output = check_output(cmd)
+    if six.PY3:
+        output = output.decode('utf-8')
     devs = [d.strip().split(' ', 2) for d in output.splitlines() if d != '']
     for dev, _, f in devs:
         loopbacks[dev.replace(':', '')] = re.search(r'\((.+)\)', f).groups()[0]
@@ -53,7 +57,7 @@ def create_loopback(file_path):
     '''
     file_path = os.path.abspath(file_path)
     check_call(['losetup', '--find', file_path])
-    for d, f in loopback_devices().items():
+    for d, f in six.iteritems(loopback_devices()):
         if f == file_path:
             return d
 
@@ -67,7 +71,7 @@ def ensure_loopback_device(path, size):
 
     :returns: str: Full path to the ensured loopback device (eg, /dev/loop0)
     '''
-    for d, f in loopback_devices().items():
+    for d, f in six.iteritems(loopback_devices()):
         if f == path:
             return d
 

@@ -1,7 +1,7 @@
 variables:
-  openstack-origin: &openstack-origin cloud:jammy-zed
+  openstack-origin: &openstack-origin cloud:focal-yoga
 
-series: jammy
+series: focal
 
 machines:
   '0':
