@@ -31,6 +31,7 @@ import subprocess
 import hashlib
 import functools
 import itertools
+import six
 
 from contextlib import contextmanager
 from collections import OrderedDict, defaultdict
@@ -114,33 +115,6 @@ def service_stop(service_name, **kwargs):
     return service('stop', service_name, **kwargs)
 
 
-def service_enable(service_name, **kwargs):
-    """Enable a system service.
-
-    The specified service name is managed via the system level init system.
-    Some init systems (e.g. upstart) require that additional arguments be
-    provided in order to directly control service instances whereas other init
-    systems allow for addressing instances of a service directly by name (e.g.
-    systemd).
-
-    The kwargs allow for the additional parameters to be passed to underlying
-    init systems for those systems which require/allow for them. For example,
-    the ceph-osd upstart script requires the id parameter to be passed along
-    in order to identify which running daemon should be restarted. The follow-
-    ing example restarts the ceph-osd service for instance id=4:
-
-    service_enable('ceph-osd', id=4)
-
-    :param service_name: the name of the service to enable
-    :param **kwargs: additional parameters to pass to the init system when
-                     managing services. These will be passed as key=value
-                     parameters to the init system's commandline. kwargs
-                     are ignored for init systems not allowing additional
-                     parameters via the commandline (systemd).
-    """
-    return service('enable', service_name, **kwargs)
-
-
 def service_restart(service_name, **kwargs):
     """Restart a system service.
 
@@ -161,7 +135,7 @@ def service_restart(service_name, **kwargs):
     :param service_name: the name of the service to restart
     :param **kwargs: additional parameters to pass to the init system when
                      managing services. These will be passed as key=value
-                     parameters to the init system's commandline. kwargs
+                     parameters to the  init system's commandline. kwargs
                      are ignored for init systems not allowing additional
                      parameters via the commandline (systemd).
     """
@@ -277,7 +251,7 @@ def service_resume(service_name, init_dir="/etc/init",
     return started
 
 
-def service(action, service_name=None, **kwargs):
+def service(action, service_name, **kwargs):
     """Control a system service.
 
     :param action: the action to take on the service
@@ -286,12 +260,10 @@ def service(action, service_name=None, **kwargs):
                     the form of key=value.
     """
     if init_is_systemd(service_name=service_name):
-        cmd = ['systemctl', action]
-        if service_name is not None:
-            cmd.append(service_name)
+        cmd = ['systemctl', action, service_name]
     else:
         cmd = ['service', service_name, action]
-        for key, value in kwargs.items():
+        for key, value in six.iteritems(kwargs):
             parameter = '%s=%s' % (key, value)
             cmd.append(parameter)
     return subprocess.call(cmd) == 0
@@ -317,7 +289,7 @@ def service_running(service_name, **kwargs):
         if os.path.exists(_UPSTART_CONF.format(service_name)):
             try:
                 cmd = ['status', service_name]
-                for key, value in kwargs.items():
+                for key, value in six.iteritems(kwargs):
                     parameter = '%s=%s' % (key, value)
                     cmd.append(parameter)
                 output = subprocess.check_output(
@@ -592,7 +564,7 @@ def write_file(path, content, owner='root', group='root', perms=0o444):
         with open(path, 'wb') as target:
             os.fchown(target.fileno(), uid, gid)
             os.fchmod(target.fileno(), perms)
-            if isinstance(content, str):
+            if six.PY3 and isinstance(content, six.string_types):
                 content = content.encode('UTF-8')
             target.write(content)
         return
@@ -995,7 +967,7 @@ def get_bond_master(interface):
 
 def list_nics(nic_type=None):
     """Return a list of nics of given type(s)"""
-    if isinstance(nic_type, str):
+    if isinstance(nic_type, six.string_types):
         int_types = [nic_type]
     else:
         int_types = nic_type
@@ -1109,7 +1081,8 @@ def chownr(path, owner, group, follow_links=True, chowntopdir=False):
             try:
                 chown(full, uid, gid)
             except (IOError, OSError) as e:
-                # Intended to ignore "file not found".
+                # Intended to ignore "file not found". Catching both to be
+                # compatible with both Python 2.7 and 3.x.
                 if e.errno == errno.ENOENT:
                     pass
 
