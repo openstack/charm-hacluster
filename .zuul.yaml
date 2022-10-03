@@ -1,4 +1,6 @@
 - project:
     templates:
-      - openstack-python3-charm-jobs
+      # this job runs py36 and py38, they are the versions used in bionic and
+      # focal respectively.
+      - openstack-python3-victoria-jobs
       - openstack-cover-jobs
