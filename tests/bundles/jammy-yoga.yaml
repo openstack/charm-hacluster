@@ -41,7 +41,7 @@ applications:
       - '3'
       - '4'
       - '5'
-    channel: latest/edge
+    channel: yoga/edge
 
   hacluster:
     charm: ../../hacluster.charm
