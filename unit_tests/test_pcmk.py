@@ -152,6 +152,7 @@ CRM_STATUS_XML = b"""
 CRM_NODE_SHOW_OUTPUT = b"""juju-c1-zaza-3(1000): member
         standby=off maintenance=true
 juju-c1-zaza-5(1002): member
+juju-3f6cb6-zaza-4135aa8b2509-8.project.serverstack: member
 """
 
 
@@ -378,7 +379,8 @@ class TestPcmk(unittest.TestCase):
 
         self.assertSequenceEqual(
             pcmk.list_nodes(),
-            ['juju-c1-zaza-3', 'juju-c1-zaza-5']
+            ['juju-3f6cb6-zaza-4135aa8b2509-8.project.serverstack',
+             'juju-c1-zaza-3', 'juju-c1-zaza-5']
         )
         check_output.assert_called_with(['crm', 'node', 'show'])
 
