@@ -193,7 +193,9 @@ def list_nodes():
         out = subprocess.check_output(cmd).decode('utf-8')
         for line in out.strip().split('\n'):
             if re.match(r'^\S+', line):
-                nodes.append(line.split('(')[0])
+                line = line.split('(')[0]
+                line = line.split(':')[0]
+                nodes.append(line)
     else:
         cmd = ['crm', 'node', 'status']
         out = subprocess.check_output(cmd).decode('utf-8')
