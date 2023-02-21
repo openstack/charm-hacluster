@@ -9,6 +9,7 @@ tags:
 series:
 - focal
 - jammy
+- kinetic
 requires:
   juju-info:
     interface: juju-info

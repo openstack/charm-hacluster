@@ -8,6 +8,7 @@ gate_bundles:
 
 dev_bundles:
   - jammy-yoga
+  - kinetic-zed
 
 configure:
   - zaza.openstack.charm_tests.keystone.setup.add_demo_user
@@ -22,3 +23,4 @@ tests_options:
     hacluster-charm-name: hacluster
   force_deploy:
     - jammy-yoga
+    - kinetic-zed
