@@ -289,9 +289,14 @@ def get_property(name):
     :returns: property value
     :rtype: str
     """
+    # get-property deprecated in favor of get_property (LP: #2008704)
+    if crm_version() >= StrictVersion('4.2.1'):
+        output = subprocess.check_output(
+            ['crm', 'configure', 'get_property', name],
+            universal_newlines=True)
     # crmsh >= 2.3 renamed show-property to get-property, 2.3.x is
     # available since zesty
-    if crm_version() >= StrictVersion('2.3.0'):
+    elif crm_version() >= StrictVersion('2.3.0'):
         output = subprocess.check_output(
             ['crm', 'configure', 'get-property', name],
             universal_newlines=True)
