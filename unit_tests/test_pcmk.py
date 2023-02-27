@@ -277,6 +277,14 @@ class TestPcmk(unittest.TestCase):
                                               'maintenance-mode'],
                                              universal_newlines=True)
 
+        mock_crm_version.return_value = StrictVersion('4.2.1')  # >= jammy
+        mock_check_output.reset_mock()
+        self.assertEqual('false\n', pcmk.get_property('maintenance-mode'))
+        mock_check_output.assert_called_with(['crm', 'configure',
+                                              'get_property',
+                                              'maintenance-mode'],
+                                             universal_newlines=True)
+
     @mock.patch('subprocess.check_output')
     @mock.patch.object(pcmk, 'crm_version')
     def test_get_property_from_xml(self, mock_crm_version, mock_check_output):
