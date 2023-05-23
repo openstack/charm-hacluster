@@ -470,7 +470,15 @@ def get_ha_nodes():
     if config('prefer-ipv6'):
         addr = get_ipv6_addr()
     else:
-        addr = get_host_ip(unit_get('private-address'))
+        rids = relation_ids('hanode')
+        if len(rids) > 0:
+            addr = relation_get('ingress-address',
+                                rid=rids[0],
+                                unit=local_unit())
+
+            addr = get_host_ip(addr)
+        else:
+            addr = get_host_ip(unit_get('private-address'))
 
     ha_nodes[corosync_id] = addr
 

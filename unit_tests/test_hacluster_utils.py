@@ -120,16 +120,13 @@ class UtilsTestCase(unittest.TestCase):
     @mock.patch.object(utils, 'get_corosync_id', lambda u: "%s-cid" % (u))
     @mock.patch.object(utils, 'peer_ips', lambda *args, **kwargs:
                        {'hanode/1': '10.0.0.2', 'hanode/2': None})
-    @mock.patch.object(utils, 'unit_get')
+    @mock.patch.object(utils, 'relation_ids', lambda *args: [1])
+    @mock.patch.object(utils, 'relation_get',
+                       lambda *args, **kwargs: '10.0.0.1')
     @mock.patch.object(utils, 'config')
-    def test_get_ha_nodes(self, mock_config, mock_unit_get, mock_get_host_ip,
+    def test_get_ha_nodes(self, mock_config, mock_get_host_ip,
                           mock_get_ipv6_addr):
         mock_get_host_ip.side_effect = lambda host: host
-
-        def unit_get(key):
-            return {'private-address': '10.0.0.1'}.get(key)
-
-        mock_unit_get.side_effect = unit_get
 
         def config(key):
             return {'prefer-ipv6': False}.get(key)
