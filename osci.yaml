@@ -3,9 +3,6 @@
       - charm-unit-jobs-py38
       - charm-unit-jobs-py310
       - charm-yoga-functional-jobs
-    check:
-      jobs:
-        - kinetic-zed
     vars:
       needs_charm_build: true
       charm_build_name: hacluster

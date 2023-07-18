@@ -9,7 +9,7 @@ tags:
 series:
 - focal
 - jammy
-- kinetic
+- mantic
 requires:
   juju-info:
     interface: juju-info
