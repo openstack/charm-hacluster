@@ -2,7 +2,7 @@ pause:
   description: Put hacluster unit in crm standby mode which migrates resources
                from this unit to another unit in the hacluster
 resume:
-  descrpition: Take hacluster unit out of standby mode
+  description: Take hacluster unit out of standby mode
 cleanup:
   description: Trigger cluster resource cleanup
   params:
