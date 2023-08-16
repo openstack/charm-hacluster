@@ -33,6 +33,7 @@ from charmhelpers.core.strutils import (
     bool_from_string,
 )
 from charmhelpers.core.hookenv import (
+    application_version_set,
     local_unit,
     log,
     TRACE,
@@ -78,6 +79,7 @@ from charmhelpers.fetch import (
     apt_install,
     add_source,
     apt_update,
+    get_upstream_version,
 )
 from charmhelpers.contrib.hahelpers.cluster import (
     peer_ips,
@@ -114,6 +116,8 @@ SYSTEMD_OVERRIDES_FILE = '{}/overrides.conf'
 
 MAAS_DNS_CONF_DIR = '/etc/maas_dns'
 STONITH_CONFIGURED = 'stonith-configured'
+
+VERSION_PACKAGE = "pacemaker"
 
 
 class MAASConfigIncomplete(Exception):
@@ -1392,6 +1396,8 @@ def assess_status_helper():
         if not pcmk.crm_res_running_on_node(resource, get_hostname()):
             return ("blocked",
                     "Resource: {} not running".format(resource))
+
+    application_version_set(get_upstream_version(VERSION_PACKAGE))
 
     return status, message
 
