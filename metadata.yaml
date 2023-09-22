@@ -4,6 +4,7 @@ maintainer: OpenStack Charmers <openstack-charmers@lists.ubuntu.com>
 subordinate: true
 description: |
   Corosync/Pacemaker
+docs: https://discourse.charmhub.io/t/hacluster-docs-index/11216
 tags:
 - misc
 series:
