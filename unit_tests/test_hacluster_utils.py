@@ -1071,7 +1071,7 @@ class UtilsTestCase(unittest.TestCase):
     @mock.patch('pcmk.commit')
     def test_configure_global_cluster(self, mock_commit):
         utils.configure_cluster_global(240, 120)
-        mock_commit.has_calls([
+        mock_commit.assert_has_calls([
             mock.call('crm configure property no-quorum-policy=stop'),
             mock.call('crm configure rsc_defaults $id="rsc-options" '
                       'resource-stickiness="100" failure-timeout=240'),
