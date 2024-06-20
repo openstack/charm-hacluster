@@ -1,15 +1,13 @@
 charm_name: hacluster
 
 smoke_bundles:
-  - focal-yoga
+  - noble-caracal
 
 gate_bundles:
-  - focal-yoga
+  - noble-caracal
 
 dev_bundles:
-  - jammy-yoga
-  - jammy-bobcat
-  - mantic-bobcat
+  - noble-caracal
 
 configure:
   - zaza.openstack.charm_tests.keystone.setup.add_demo_user
@@ -22,6 +20,3 @@ tests_options:
   hacluster:
     principle-app-name: keystone
     hacluster-charm-name: hacluster
-  force_deploy:
-    - jammy-yoga
-    - mantic-bobcat

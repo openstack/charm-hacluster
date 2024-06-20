@@ -1,7 +1,7 @@
 variables:
-  openstack-origin: &openstack-origin cloud:focal-yoga
+  openstack-origin: &openstack-origin distro
 
-series: focal
+series: noble
 
 machines:
   '0':
@@ -41,7 +41,7 @@ applications:
       - '3'
       - '4'
       - '5'
-    channel: yoga/edge
+    channel: latest/edge
 
   keystone-hacluster:
     charm: ../../hacluster.charm
