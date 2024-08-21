@@ -1285,7 +1285,7 @@ class UtilsTestCase(unittest.TestCase):
         self.assertTrue(
             utils.is_update_ring_requested('random-uuid-generated')
         )
-        self.assertEquals(
+        self.assertEqual(
             hook_data.kv.get('corosync-update-uuid'),
             'random-uuid-generated',
         )

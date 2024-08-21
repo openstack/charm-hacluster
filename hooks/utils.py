@@ -1328,14 +1328,14 @@ def assess_status_helper():
                                corresponding messages
     """
     if config('stonith_enabled') in ['true', 'True', True]:
-        return(
+        return (
             'blocked',
             'stonith_enabled config option is no longer supported')
 
     if config('no_quorum_policy'):
         if config('no_quorum_policy').lower() not in ['ignore', 'freeze',
                                                       'stop', 'suicide']:
-            return(
+            return (
                 'blocked',
                 'Invalid no_quorum_policy specified')
 
