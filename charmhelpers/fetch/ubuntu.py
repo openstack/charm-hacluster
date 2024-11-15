@@ -246,6 +246,30 @@ CLOUD_ARCHIVE_POCKETS = {
     'bobcat/proposed': 'jammy-proposed/bobcat',
     'jammy-bobcat/proposed': 'jammy-proposed/bobcat',
     'jammy-proposed/bobcat': 'jammy-proposed/bobcat',
+    # caracal
+    'caracal': 'jammy-updates/caracal',
+    'jammy-caracal': 'jammy-updates/caracal',
+    'jammy-caracal/updates': 'jammy-updates/caracal',
+    'jammy-updates/caracal': 'jammy-updates/caracal',
+    'caracal/proposed': 'jammy-proposed/caracal',
+    'jammy-caracal/proposed': 'jammy-proposed/caracal',
+    'jammy-proposed/caracal': 'jammy-proposed/caracal',
+    # dalmatian
+    'dalmatian': 'noble-updates/dalmatian',
+    'noble-dalmatian': 'noble-updates/dalmatian',
+    'noble-dalmatian/updates': 'noble-updates/dalmatian',
+    'noble-updates/dalmatian': 'noble-updates/dalmatian',
+    'dalmatian/proposed': 'noble-proposed/dalmatian',
+    'noble-dalmatian/proposed': 'noble-proposed/dalmatian',
+    'noble-proposed/dalmatian': 'noble-proposed/dalmatian',
+    # epoxy
+    'epoxy': 'noble-updates/epoxy',
+    'noble-epoxy': 'noble-updates/epoxy',
+    'noble-epoxy/updates': 'noble-updates/epoxy',
+    'noble-updates/epoxy': 'noble-updates/epoxy',
+    'epoxy/proposed': 'noble-proposed/epoxy',
+    'noble-epoxy/proposed': 'noble-proposed/epoxy',
+    'noble-proposed/epoxy': 'noble-proposed/epoxy',
 
     # OVN
     'focal-ovn-22.03': 'focal-updates/ovn-22.03',
@@ -279,6 +303,9 @@ OPENSTACK_RELEASES = (
     'zed',
     'antelope',
     'bobcat',
+    'caracal',
+    'dalmatian',
+    'epoxy',
 )
 
 
@@ -308,6 +335,9 @@ UBUNTU_OPENSTACK_RELEASE = OrderedDict([
     ('kinetic', 'zed'),
     ('lunar', 'antelope'),
     ('mantic', 'bobcat'),
+    ('noble', 'caracal'),
+    ('oracular', 'dalmatian'),
+    ('plucky', 'epoxy'),
 ])
 
 
