@@ -440,7 +440,7 @@ def get_ipv6_addr():
                                     level=DEBUG)
                                 excludes.append(v)
 
-    return utils.get_ipv6_addr(exc_list=excludes)[0]
+    return utils.get_ipv6_addr(exc_list=excludes, dynamic_only=False)[0]
 
 
 def get_ha_nodes():

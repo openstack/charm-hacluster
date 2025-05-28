@@ -134,6 +134,8 @@ def get_address_in_network(network, fallback=None, fatal=False):
 
 def is_ipv6(address):
     """Determine whether provided address is IPv6 or not."""
+    if not address:
+        return False
     try:
         address = netaddr.IPAddress(address)
     except netaddr.AddrFormatError:
@@ -618,7 +620,7 @@ def get_relation_ip(interface, cidr_network=None):
         # Currently IPv6 has priority, eventually we want IPv6 to just be
         # another network space.
         assert_charm_supports_ipv6()
-        return get_ipv6_addr()[0]
+        return get_ipv6_addr(dynamic_only=False)[0]
     elif cidr_network:
         # If a specific CIDR network is passed get the address from that
         # network.
