@@ -254,22 +254,6 @@ CLOUD_ARCHIVE_POCKETS = {
     'caracal/proposed': 'jammy-proposed/caracal',
     'jammy-caracal/proposed': 'jammy-proposed/caracal',
     'jammy-proposed/caracal': 'jammy-proposed/caracal',
-    # dalmatian
-    'dalmatian': 'noble-updates/dalmatian',
-    'noble-dalmatian': 'noble-updates/dalmatian',
-    'noble-dalmatian/updates': 'noble-updates/dalmatian',
-    'noble-updates/dalmatian': 'noble-updates/dalmatian',
-    'dalmatian/proposed': 'noble-proposed/dalmatian',
-    'noble-dalmatian/proposed': 'noble-proposed/dalmatian',
-    'noble-proposed/dalmatian': 'noble-proposed/dalmatian',
-    # epoxy
-    'epoxy': 'noble-updates/epoxy',
-    'noble-epoxy': 'noble-updates/epoxy',
-    'noble-epoxy/updates': 'noble-updates/epoxy',
-    'noble-updates/epoxy': 'noble-updates/epoxy',
-    'epoxy/proposed': 'noble-proposed/epoxy',
-    'noble-epoxy/proposed': 'noble-proposed/epoxy',
-    'noble-proposed/epoxy': 'noble-proposed/epoxy',
 
     # OVN
     'focal-ovn-22.03': 'focal-updates/ovn-22.03',
@@ -304,8 +288,6 @@ OPENSTACK_RELEASES = (
     'antelope',
     'bobcat',
     'caracal',
-    'dalmatian',
-    'epoxy',
 )
 
 
@@ -336,12 +318,10 @@ UBUNTU_OPENSTACK_RELEASE = OrderedDict([
     ('lunar', 'antelope'),
     ('mantic', 'bobcat'),
     ('noble', 'caracal'),
-    ('oracular', 'dalmatian'),
-    ('plucky', 'epoxy'),
 ])
 
 
-APT_ERROR_CODE = 100  # The return code for APT errors.
+APT_NO_LOCK = 100  # The return code for "couldn't acquire lock" in APT.
 CMD_RETRY_DELAY = 10  # Wait 10 seconds between command retries.
 CMD_RETRY_COUNT = 10  # Retry a failing fatal command X times.
 
@@ -464,8 +444,6 @@ def apt_upgrade(options=None, fatal=False, dist=False):
 def apt_update(fatal=False):
     """Update local apt cache."""
     cmd = ['apt-get', 'update']
-    if fatal:
-        cmd.append("--error-on=any")
     _run_apt_command(cmd, fatal)
 
 
@@ -1023,7 +1001,8 @@ def _run_apt_command(cmd, fatal=False, quiet=False):
     """
     if fatal:
         _run_with_retries(
-            cmd, retry_exitcodes=(1, APT_ERROR_CODE,),
+            cmd, retry_exitcodes=(1, APT_NO_LOCK,),
+            retry_message="Couldn't acquire DPKG lock",
             quiet=quiet)
     else:
         kwargs = {}

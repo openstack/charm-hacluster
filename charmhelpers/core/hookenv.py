@@ -18,10 +18,7 @@
 #  Charm Helpers Developers <juju@lists.ubuntu.com>
 
 import copy
-try:
-    from distutils.version import LooseVersion
-except ImportError:
-    from looseversion import LooseVersion
+from distutils.version import LooseVersion
 from enum import Enum
 from functools import wraps
 from collections import namedtuple, UserDict
