@@ -43,15 +43,15 @@ applications:
       - '5'
     channel: yoga/edge
 
-  hacluster:
-    charm: ../../hacluster.charm
+  keystone-hacluster:
+    charm: ../../hacluster_ubuntu@22.04-amd64.charm
     subordinate-to:
       - keystone
 
 relations:
   - - 'keystone:shared-db'
     - 'keystone-mysql-router:shared-db'
-  - - 'hacluster:ha'
+  - - 'keystone-hacluster:ha'
     - 'keystone:ha'
   - - "keystone-mysql-router:db-router"
     - "mysql-innodb-cluster:db-router"

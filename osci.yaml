@@ -1,6 +1,5 @@
 - project:
     templates:
-      - charm-unit-jobs-py38
       - charm-unit-jobs-py310
       - charm-yoga-functional-jobs
     vars:
