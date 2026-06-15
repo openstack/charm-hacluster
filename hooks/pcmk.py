@@ -227,7 +227,7 @@ def delete_node(node_name, failure_is_fatal=True):
     :raises: subprocess.CalledProcessError
     """
     log('Deleting node {} from the cluster'.format(node_name))
-    cmd = 'crm -w -F node delete {}'.format(node_name)
+    cmd = 'crm_node --remove={} --force'.format(node_name)
     for attempt in [2, 1, 0]:
         try:
             commit(cmd, failure_is_fatal=failure_is_fatal)
